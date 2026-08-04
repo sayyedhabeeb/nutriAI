@@ -140,7 +140,7 @@ export function UploadView() {
       </Card>
 
       {/* How it works — Connected Step Indicator */}
-      <Card className="rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-gray-50/50 dark:bg-gray-800/30 p-5">
+      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-gray-50/50 dark:bg-gray-800/30 p-5">
         <h3 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-6">How it works</h3>
         <div className="relative">
           {/* Connecting line behind circles */}
@@ -167,7 +167,7 @@ export function UploadView() {
       </Card>
 
       {/* Tips section */}
-      <Card className="rounded-2xl shadow-md border border-amber-100 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/10 p-5">
+      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-amber-100 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/10 p-5">
         <div className="flex items-start gap-3">
           <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0 mt-0.5">
             <Lightbulb className="h-4 w-4 text-amber-600 dark:text-amber-400" />

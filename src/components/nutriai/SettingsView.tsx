@@ -108,14 +108,28 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
           <p className="text-xs text-gray-400 dark:text-gray-500">Manage your profile and preferences</p>
-          {user?.email && (
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{user.email as string}</p>
-          )}
         </div>
       </div>
 
+      {/* Account Info Card */}
+      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-gradient-to-r from-emerald-500/5 to-teal-500/5 p-5">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center shadow-md">
+            <span className="text-white font-bold text-xl">{((user?.name as string) || 'U').charAt(0).toUpperCase()}</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-gray-900 dark:text-gray-100">{user?.name as string || 'User'}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-300">{user?.email as string || ''}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400">{(user?.role as string || 'user').charAt(0).toUpperCase() + (user?.role as string || 'user').slice(1)}</Badge>
+              {user?.createdAt && <span className="text-[10px] text-gray-400 dark:text-gray-500">Joined {new Date(user.createdAt as string).toLocaleDateString()}</span>}
+            </div>
+          </div>
+        </div>
+      </Card>
+
       {/* ═══ Profile Section ═══ */}
-      <Card className="rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-5">
+      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-5">
         <div className="flex items-center gap-2 mb-4">
           <User className="h-4 w-4 text-emerald-600" />
           <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Personal Profile</span>
@@ -193,7 +207,7 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
       </Card>
 
       {/* ═══ Goals Section ═══ */}
-      <Card className="rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-5">
+      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-5">
         <div className="flex items-center gap-2 mb-4">
           <Target className="h-4 w-4 text-emerald-600" />
           <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Fitness Goals</span>
@@ -227,7 +241,7 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
       </Card>
 
       {/* ═══ Preferences Section ═══ */}
-      <Card className="rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-5">
+      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-5">
         <div className="flex items-center gap-2 mb-4">
           <Heart className="h-4 w-4 text-emerald-600" />
           <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Dietary Preferences</span>
@@ -288,7 +302,7 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
       </Button>
 
       {/* Danger Zone */}
-      <Card className="rounded-2xl shadow-md border border-red-100 dark:border-red-900/30 bg-white dark:bg-gray-900 p-5">
+      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-red-100 dark:border-red-900/30 bg-white dark:bg-gray-900 p-5">
         <div className="flex items-center gap-2 mb-3">
           <AlertTriangle className="h-4 w-4 text-red-500" />
           <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Danger Zone</span>

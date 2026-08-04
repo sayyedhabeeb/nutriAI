@@ -90,6 +90,16 @@ export function ProgressView() {
     }
   };
 
+  const handleWaterAdd = async () => {
+    setJustFilledIndex(waterGlasses);
+    setTimeout(() => setJustFilledIndex(null), 600);
+    try {
+      await apiFetch('/api/water-log', { method: 'POST', body: JSON.stringify({ glasses: 1 }) });
+      setWaterGlasses(waterGlasses + 1);
+      toast.success('\uD83D\uDCA7 +1 glass of water');
+    } catch { toast.error('Failed to log water'); }
+  };
+
   const handleLogWeight = async () => {
     if (!weightInput || Number(weightInput) <= 0) return;
     try {
@@ -265,7 +275,7 @@ export function ProgressView() {
       </Tabs>
 
       {/* Calorie Chart */}
-      <Card className="p-5 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+      <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
         <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3">Calorie Intake</h3>
         <div className="h-48 relative">
           {isSparse && !allCaloriesZero && (
@@ -305,7 +315,7 @@ export function ProgressView() {
 
       {/* Macro Pie + Weight Trend */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Card className="p-5 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+        <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
           <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-2">Macro Breakdown</h3>
           <div className="h-44 relative">
             <ResponsiveContainer width="100%" height="100%">
@@ -325,12 +335,12 @@ export function ProgressView() {
             {macroData.map((m) => (
               <div key={m.name} className="flex items-center gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: m.color }} />
-                <span className="text-xs text-gray-600 dark:text-gray-400 font-medium">{m.name} {Math.round(m.value)}g</span>
+                <span className="text-xs text-gray-600 dark:text-gray-300 font-medium">{m.name} {Math.round(m.value)}g</span>
               </div>
             ))}
           </div>
         </Card>
-        <Card className="p-5 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+        <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
           <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-2">Weight Trend</h3>
           {noWeightData ? (
             <div className="h-44 flex flex-col items-center justify-center py-8 text-gray-400">
@@ -360,14 +370,14 @@ export function ProgressView() {
 
       {/* Weekly Summary Insight */}
       {summary && !allCaloriesZero && (
-        <Card className="p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-900/10 dark:to-teal-900/10">
+        <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-900/10 dark:to-teal-900/10">
           <div className="flex items-start gap-3">
             <div className="w-9 h-9 rounded-xl bg-emerald-100/80 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
               <Lightbulb className="h-[18px] w-[18px] text-emerald-500" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">Weekly Insight</h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">
+              <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 leading-relaxed">
                 {(() => {
                   const avgCal = Math.round(summary?.avgCalories || 0);
                   const targetCal = chartData[0]?.target || 0;
@@ -402,7 +412,7 @@ export function ProgressView() {
               <s.icon className={`h-4 w-4 ${s.iconColor}`} />
             </div>
             <div>
-              <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium uppercase">{s.label}</p>
+              <p className="text-[10px] text-gray-500 dark:text-gray-300 font-medium uppercase">{s.label}</p>
               <p className="text-base font-bold text-gray-900 dark:text-gray-100 tabular-nums">{s.value}</p>
             </div>
           </div>
@@ -411,7 +421,7 @@ export function ProgressView() {
 
       {/* Achievements Grid */}
       {achievements.length > 0 && (
-        <Card className="p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+        <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
           <div className="flex items-center gap-2 mb-4">
             <Trophy className="h-4 w-4 text-amber-500" />
             <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">Achievements</h3>
@@ -437,7 +447,7 @@ export function ProgressView() {
                 <p className={`text-sm font-semibold ${ach.earned ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`}>
                   {ach.name}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">
+                <p className="text-xs text-gray-500 dark:text-gray-300 mt-0.5 leading-snug">
                   {ach.description}
                 </p>
               </div>
@@ -452,7 +462,7 @@ export function ProgressView() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        <Card className="p-0 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 overflow-hidden">
+        <Card className="p-0 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 overflow-hidden">
           {/* Table header */}
           <div className="bg-gray-50/80 px-5 py-3 border-b border-gray-100">
             <h3 className="text-base font-semibold text-gray-800">Calorie Breakdown</h3>
@@ -542,7 +552,7 @@ export function ProgressView() {
       </motion.div>
 
       {/* Water Tracking */}
-      <Card className="p-5 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+      <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
             <Droplets className="h-4 w-4 text-blue-500" /> Water Intake
@@ -611,7 +621,7 @@ export function ProgressView() {
       </Card>
 
       {/* Weight Logging */}
-      <Card className="p-5 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+      <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
         <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
           <Scale className="h-4 w-4 text-purple-500" /> Log Weight
         </h3>
@@ -648,6 +658,28 @@ export function ProgressView() {
             ))}
           </div>
         )}
+      </Card>
+
+      {/* Quick Log Water */}
+      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">
+              <Droplets className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Log Water</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-300">Tap to add a glass ({waterGlasses}/8)</p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            className="bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl font-medium min-h-[36px]"
+            onClick={handleWaterAdd}
+          >
+            <Plus className="h-4 w-4 mr-1" />Add
+          </Button>
+        </div>
       </Card>
     </motion.div>
   );

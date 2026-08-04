@@ -77,7 +77,7 @@ export function NutritionFactsLabel({
 // ═══ Calorie Ring SVG (with gradient stroke + pulsing glow) ═══
 export function CalorieRing({ consumed, target }: { consumed: number; target: number }) {
   const pct = target > 0 ? Math.min(consumed / target, 1) : 0;
-  const radius = 70;
+  const radius = 74;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference * (1 - pct);
   const remaining = Math.max(0, target - consumed);
@@ -90,7 +90,7 @@ export function CalorieRing({ consumed, target }: { consumed: number; target: nu
       {/* Pulsing glow ring when under 50% */}
       {isLow && (
         <motion.div
-          className="absolute w-[180px] h-[180px] rounded-full ring-2 ring-emerald-300/20"
+          className="absolute w-[190px] h-[190px] rounded-full ring-2 ring-emerald-300/20"
           style={{
             background: 'radial-gradient(circle, rgba(16,185,129,0.15) 0%, transparent 70%)',
           }}
@@ -98,7 +98,7 @@ export function CalorieRing({ consumed, target }: { consumed: number; target: nu
           transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
         />
       )}
-      <svg width="180" height="180" viewBox="0 0 180 180" className="-rotate-90">
+      <svg width="190" height="190" viewBox="0 0 190 190" className="-rotate-90">
         <defs>
           <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="#10b981" />
@@ -120,7 +120,7 @@ export function CalorieRing({ consumed, target }: { consumed: number; target: nu
           stroke={pct > 1 ? '#f43f5e' : `url(#${gradId})`}
           strokeWidth="12" strokeLinecap="round"
           strokeDasharray={circumference}
-          filter={isLow ? `url(#${glowId})` : undefined}
+          filter={(isLow || pct >= 0.75) ? `url(#${glowId})` : undefined}
           initial={{ strokeDashoffset: circumference }}
           animate={{ strokeDashoffset }}
           transition={{ duration: 1, ease: 'easeOut' }}

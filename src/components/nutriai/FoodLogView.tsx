@@ -215,7 +215,7 @@ export function FoodLogView() {
               onClick={() => setSelectedDate(date)}
               className={`flex flex-col items-center min-w-[52px] py-2 px-2 rounded-xl transition-all shrink-0 min-h-[44px] ${
                 isSelected
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200 dark:shadow-emerald-900/50'
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200/60 dark:shadow-emerald-900/40 -translate-y-0.5'
                   : `text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 ${isToday && !isSelected ? 'ring-1 ring-emerald-300 dark:ring-emerald-700' : ''}`
               }`}
             >
@@ -244,7 +244,7 @@ export function FoodLogView() {
       </div>
 
       {/* Summary */}
-      <Card className="p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
         <div className="grid grid-cols-4 gap-2 text-center">
           {[
             { label: 'Calories', val: foodLog?.totalCalories || 0, unit: 'kcal', color: 'text-orange-600 dark:text-orange-400', iconBg: 'bg-orange-100 dark:bg-orange-900/30', Icon: Flame },
@@ -287,7 +287,7 @@ export function FoodLogView() {
 
       {/* Empty state */}
       {!loading && !hasItems && (
-        <Card className="p-8 text-center rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+        <Card className="p-8 text-center rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
           <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <UtensilsCrossed className="h-8 w-8 text-gray-300 dark:text-gray-600" />
           </div>
@@ -301,7 +301,7 @@ export function FoodLogView() {
         const items = itemsBySlot[slot] || [];
         if (items.length === 0) return null;
         return (
-          <Card key={slot} className={`p-0 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden bg-white dark:bg-gray-900`}>
+          <Card key={slot} className={`p-0 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden bg-white dark:bg-gray-900`}>
             <div className="p-4 pb-2">
               <div className="flex items-center gap-2">
                 <span className="text-base">{SLOT_ICONS[slot]}</span>
@@ -311,7 +311,7 @@ export function FoodLogView() {
             </div>
             <div className="px-4 pb-3 space-y-3">
               {items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 group hover:shadow-sm hover:bg-gray-50/100 dark:hover:bg-gray-800/80 hover:border-gray-200/80 dark:hover:border-gray-700 transition-all">
+                <div key={item.id} className={`flex items-center justify-between p-3 rounded-xl bg-gray-50/80 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 border-l-3 ${SLOT_BORDER_COLORS[slot]} group shadow-sm hover:shadow-md hover:bg-gray-50/100 dark:hover:bg-gray-800/80 hover:border-gray-200/80 dark:hover:border-gray-700 transition-all`}>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{item.meal?.name || 'Unknown'}</p>
                     <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{item.servingGms}g</p>

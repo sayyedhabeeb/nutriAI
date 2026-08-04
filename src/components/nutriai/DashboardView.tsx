@@ -256,7 +256,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
     return (
       <div className="p-4 max-w-lg mx-auto space-y-4">
         <Skeleton className="h-8 w-56 rounded-xl" />
-        <div className="flex justify-center"><Skeleton className="h-[180px] w-[180px] rounded-full" /></div>
+        <div className="flex justify-center"><Skeleton className="h-[190px] w-[190px] rounded-full" /></div>
         <div className="space-y-3"><Skeleton className="h-10 w-full rounded-xl" /><Skeleton className="h-10 w-full rounded-xl" /><Skeleton className="h-10 w-full rounded-xl" /></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><Skeleton className="h-56 w-full rounded-xl" /><Skeleton className="h-56 w-full rounded-xl" /></div>
       </div>
@@ -298,23 +298,23 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
       </div>
 
       {/* ═══ Quick Stats Row ═══ */}
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-3 gap-3">
         <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100/60 dark:border-gray-800/60 border-t-2 border-t-emerald-400 shadow-sm text-center">
-          <p className="text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">{mealsLoggedToday}</p>
+          <p className="text-2xl font-extrabold tracking-tight text-gray-900 dark:text-gray-100 tabular-nums mb-1">{mealsLoggedToday}</p>
           <p className="text-[11px] text-gray-600 dark:text-gray-400 font-semibold">Meals Logged</p>
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100/60 dark:border-gray-800/60 border-t-2 border-t-cyan-400 shadow-sm text-center">
-          <p className="text-xl font-bold text-cyan-600 dark:text-cyan-400 tabular-nums">{waterCount}</p>
+          <p className="text-2xl font-extrabold tracking-tight text-cyan-600 dark:text-cyan-400 tabular-nums mb-1">{waterCount}</p>
           <p className="text-[11px] text-gray-600 dark:text-gray-400 font-semibold">Glasses</p>
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100/60 dark:border-gray-800/60 border-t-2 border-t-amber-400 shadow-sm text-center">
-          <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{streak}</p>
+          <p className="text-2xl font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400 tabular-nums mb-1">{streak}</p>
           <p className="text-[11px] text-gray-600 dark:text-gray-400 font-semibold">Day Streak</p>
         </div>
       </div>
 
       {/* ═══ Calorie Ring Card ═══ */}
-      <Card className="p-6 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60">
+      <Card className="p-6 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60">
         <div className="flex justify-center">
           <CalorieRing consumed={consumedCal} target={targetCal} />
         </div>
@@ -331,7 +331,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
       </Card>
 
       {/* ═══ Macro Progress Bars ═══ */}
-      <Card className="p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 space-y-3">
+      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 space-y-3 mb-5">
         <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">Today&apos;s Macros</h3>
         {[
           { label: 'Protein', val: consumedProtein, target: targetProtein, from: '#3b82f6', to: '#60a5fa', unit: 'g' },
@@ -360,7 +360,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
       </Card>
 
       {/* ═══ Hydration Widget ═══ */}
-      <Card className="p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60">
+      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Droplets className="h-4 w-4 text-cyan-500" />
@@ -394,7 +394,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
       >
-        <Card className={`p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 ${pctConsumed > 1 ? 'bg-amber-50/50 dark:bg-amber-900/10' : pctConsumed >= 0.75 ? 'bg-emerald-50/50 dark:bg-emerald-900/10' : 'bg-blue-50/50 dark:bg-blue-900/10'}`}>
+        <Card className={`p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 ${pctConsumed > 1 ? 'bg-amber-50/50 dark:bg-amber-900/10' : pctConsumed >= 0.75 ? 'bg-emerald-50/50 dark:bg-emerald-900/10' : 'bg-blue-50/50 dark:bg-blue-900/10'}`}>
           <div className="flex items-start gap-3">
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${pctConsumed > 1 ? 'bg-amber-100/80 dark:bg-amber-900/30' : pctConsumed >= 0.75 ? 'bg-emerald-100/80 dark:bg-emerald-900/30' : 'bg-blue-100/80 dark:bg-blue-900/30'}`}>
               <Lightbulb className={`h-4.5 w-4.5 ${pctConsumed > 1 ? 'text-amber-500' : pctConsumed >= 0.75 ? 'text-emerald-500' : 'text-blue-500'}`} />
@@ -444,7 +444,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
       >
-        <Card className="p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-gradient-to-r from-emerald-500/5 to-teal-500/5">
+        <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-gradient-to-r from-emerald-500/5 to-teal-500/5">
           {!mealPlan?.exists ? (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -572,7 +572,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
 
       {/* ═══ Achievements Row ═══ */}
       {achievements.length > 0 && (
-        <Card className="p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60">
+        <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Trophy className="h-4 w-4 text-amber-500" />
@@ -618,7 +618,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
           const recs = recommendations[slot] || [];
           const grad = SLOT_GRADIENT_COLORS[slot];
           return (
-            <Card key={slot} className={`p-0 rounded-xl shadow-md border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden`}>
+            <Card key={slot} className={`p-0 rounded-xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden`}>
               <div className={`bg-gradient-to-r ${grad.from} ${grad.to} px-4 py-3`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">

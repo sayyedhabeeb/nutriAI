@@ -85,7 +85,7 @@ export default function NutriAIPage() {
                 className={`relative flex flex-col items-center justify-center gap-0.5 flex-1 h-full min-h-[44px] transition-colors ${
                   activeTab === tab
                     ? 'text-emerald-600 dark:text-emerald-400'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                    : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
                 }`}
               >
                 <div className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-all duration-200 ${
@@ -94,7 +94,7 @@ export default function NutriAIPage() {
                     : ''
                 }`}>
                   <Icon className={`h-5 w-5 transition-transform duration-200 ${activeTab === tab ? 'scale-110' : ''}`} strokeWidth={activeTab === tab ? 2.5 : 1.8} />
-                  <span className={`text-[10px] ${activeTab === tab ? 'font-semibold' : 'font-medium'}`}>{label}</span>
+                  <span className={`text-[11px] ${activeTab === tab ? 'font-semibold' : 'font-medium'}`}>{label}</span>
                 </div>
               </button>
             ))}

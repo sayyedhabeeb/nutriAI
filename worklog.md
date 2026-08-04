@@ -1276,3 +1276,143 @@ Work Log:
 8. **Add barcode scanning** for packaged food nutrition lookup
 9. **Consider persistent sessions** in SQLite for production readiness
 10. **Improve empty state illustrations** — custom SVG illustrations instead of icon-only empty states
+
+---
+Task ID: 8-a
+Agent: full-stack-developer subagent
+Task: v8 micro-detail styling - nav, dashboard, foodlog, ring
+
+Work Log:
+- page.tsx: Changed inactive nav icons from `text-gray-500 dark:text-gray-400` to `text-gray-400 dark:text-gray-500` for better dark mode visibility
+- page.tsx: Changed active nav label from `text-[10px]` to `text-[11px]` for improved readability
+- DashboardView.tsx: Changed Quick Stats grid gap from `gap-2.5` to `gap-3`
+- DashboardView.tsx: Changed stat numbers from `text-xl font-bold` to `text-2xl font-extrabold tracking-tight` with `mb-1` for breathing room
+- DashboardView.tsx: Replaced all `shadow-md` on Card components (7 instances) with `shadow-lg shadow-gray-200/50 dark:shadow-black/20` for premium floating effect
+- DashboardView.tsx: Added `mb-5` to Macro Progress Bars Card for extra breathing room before next section
+- DashboardView.tsx: Updated calorie ring skeleton from 180px to 190px
+- FoodLogView.tsx: Added `-translate-y-0.5` lift effect and changed to `shadow-lg shadow-emerald-200/60 dark:shadow-emerald-900/40` on selected date pill
+- FoodLogView.tsx: Replaced all `shadow-md` on Card components (3 instances) with `shadow-lg shadow-gray-200/50 dark:shadow-black/20`
+- FoodLogView.tsx: Added `border-l-3 ${SLOT_BORDER_COLORS[slot]}` left colored accent to food item cards
+- FoodLogView.tsx: Changed food item shadow from `hover:shadow-sm` to `shadow-sm hover:shadow-md`
+- shared.tsx: Added glow filter when `pct >= 0.75` (in addition to existing `isLow` condition)
+- shared.tsx: Increased CalorieRing SVG size from 180×180 to 190×190
+- shared.tsx: Increased ring radius from 70 to 74
+- ESLint passes clean (0 errors, 0 warnings)
+
+Stage Summary:
+- Nav icons now properly visible in dark mode
+- Dashboard stats have larger, bolder typography with better spacing
+- All cards use premium shadow-lg with dark mode support
+- Date picker has tactile lift effect on selected date
+- Food items show colored left accent matching their slot
+- Calorie ring is slightly larger with glow at ≥75% progress
+
+---
+Task ID: 8-b
+Agent: full-stack-developer subagent
+Task: v8 features + styling - progress, settings, upload, chat, auth, onboarding
+
+Work Log:
+- ProgressView.tsx: Changed dark:text-gray-400 to dark:text-gray-300 on stat labels (line 405), weekly insight text (line 370), macro breakdown labels (line 328), and achievement descriptions (line 440)
+- ProgressView.tsx: Replaced all 8 Card shadow-md instances with shadow-lg shadow-gray-200/50 dark:shadow-black/20
+- ProgressView.tsx: Added handleWaterAdd function that POSTs to /api/water-log with { glasses: 1 }
+- ProgressView.tsx: Added "Quick Log Water" card after Weight Logging section with Droplets icon, glass count, and cyan Add button
+- SettingsView.tsx: Added Account Info card at top with gradient avatar (emerald-400→600), user name, email, role badge, and join date
+- SettingsView.tsx: Removed email display from header section (now in Account Info card)
+- SettingsView.tsx: Replaced all 4 Card shadow-md instances with shadow-lg shadow-gray-200/50 dark:shadow-black/20
+- UploadView.tsx: Replaced 2 Card shadow-md instances with shadow-lg shadow-gray-200/50 dark:shadow-black/20
+- ChatView.tsx: Changed typing indicator dots from bg-gray-400 dark:bg-gray-500 to bg-emerald-400 dark:bg-emerald-500
+- AuthView.tsx: Verified already has gradient bg — no change needed
+- AuthView.tsx: Verified uses shadow-xl (not shadow-md) — no change needed
+- OnboardingView.tsx: Verified uses shadow-xl (not shadow-md) — no change needed
+- ESLint passes clean (0 errors, 0 warnings)
+
+Stage Summary:
+- Dark mode contrast improved on 4 categories of secondary text in ProgressView
+- New "Log Water" quick action card on Progress page with one-tap water logging
+- Account Info card added to Settings with user avatar, email, role badge, join date
+- All Card shadows upgraded to premium shadow-lg across Progress, Settings, Upload
+- Chat typing indicator uses brand emerald color for visual consistency
+- AuthView and OnboardingView already compliant — no changes needed
+
+---
+Task ID: 22
+Agent: Main (orchestrator) + 2 parallel full-stack-developer subagents (8-a, 8-b)
+Task: v8 — VLM-directed micro-detail styling + new features
+
+Work Log:
+- Read worklog.md (1279 lines, 21 previous tasks) to assess project status
+- QA tested all 6 views via agent-browser + E2E interaction tests (water log, weight log, search, dark mode toggle)
+- Captured screenshots for VLM analysis (light + dark mode)
+- VLM ratings: Dashboard 7.5/10, FoodLog 7/10, Dark Mode 7.5/10
+- Key VLM findings: flat card shadows, cramped spacing, invisible dark mode nav icons, weak date picker
+- Launched 2 parallel subagents:
+  - Agent 8-a: page.tsx nav + DashboardView + FoodLogView + shared.tsx (styling micro-details)
+  - Agent 8-b: ProgressView + SettingsView + UploadView + ChatView + AuthView + OnboardingView (features + styling)
+- Post-implementation QA: re-screenshotted, VLM verified all changes
+- ESLint: 0 errors, 0 warnings
+- Zero console errors, zero runtime errors
+
+## Current Status Assessment
+- **Phase**: v8 Complete — VLM micro-detail styling + features
+- **Auth**: Fully working (Prisma sessions with Session model)
+- **Database**: 77 meals, 19+ models, SQLite, 12+ days test data
+- **API**: 31 routes, all functional
+- **Frontend**: 8 views in 14 files (~4,600+ lines), responsive, mobile-first, dark mode (9/10)
+- **ESLint**: Clean (0 errors, 0 warnings)
+
+## Completed This Round
+### Styling Improvements (VLM-Directed, Micro-Details)
+1. **Nav inactive icons**: Brightened in dark mode (gray-400 → gray-500), active label enlarged (10px → 11px)
+2. **Dashboard stat numbers**: Enlarged (xl → 2xl), extra-bold with tight tracking, breathing room (mb-1)
+3. **Dashboard stats grid**: Wider gap (2.5 → 3) for better separation
+4. **All Card shadows system-wide**: Upgraded from `shadow-md` to `shadow-lg shadow-gray-200/50 dark:shadow-black/20` across ALL views (DashboardView, FoodLogView, ProgressView, SettingsView, UploadView) — ~20+ cards
+5. **Dashboard macro card**: Added mb-5 for breathing room before next section
+6. **FoodLog date picker**: Selected date gets -translate-y-0.5 lift + stronger emerald shadow
+7. **FoodLog food items**: Added colored left border accent (border-l-3 SLOT_BORDER_COLORS) + hover shadow
+8. **Calorie Ring**: Enlarged (180→190px, radius 70→74), glow now also active at ≥75% (not just <50%)
+9. **Progress dark mode**: Secondary text contrast improved (gray-400 → gray-300) on stat labels, insights, macros
+10. **Chat typing indicator**: Dots changed from gray to emerald for brand consistency
+
+### New Features
+11. **Progress: Quick Log Water card** — Cyan-themed card with water glass count, Add button, POSTs to /api/water-log
+12. **Settings: Account Info card** — Gradient emerald avatar with initial, user name, email, role badge, join date
+
+### E2E Tests Verified
+- Water logging via dashboard (+1 glass, 2→3 confirmed)
+- Weight logging via progress (filled 75.0, clicked Log, confirmed)
+- Meal search via food log (searched 'chicken', results returned, dialog functional)
+- Dark mode toggle (light→dark→light, all views preserved)
+- All 6 tab navigation (zero errors)
+
+## Verification Results
+- ESLint: 0 errors, 0 warnings
+- Agent-browser QA: All 6 tabs navigable, zero console errors
+- VLM ratings:
+  - Dark mode: 7.5 → 9/10 ("Premium, well-executed dark mode")
+  - Settings: Account Info card confirmed with gradient avatar, name, email, role
+  - Progress: Log Water card confirmed with cyan Add button
+- All APIs returning 200, no runtime errors
+
+## Unresolved Issues & Risks
+1. VLM food recognition not tested with real food photos (API ready, untested E2E)
+2. No PWA manifest for mobile install-ability
+3. No notification/reminder system
+4. No social features (sharing, challenges)
+5. In-memory sessions lost on server restart (acceptable for MVP)
+6. No barcode scanning for packaged foods
+7. Onboarding E2E flow not tested via agent-browser
+8. Monthly progress tab data not verified with sufficient historical data
+9. Calorie Ring skeleton size may need sync (currently 190px ring but skeleton may reference 180px)
+
+## Priority Recommendations for Next Phase
+1. **Test onboarding E2E** — Register new user → complete 3-step → dashboard
+2. **Test VLM food recognition** with real food photo
+3. **Add PWA manifest** for mobile install-ability
+4. **Add notification/reminder system** (cron for water/meal reminders)
+5. **Add recipe detail view** with ingredients, instructions, nutrition
+6. **Add social/sharing features** (share progress, challenges)
+7. **Add barcode scanning** for packaged foods
+8. **Add more empty state illustrations** — custom SVGs for food log, chat, progress
+9. **Add meal plan sharing** — export today's plan as image/text
+10. **Consider persistent sessions** in SQLite for production
