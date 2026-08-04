@@ -934,3 +934,193 @@ Work Log:
 6. **Add social/sharing features** (share progress, friend challenges)
 7. **Add barcode scanning** for packaged food nutrition lookup
 8. **Consider persistent sessions** in SQLite for production readiness
+
+---
+Task ID: 3-a
+Agent: Styling-UX Subagent
+Task: Improve styling and add features to page.tsx, DashboardView.tsx, FoodLogView.tsx
+
+Work Log:
+- **page.tsx (Bottom Nav Overhaul)**:
+  - Replaced dot indicator with pill-shaped bg-emerald-50/dark:bg-emerald-900/30 background for active tab
+  - Changed inactive icon color from text-gray-400 to text-gray-500 dark:text-gray-400 with proper hover states
+  - Added top shadow: shadow-[0_-4px_20px_rgba(0,0,0,0.05)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.3)]
+  - Increased nav height from h-16 to h-[68px] for better touch targets
+  - Active tab uses text-emerald-600 dark:text-emerald-400 with strokeWidth={2.5}
+  - Updated main padding-bottom from pb-20 to pb-24 to account for taller nav
+
+- **shared.tsx (CalorieRing Typography)**:
+  - Changed "of X kcal" from text-gray-500 to text-gray-600 dark:text-gray-300 font-medium
+  - Changed "X left" to "X kcal remaining" with text-emerald-600 dark:text-emerald-400
+  - Changed "Goal reached!" to text-emerald-600 dark:text-emerald-400 font-bold
+  - Added tabular-nums class to calorie number for stable digit width
+
+- **DashboardView.tsx (Styling + New Features)**:
+  - A. Card shadows: shadow-sm → shadow-md, border-gray-100/80 → border-gray-100/60 dark:border-gray-800/60
+  - B. Avatar: Replaced User icon with user's initial in gradient circle (from-emerald-400 to-emerald-600), fallback User icon kept
+  - C. Streak badge: amber → emerald colors (bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400)
+  - E. Macro bars: label font-bold, dark:text-gray-200, dark:bg-gray-800 track, text-right tabular-nums values
+  - F. Water FAB: bg-blue-500 → bg-cyan-500 hover:bg-cyan-600
+  - G. NEW Water Intake Widget: 8-glass visual tracker with Plus button, fetches /api/water-log on load, local state with optimistic update
+  - H. NEW Quick Stats Row: 3-column grid showing Meals Logged, Glasses (water), Day Streak with tabular-nums
+  - Added dark: variants throughout all text, borders, and backgrounds
+  - FAB position adjusted from bottom-20 to bottom-24 for taller nav
+  - Added dark mode to all dialog/sheet content, search results, meal plan items
+
+- **FoodLogView.tsx (Food Log Styling)**:
+  - A. Title: text-xl → text-2xl font-bold text-gray-900 dark:text-gray-100
+  - B. Date picker: Selected uses bg-emerald-600 shadow-md shadow-emerald-200/dark:shadow-emerald-900/50; Unselected uses text-gray-600 dark:text-gray-400 hover states; Today gets ring-1 ring-emerald-300/dark:ring-emerald-700
+  - C. Food items: Metadata text from text-gray-500 to text-gray-500 dark:text-gray-400 font-medium; Delete button opacity-40 hover:opacity-100 transition-opacity
+  - D. Macro summary cards: Added border border-gray-100/dark:border-gray-800 and shadow-sm, tabular-nums on values
+  - E. Search button: Full outline style with border, bg-white/dark:bg-gray-900, shadow-sm, hover:shadow-md, hover:border-emerald-200
+  - F. Empty state: Replaced Camera with UtensilsCrossed icon, changed text to "No meals logged"
+  - G. Log Again: Changed to emerald-colored button with hover:bg-emerald-50/dark:bg-emerald-900/20
+  - FAB position adjusted from bottom-20 to bottom-24
+  - Added dark: variants throughout
+
+Stage Summary:
+- All 3 files updated with comprehensive dark mode support
+- 2 new dashboard features: Water Intake Widget and Quick Stats Row
+- Navigation redesigned with pill-shaped active indicator and top shadow
+- All existing functionality preserved, zero breaking changes
+- ESLint passes cleanly with no errors
+
+---
+Task ID: 3-b
+Agent: Main
+Task: Improve styling and add features to ChatView, UploadView, ProgressView, SettingsView
+
+Work Log:
+
+### ChatView.tsx
+- Empty state: Added animated gradient ring (emerald-to-teal blur) behind Sparkles icon, enlarged icon to h-9 w-9, wrapped in white/gray-900 circle with border and shadow-md
+- Added 2 new quick action chips: "What should I eat?" and "How's my protein?" with Utensils and Dumbbell icons
+- All quick action chips now have shadow-sm base with hover:shadow-md transition
+- Input bar: increased height from h-11 to h-12, added placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-medium, added ring-1 ring-inset ring-gray-200 dark:ring-gray-700
+- Send button: increased to h-12 w-12 rounded-xl
+- User message bubbles: changed to bg-gradient-to-br from-emerald-600 to-emerald-700
+- AI message bubbles: added border-l-2 border-emerald-200 dark:border-emerald-800
+- Added "NutriAI" label with tiny Sparkles icon above each AI message
+- Imported Dumbbell from lucide-react for new chip
+
+### UploadView.tsx
+- Removed redundant "Scan Your Food" heading inside upload zone, kept subtitle and Camera icon
+- Added prominent "Tap to Upload" CTA text below subtitle
+- Upload zone border: changed default from gray-300/600 to emerald-200/700, hover to emerald-400/500
+- Added gradient background to empty zone: bg-gradient-to-b from-emerald-50/30 to-transparent dark:from-emerald-900/10
+- File format pills: reduced to text-[10px] text-gray-300 dark:text-gray-600 with smaller padding
+- Added "Supports JPG, PNG, WebP" supporting text above format pills
+- How It Works card: changed to bg-gray-50/50 dark:bg-gray-800/30, shadow-md, border-gray-100/60
+- Step circles enlarged to w-9 h-9, added shadow-sm shadow-emerald-200 glow effect
+- Step icons wrapped in individual bg-emerald-50 rounded-lg containers
+- Tips card: changed from shadow-sm to shadow-md
+
+### ProgressView.tsx
+- Export button: replaced Button component with styled native button (border, shadow-sm, rounded-lg, proper hover states)
+- Tab styling: Monthly tab uses text-gray-500 dark:text-gray-400, active tabs get data-[state=active]:shadow-sm
+- Calorie chart card: shadow-md, border-gray-100/60, dark:bg-gray-900
+- Bar chart: changed radius to [4,4,0,0], XAxis/YAxis tick fill set to #6b7280
+- Added ReferenceLine for target calories (dashed, emerald, 60% opacity)
+- Macro Breakdown: enlarged to h-44, innerRadius=38 outerRadius=60, removed inline labels
+- Added center label showing average calories with "avg kcal" subtitle
+- Added custom legend below pie with colored dots and larger text
+- Weight Trend: replaced LineChart with AreaChart + Area for gradient fill below line
+- Added weightGrad linearGradient (emerald, 30% to 2% opacity)
+- Bottom cards gap reduced from gap-4 to gap-3
+- All cards: shadow-md, border-gray-100/60, dark:bg-gray-900, dark mode text colors
+- Stats cards: shadow-md, border-gray-100/60, tabular-nums, dark:text-gray-100
+- NEW: Weekly Summary Insight card between charts and stats
+  - Shows dynamic insight based on weekly data
+  - Calculates avg calories, protein % of target, best day, over/under target
+  - Gradient background from-emerald-50/50 to-teal-50/50
+  - Lightbulb icon in emerald rounded-xl container
+
+### SettingsView.tsx
+- Header: Settings icon bg changed to bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700
+- Added user email display below subtitle (conditional on user?.email)
+- Profile section: Age/Height changed from 3-col grid to 2-col grid, Weight moved to full-width row below
+- Added unit suffixes (yrs, cm, kg) via absolute-positioned spans in relative wrappers
+- All measurement inputs now have pr-10 and placeholder examples
+- Gender selector: container gets border border-gray-200 dark:border-gray-700
+- Inactive gender buttons: bg-white dark:bg-gray-800 with individual border, hover:bg-gray-50
+- Active gender button: added shadow-sm
+- BMI display: moved to distinct card with bg-gradient-to-r from-emerald-50 to-teal-50, larger text (text-2xl), tabular-nums, emerald border, Badge with text-sm px-3 py-1
+- Target Weight input: wrapped in relative div with kg suffix span
+- All section cards: shadow-md, border-gray-100/60 dark:border-gray-800/60
+- Logout button: added shadow-sm
+
+Stage Summary:
+- All 4 files updated with comprehensive styling improvements
+- 1 new feature: Weekly Summary Insight card in ProgressView
+- All dark: variants added for every new style
+- All existing functionality preserved, zero breaking changes
+- ESLint passes cleanly with no errors
+
+---
+Task ID: 20
+Agent: Main (orchestrator) + 2 parallel full-stack-developer subagents
+Task: v6 — Comprehensive styling overhaul across all views + new features
+
+Work Log:
+- Reviewed worklog.md (936 lines, 19 previous tasks)
+- QA tested all 6 views via agent-browser: login → dashboard → food log → scan → chat → progress → settings
+- Zero console errors, all views functional
+- Captured screenshots of all 6 views for VLM visual analysis
+- VLM analyzed each screenshot individually, providing detailed styling improvement recommendations
+- Launched 2 parallel subagents for simultaneous development:
+  - Agent A (3-a): page.tsx nav + DashboardView + FoodLogView
+  - Agent B (3-b): ChatView + UploadView + ProgressView + SettingsView
+- Post-implementation QA: re-screenshotted all 6 views
+- VLM before/after comparison confirmed 8/10 improvement rating
+- ESLint: 0 errors, 0 warnings
+
+## Current Status Assessment
+- **Phase**: v6 Complete — Comprehensive styling overhaul + new features
+- **Auth**: Fully working (async Prisma sessions, UUID tokens)
+- **Database**: 77 meals, 19 models, SQLite, 12+ days of test user food history
+- **API**: 29 routes, all functional
+- **Frontend**: 8 views in 14 modular files (~4,000+ lines), responsive, mobile-first, dark mode
+- **AI Integration**: LLM chat with meal logging, VLM food recognition (ready), 9-stage recommendation engine
+- **Gamification**: 8 achievements with real data tracking
+- **Dark Mode**: Full support via next-themes (Sun/Moon toggle in nav)
+- **ESLint**: Clean (0 errors, 0 warnings)
+
+## Completed This Round
+1. **Bottom Navigation Overhaul**: Pill-shaped active indicator, top shadow, taller height (68px), darker inactive icons
+2. **Dashboard Styling**: Card shadows upgraded to shadow-md, avatar initials (gradient circle), emerald streak badge, improved macro bar typography with tabular-nums
+3. **Dashboard NEW: Hydration Widget**: 8-glass visual water tracker with Plus button, fetches /api/water-log, optimistic state update
+4. **Dashboard NEW: Quick Stats Row**: 3-column grid (Meals Logged, Glasses, Day Streak) with tabular-nums
+5. **CalorieRing Typography**: "X kcal remaining" (emerald), "of X kcal" (darker, font-medium), "Goal reached!" (emerald bold), tabular-nums on calorie number
+6. **FoodLog Styling**: Bolder title, improved date picker (emerald selected, today ring), food item metadata darkened, macro card borders, search button outline, empty state with icon, improved Log Again buttons
+7. **Chat Styling**: Animated gradient ring behind empty state icon, 5 quick actions (was 3), taller input (h-12), ring inset on input, gradient user bubbles, AI bubble left-border, "NutriAI" label on AI messages
+8. **Upload Styling**: Removed redundant heading, emerald border on upload zone, gradient background, subtle format pills, improved How It Works (bg tint, larger steps, icon glow)
+9. **Progress Styling**: Target calories ReferenceLine on bar chart, improved pie chart with center label + custom legend, AreaChart with gradient fill for weight trend, weekly insight card (NEW), better tab contrast, styled export button, reduced bottom gap
+10. **Progress NEW: Weekly Insight Card**: Dynamic insight showing avg calories, protein % of target, best day, over/under analysis
+11. **Settings Styling**: 2-col mobile layout (Age+Height), weight full-width, unit suffixes (yrs/cm/kg) in inputs, improved gender selector (borders), distinct BMI card (gradient, large text), user email in header, improved card shadows
+
+## Verification Results
+- ESLint: 0 errors, 0 warnings
+- Agent-browser QA: All 6 tabs navigable, zero console errors
+- VLM before/after comparison: 8/10 improvement rating across Dashboard, Settings, Chat
+- All APIs returning 200, no runtime errors in dev.log
+
+## Unresolved Issues & Risks
+1. VLM food recognition not tested with real food photos (API fixed, ready)
+2. No PWA manifest for mobile install-ability
+3. No notification/reminder system
+4. No social features (sharing, challenges)
+5. In-memory sessions lost on server restart (acceptable for MVP)
+6. No barcode scanning for packaged foods
+7. Weight trend AreaChart gradient needs SVG gradient definition in Recharts — verify rendering
+
+## Priority Recommendations for Next Phase
+1. **Test VLM food recognition** with real food photos
+2. **Add PWA manifest** for mobile install-ability
+3. **Add notification system** (cron reminders for water/meal logging)
+4. **Add more achievements** (monthly challenges, cuisine explorer tiers)
+5. **Add recipe detail page** with ingredients and instructions
+6. **Add social/sharing features** (share progress, friend challenges)
+7. **Add barcode scanning** for packaged food nutrition lookup
+8. **Consider persistent sessions** in SQLite for production readiness
+9. **Add onboarding E2E test** — register new user and complete full onboarding flow
+10. **Add water/weight POST E2E test** — log water glasses and weight entries via agent-browser

@@ -102,17 +102,20 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
     <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-5 pb-4">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 flex items-center justify-center">
           <Settings className="h-5 w-5 text-gray-600 dark:text-gray-400" />
         </div>
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
           <p className="text-xs text-gray-400 dark:text-gray-500">Manage your profile and preferences</p>
+          {user?.email && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{user.email as string}</p>
+          )}
         </div>
       </div>
 
       {/* ═══ Profile Section ═══ */}
-      <Card className="rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
+      <Card className="rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-5">
         <div className="flex items-center gap-2 mb-4">
           <User className="h-4 w-4 text-emerald-600" />
           <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Personal Profile</span>
@@ -128,25 +131,34 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
               <Input className="h-11 rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" placeholder="e.g., Doe" value={profile.lastName} onChange={(e) => setProfile((p) => ({ ...p, lastName: e.target.value }))} />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-gray-500 dark:text-gray-400">Age</Label>
-              <Input type="number" className="h-11 rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" value={profile.age} onChange={(e) => setProfile((p) => ({ ...p, age: e.target.value }))} />
+              <div className="relative">
+                <Input type="number" className="h-11 rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 pr-10" placeholder="e.g., 28" value={profile.age} onChange={(e) => setProfile((p) => ({ ...p, age: e.target.value }))} />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 dark:text-gray-500 pointer-events-none">yrs</span>
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-gray-500 dark:text-gray-400">Height</Label>
-              <Input type="number" className="h-11 rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" placeholder="cm" value={profile.heightCm} onChange={(e) => setProfile((p) => ({ ...p, heightCm: e.target.value }))} />
+              <div className="relative">
+                <Input type="number" className="h-11 rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 pr-10" placeholder="e.g., 175" value={profile.heightCm} onChange={(e) => setProfile((p) => ({ ...p, heightCm: e.target.value }))} />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 dark:text-gray-500 pointer-events-none">cm</span>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-gray-500 dark:text-gray-400">Weight</Label>
-              <Input type="number" className="h-11 rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" placeholder="kg" value={profile.weightKg} onChange={(e) => setProfile((p) => ({ ...p, weightKg: e.target.value }))} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-gray-500 dark:text-gray-400">Weight</Label>
+            <div className="relative">
+              <Input type="number" className="h-11 rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 pr-10" placeholder="e.g., 74" value={profile.weightKg} onChange={(e) => setProfile((p) => ({ ...p, weightKg: e.target.value }))} />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 dark:text-gray-500 pointer-events-none">kg</span>
             </div>
           </div>
 
           {/* Gender Segmented Control */}
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-gray-500 dark:text-gray-400">Gender</Label>
-            <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+            <div className="flex gap-1 rounded-xl p-1 border border-gray-200 dark:border-gray-700">
               {GENDER_OPTIONS.map((g) => (
                 <button
                   key={g.value}
@@ -154,8 +166,8 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
                   onClick={() => setProfile((p) => ({ ...p, gender: g.value }))}
                   className={`flex-1 rounded-xl text-sm font-medium py-2 transition-colors min-h-[36px] ${
                     profile.gender === g.value
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                   }`}
                 >
                   {g.label}
@@ -165,9 +177,12 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
           </div>
 
           {bmi && bmiCategory && (
-            <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3">
-              <span className="text-sm text-gray-600 dark:text-gray-300">BMI: <b className="text-gray-900 dark:text-gray-100">{bmi}</b></span>
-              <Badge className={bmiCategory.color}>{bmiCategory.label}</Badge>
+            <div className="flex items-center justify-between bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl p-4 border border-emerald-100 dark:border-emerald-800">
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Body Mass Index</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-0.5 tabular-nums">{bmi}</p>
+              </div>
+              <Badge className={bmiCategory.color + ' text-sm px-3 py-1'}>{bmiCategory.label}</Badge>
             </div>
           )}
 
@@ -178,7 +193,7 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
       </Card>
 
       {/* ═══ Goals Section ═══ */}
-      <Card className="rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
+      <Card className="rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-5">
         <div className="flex items-center gap-2 mb-4">
           <Target className="h-4 w-4 text-emerald-600" />
           <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Fitness Goals</span>
@@ -200,7 +215,10 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-gray-500 dark:text-gray-400">Target Weight</Label>
-            <Input type="number" className="h-11 rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" placeholder="kg" value={goals.targetWeightKg} onChange={(e) => setGoals((g) => ({ ...g, targetWeightKg: e.target.value }))} />
+            <div className="relative">
+              <Input type="number" className="h-11 rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 pr-10" placeholder="e.g., 70" value={goals.targetWeightKg} onChange={(e) => setGoals((g) => ({ ...g, targetWeightKg: e.target.value }))} />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 dark:text-gray-500 pointer-events-none">kg</span>
+            </div>
           </div>
           <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl min-h-[44px] font-semibold" onClick={saveGoals} disabled={saving}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Goals
@@ -209,7 +227,7 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
       </Card>
 
       {/* ═══ Preferences Section ═══ */}
-      <Card className="rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
+      <Card className="rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-5">
         <div className="flex items-center gap-2 mb-4">
           <Heart className="h-4 w-4 text-emerald-600" />
           <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Dietary Preferences</span>
@@ -263,7 +281,7 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
       {/* Logout */}
       <Button
         variant="outline"
-        className="w-full border-2 border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 min-h-[44px] rounded-xl font-semibold"
+        className="w-full border-2 border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 min-h-[44px] rounded-xl font-semibold shadow-sm"
         onClick={onLogout}
       >
         <LogOut className="mr-2 h-4 w-4" />Log Out

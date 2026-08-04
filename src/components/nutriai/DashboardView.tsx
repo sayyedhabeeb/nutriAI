@@ -24,7 +24,7 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
-  User, Search, Droplets, Camera, Clock, Zap, ChevronRight, Lightbulb, Sparkles, ChevronDown, Loader2, Trophy, Lock,
+  User, Search, Droplets, Camera, Clock, Zap, ChevronRight, Lightbulb, Sparkles, ChevronDown, Loader2, Trophy, Lock, Plus,
 } from 'lucide-react';
 import { apiFetch } from './api';
 import {
@@ -40,6 +40,8 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
   const [recommendations, setRecommendations] = useState<Record<string, MealRecommendation[]>>({});
   const [loading, setLoading] = useState(true);
   const [streak, setStreak] = useState(0);
+  const [waterCount, setWaterCount] = useState(0);
+  const [mealsLoggedToday, setMealsLoggedToday] = useState(0);
 
   // Log meal dialog state
   const [logDialog, setLogDialog] = useState<{
@@ -100,6 +102,27 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
         else break;
       }
       setStreak(streakCount);
+
+      // Fetch water log for today
+      try {
+        const waterData = await apiFetch('/api/water-log');
+        setWaterCount(waterData.glassesConsumed || 0);
+      } catch {
+        // Silent fail
+      }
+
+      // Fetch meals logged today
+      try {
+        const foodLogData = await apiFetch('/api/food-logs');
+        const itemsBySlot = (foodLogData.itemsBySlot || {}) as Record<string, unknown[]>;
+        let totalCount = 0;
+        for (const slot of Object.keys(itemsBySlot)) {
+          totalCount += itemsBySlot[slot].length;
+        }
+        setMealsLoggedToday(totalCount);
+      } catch {
+        // Silent fail
+      }
 
       const recs = await Promise.all(
         SLOTS.map(async (slot) => {
@@ -191,7 +214,8 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
 
   const handleWaterAdd = async () => {
     try {
-      await apiFetch('/api/water-log', { method: 'POST', body: JSON.stringify({ glasses: 1 }) });
+      const result = await apiFetch('/api/water-log', { method: 'POST', body: JSON.stringify({ glasses: 1 }) });
+      setWaterCount(result.glassesConsumed || waterCount + 1);
       toast.success('\uD83D\uDCA7 +1 glass of water');
     } catch { toast.error('Failed to log water'); }
   };
@@ -209,7 +233,9 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
     finally { setPlanLoading(false); }
   };
 
-  const firstName = (user?.profile as Record<string, unknown> | null)?.firstName || (user?.name as string) || 'there';
+  const firstName = (user?.profile as Record<string, unknown> | null)?.firstName || (user?.name as string) || '';
+  const initial = firstName ? firstName.charAt(0).toUpperCase() : '';
+  const displayName = firstName || 'there';
   const todayStr = format(new Date(), 'EEEE, MMMM d');
 
   // Insights logic (Feature 3)
@@ -240,33 +266,55 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
   return (
     <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-4">
       {/* ═══ Hero Section with gradient bg & decorative blobs ═══ */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500/5 to-teal-500/5 p-5 border border-emerald-100/50 backdrop-blur-sm">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500/5 to-teal-500/5 p-5 border border-emerald-100/50 dark:border-emerald-800/30 backdrop-blur-sm">
         <div className="absolute -top-8 -right-8 w-24 h-24 bg-emerald-200/20 rounded-full blur-2xl" />
         <div className="absolute -bottom-6 -left-6 w-20 h-20 bg-teal-200/20 rounded-full blur-2xl" />
         <div className="absolute top-1/2 right-1/4 w-12 h-12 bg-green-200/10 rounded-full blur-xl" />
         <div className="relative flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Hi, {firstName}! {'\uD83D\uDC4B'}</h1>
-            <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-500">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Hi, {displayName}! {'\uD83D\uDC4B'}</h1>
+            <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-500 dark:text-gray-400">
               <CalendarIcon className="h-3.5 w-3.5" />
               <span>{todayStr}</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {streak > 0 && (
-              <Badge className="bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 gap-1 shadow-sm">
+              <Badge className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 px-2.5 py-1 gap-1 shadow-sm">
                 <Zap className="h-3 w-3" />{streak} day{streak > 1 ? 's' : ''}
               </Badge>
             )}
-            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center shadow-sm">
-              <User className="h-5 w-5 text-emerald-600" />
-            </div>
+            {initial ? (
+              <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
+                <span className="text-white font-bold text-sm">{initial}</span>
+              </div>
+            ) : (
+              <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/40 rounded-xl flex items-center justify-center shadow-md">
+                <User className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+            )}
           </div>
         </div>
       </div>
 
+      {/* ═══ Quick Stats Row ═══ */}
+      <div className="grid grid-cols-3 gap-2.5">
+        <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100/60 dark:border-gray-800/60 shadow-sm text-center">
+          <p className="text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">{mealsLoggedToday}</p>
+          <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Meals Logged</p>
+        </div>
+        <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100/60 dark:border-gray-800/60 shadow-sm text-center">
+          <p className="text-lg font-bold text-cyan-600 dark:text-cyan-400 tabular-nums">{waterCount}</p>
+          <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Glasses</p>
+        </div>
+        <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100/60 dark:border-gray-800/60 shadow-sm text-center">
+          <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{streak}</p>
+          <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Day Streak</p>
+        </div>
+      </div>
+
       {/* ═══ Calorie Ring Card ═══ */}
-      <Card className="p-6 rounded-2xl shadow-sm border border-gray-100/80">
+      <Card className="p-6 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60">
         <div className="flex justify-center">
           <CalorieRing consumed={consumedCal} target={targetCal} />
         </div>
@@ -278,8 +326,8 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
       </Card>
 
       {/* ═══ Macro Progress Bars ═══ */}
-      <Card className="p-4 rounded-2xl shadow-sm border border-gray-100/80 space-y-3">
-        <h3 className="text-sm font-semibold text-gray-700">Today&apos;s Macros</h3>
+      <Card className="p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 space-y-3">
+        <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">Today&apos;s Macros</h3>
         {[
           { label: 'Protein', val: consumedProtein, target: targetProtein, from: '#3b82f6', to: '#60a5fa', unit: 'g' },
           { label: 'Carbs', val: nutrition?.consumed?.carbsG || 0, target: nutrition?.targets?.carbsG || 0, from: '#f59e0b', to: '#fbbf24', unit: 'g' },
@@ -289,10 +337,10 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
           return (
             <div key={m.label}>
               <div className="flex justify-between mb-1.5">
-                <span className="text-sm text-gray-600 font-medium">{m.label}</span>
-                <span className="text-xs text-gray-600 font-medium">{m.val}{m.unit} / {m.target}{m.unit} &middot; {pct}%</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">{m.label}</span>
+                <span className="text-xs text-gray-600 dark:text-gray-400 font-medium text-right tabular-nums">{m.val}{m.unit} / {m.target}{m.unit} &middot; {pct}%</span>
               </div>
-              <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
                 <motion.div
                   className="h-full rounded-full"
                   style={{ background: `linear-gradient(90deg, ${m.from}, ${m.to})` }}
@@ -306,51 +354,80 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
         })}
       </Card>
 
+      {/* ═══ Hydration Widget ═══ */}
+      <Card className="p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Droplets className="h-4 w-4 text-cyan-500" />
+            <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">Hydration</h3>
+          </div>
+          <span className="text-xs text-gray-500 dark:text-gray-400">Goal: 8 glasses</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex-1 flex gap-1.5">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((g) => (
+              <div
+                key={g}
+                className={`h-6 flex-1 rounded-md transition-colors ${g <= waterCount ? 'bg-cyan-400 dark:bg-cyan-500' : 'bg-gray-100 dark:bg-gray-800'}`}
+              />
+            ))}
+          </div>
+          <Button
+            size="icon"
+            className="w-9 h-9 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white shadow-sm"
+            onClick={handleWaterAdd}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">{waterCount} of 8 glasses today</p>
+      </Card>
+
       {/* ═══ Feature 3: Today's Insights Card ═══ */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
       >
-        <Card className={`p-4 rounded-2xl shadow-sm border border-gray-100/80 ${pctConsumed > 1 ? 'bg-amber-50/50' : pctConsumed >= 0.75 ? 'bg-emerald-50/50' : 'bg-blue-50/50'}`}>
+        <Card className={`p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 ${pctConsumed > 1 ? 'bg-amber-50/50 dark:bg-amber-900/10' : pctConsumed >= 0.75 ? 'bg-emerald-50/50 dark:bg-emerald-900/10' : 'bg-blue-50/50 dark:bg-blue-900/10'}`}>
           <div className="flex items-start gap-3">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${pctConsumed > 1 ? 'bg-amber-100/80' : pctConsumed >= 0.75 ? 'bg-emerald-100/80' : 'bg-blue-100/80'}`}>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${pctConsumed > 1 ? 'bg-amber-100/80 dark:bg-amber-900/30' : pctConsumed >= 0.75 ? 'bg-emerald-100/80 dark:bg-emerald-900/30' : 'bg-blue-100/80 dark:bg-blue-900/30'}`}>
               <Lightbulb className={`h-4.5 w-4.5 ${pctConsumed > 1 ? 'text-amber-500' : pctConsumed >= 0.75 ? 'text-emerald-500' : 'text-blue-500'}`} />
             </div>
             <div className="flex-1 min-w-0 space-y-2">
-              <h3 className="text-sm font-semibold text-gray-900">Today&apos;s Insights</h3>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Today&apos;s Insights</h3>
 
               {/* Calorie status message */}
               {pctConsumed > 1 && (
-                <p className="text-xs text-amber-700 leading-relaxed">
+                <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
                   You&apos;ve exceeded your calorie goal by <span className="font-bold">{Math.round(consumedCal - targetCal)} kcal</span>. Consider lighter meals for the rest of the day.
                 </p>
               )}
               {pctConsumed >= 0.75 && pctConsumed <= 1 && (
-                <p className="text-xs text-emerald-700 leading-relaxed">
+                <p className="text-xs text-emerald-700 dark:text-emerald-400 leading-relaxed">
                   Great progress! You&apos;re <span className="font-bold">{Math.round(targetCal - consumedCal)} kcal</span> away from your daily goal.
                 </p>
               )}
               {pctConsumed < 0.75 && pctConsumed > 0 && (
-                <p className="text-xs text-blue-700 leading-relaxed">
+                <p className="text-xs text-blue-700 dark:text-blue-400 leading-relaxed">
                   You still have <span className="font-bold">{Math.round(targetCal - consumedCal)} kcal</span> remaining. Time to fuel up!
                 </p>
               )}
               {consumedCal === 0 && (
-                <p className="text-xs text-gray-500 leading-relaxed">
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
                   No meals logged yet today. Start with a balanced breakfast!
                 </p>
               )}
 
               {/* Protein status */}
               {consumedProtein > 0 && pctProtein >= 0.8 && (
-                <p className="text-xs text-emerald-600 font-medium">
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
                   Protein goal almost reached! {'\uD83C\uDF89'} ({Math.round(consumedProtein)}/{Math.round(targetProtein)}g)
                 </p>
               )}
 
               {/* Time-of-day tip */}
-              <p className="text-xs text-gray-500 italic">{'\uD83D\uDCAC'} {timeOfDayTip}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 italic">{'\uD83D\uDCAC'} {timeOfDayTip}</p>
             </div>
           </div>
         </Card>
@@ -362,16 +439,16 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
       >
-        <Card className="p-4 rounded-2xl shadow-sm border border-gray-100/80 bg-gradient-to-r from-emerald-500/5 to-teal-500/5">
+        <Card className="p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-gradient-to-r from-emerald-500/5 to-teal-500/5">
           {!mealPlan?.exists ? (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center">
-                  <Sparkles className="h-4.5 w-4.5 text-emerald-600" />
+                <div className="w-9 h-9 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center">
+                  <Sparkles className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Today&apos;s Plan</h3>
-                  <p className="text-xs text-gray-500">Generate a personalized meal plan</p>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Today&apos;s Plan</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Generate a personalized meal plan</p>
                 </div>
               </div>
               <Button
@@ -388,15 +465,15 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center">
-                    <Sparkles className="h-4.5 w-4.5 text-emerald-600" />
+                  <div className="w-9 h-9 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center">
+                    <Sparkles className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900">Today&apos;s Meal Plan</h3>
-                    <p className="text-xs text-gray-500">AI-generated for your goals</p>
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Today&apos;s Meal Plan</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">AI-generated for your goals</p>
                   </div>
                 </div>
-                <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">Active</Badge>
+                <Badge className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 text-xs">Active</Badge>
               </div>
 
               {/* Plan items by slot */}
@@ -411,11 +488,11 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                     onOpenChange={(open) => setPlanExpanded((prev) => ({ ...prev, [slot]: open }))}
                   >
                     <CollapsibleTrigger asChild>
-                      <button className={`w-full flex items-center gap-2 p-2.5 rounded-xl border border-gray-100 hover:bg-white/80 transition-colors text-left ${SLOT_GRADIENT_COLORS[slot].from} ${SLOT_GRADIENT_COLORS[slot].to}`}>
+                      <button className={`w-full flex items-center gap-2 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-white/80 dark:hover:bg-gray-800/50 transition-colors text-left ${SLOT_GRADIENT_COLORS[slot].from} ${SLOT_GRADIENT_COLORS[slot].to}`}>
                         <span>{SLOT_ICONS[slot]}</span>
-                        <span className="text-xs font-semibold text-gray-700">{SLOT_LABELS[slot]}</span>
-                        <span className="text-xs text-gray-500 truncate flex-1">{slotItems[0]?.meal.name}</span>
-                        <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">{SLOT_LABELS[slot]}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 truncate flex-1">{slotItems[0]?.meal.name}</span>
+                        <ChevronDown className={`h-3.5 w-3.5 text-gray-400 dark:text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                       </button>
                     </CollapsibleTrigger>
                     <AnimatePresence>
@@ -430,16 +507,16 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                           >
                             <div className="pl-4 pr-1 pt-1 space-y-1.5">
                               {slotItems.map((item) => (
-                                <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white border border-gray-100">
+                                <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-medium text-gray-800 truncate">{item.meal.name}</p>
+                                    <p className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">{item.meal.name}</p>
                                     <div className="flex items-center gap-1.5 mt-0.5">
-                                      <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 font-medium border-gray-200 text-gray-500">{item.meal.cuisine}</Badge>
-                                      <span className="text-xs text-gray-400">{item.servingGms}g</span>
+                                      <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 font-medium border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">{item.meal.cuisine}</Badge>
+                                      <span className="text-xs text-gray-400 dark:text-gray-500">{item.servingGms}g</span>
                                     </div>
                                     {item.nutrition && (
-                                      <div className="flex gap-2 mt-0.5 text-xs text-gray-500">
-                                        <span className="text-orange-600 font-medium">{item.nutrition.calories} kcal</span>
+                                      <div className="flex gap-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                        <span className="text-orange-600 dark:text-orange-400 font-medium">{item.nutrition.calories} kcal</span>
                                         <span>P: {item.nutrition.proteinG}g</span>
                                         <span>C: {item.nutrition.carbsG}g</span>
                                         <span>F: {item.nutrition.fatG}g</span>
@@ -490,7 +567,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
 
       {/* ═══ Achievements Row ═══ */}
       {achievements.length > 0 && (
-        <Card className="p-4 rounded-2xl shadow-sm border border-gray-100/80">
+        <Card className="p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Trophy className="h-4 w-4 text-amber-500" />
@@ -511,8 +588,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                     ach.earned
                       ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'
                       : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-40'
-                  }`
-                }
+                  }`}
                 >
                   {ach.earned ? (
                     <span className="text-2xl leading-none">{ach.icon}</span>
@@ -537,16 +613,16 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
           const recs = recommendations[slot] || [];
           const grad = SLOT_GRADIENT_COLORS[slot];
           return (
-            <Card key={slot} className={`p-0 rounded-xl shadow-sm border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden`}>
+            <Card key={slot} className={`p-0 rounded-xl shadow-md border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden`}>
               <div className={`bg-gradient-to-r ${grad.from} ${grad.to} px-4 py-3`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-base">{SLOT_ICONS[slot]}</span>
-                    <h3 className="font-semibold text-sm text-gray-900">{SLOT_LABELS[slot]}</h3>
+                    <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100">{SLOT_LABELS[slot]}</h3>
                   </div>
                   <Button
                     variant="ghost" size="icon"
-                    className="h-8 w-8 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50"
+                    className="h-8 w-8 text-gray-400 dark:text-gray-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                     onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot }); }}
                   >
                     <Search className="h-4 w-4" />
@@ -556,8 +632,8 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
               <div className="px-4 pb-3 pt-2 space-y-2 max-h-64 overflow-y-auto">
                 {recs.length === 0 && (
                   <div className="text-center py-3">
-                    <p className="text-xs text-gray-400">No recommendations</p>
-                    <Button variant="ghost" size="sm" className="text-emerald-600 text-xs mt-1 hover:bg-emerald-50" onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot }); }}>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">No recommendations</p>
+                    <Button variant="ghost" size="sm" className="text-emerald-600 dark:text-emerald-400 text-xs mt-1 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot }); }}>
                       <Search className="h-3 w-3 mr-1" />Search for meals
                     </Button>
                   </div>
@@ -565,28 +641,28 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                 {recs.map((rec) => (
                   <div
                     key={rec.meal.id}
-                    className="p-2.5 rounded-xl border border-gray-100 bg-white space-y-1.5 hover:shadow-sm hover:border-emerald-100 transition-all cursor-pointer"
+                    className="p-2.5 rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 space-y-1.5 hover:shadow-sm hover:border-emerald-100 dark:hover:border-emerald-800 transition-all cursor-pointer"
                     onClick={() => setDetailSheet({ open: true, rec })}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium text-gray-800 leading-tight line-clamp-1">{rec.meal.name}</p>
+                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200 leading-tight line-clamp-1">{rec.meal.name}</p>
                       <div className="flex items-center gap-1 shrink-0">
-                        {rec.meal.isVeg && <span className="text-green-600 text-xs font-bold border border-green-300 rounded px-1">V</span>}
-                        {rec.meal.isVegan && <span className="text-green-700 text-xs font-bold border border-green-400 rounded px-1">VG</span>}
+                        {rec.meal.isVeg && <span className="text-green-600 text-xs font-bold border border-green-300 dark:border-green-700 rounded px-1">V</span>}
+                        {rec.meal.isVegan && <span className="text-green-700 text-xs font-bold border border-green-400 dark:border-green-600 rounded px-1">VG</span>}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 font-medium border-gray-200 text-gray-500">{rec.meal.cuisine}</Badge>
+                      <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 font-medium border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">{rec.meal.cuisine}</Badge>
                       {rec.meal.prepTimeMin && (
-                        <span className="text-xs text-gray-400 flex items-center gap-0.5"><Clock className="h-3 w-3" />{rec.meal.prepTimeMin}m</span>
+                        <span className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-0.5"><Clock className="h-3 w-3" />{rec.meal.prepTimeMin}m</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <span className="font-medium text-gray-700">{rec.baseNutritionPer100g?.calories || 0} kcal/100g</span>
+                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                      <span className="font-medium text-gray-700 dark:text-gray-300">{rec.baseNutritionPer100g?.calories || 0} kcal/100g</span>
                       <span>&middot;</span>
                       <span>P: {rec.baseNutritionPer100g?.proteinG || 0}g</span>
                       {rec.estimatedNutrition && (
-                        <span>&middot; <span className="text-emerald-600">~{rec.estimatedNutrition.calories} kcal ({rec.recommendedServingGms}g)</span></span>
+                        <span>&middot; <span className="text-emerald-600 dark:text-emerald-400">~{rec.estimatedNutrition.calories} kcal ({rec.recommendedServingGms}g)</span></span>
                       )}
                     </div>
                     <Button
@@ -615,22 +691,22 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
       </div>
 
       {/* ═══ FAB buttons ═══ */}
-      <div className="fixed bottom-20 right-4 z-40 flex flex-col items-end gap-2">
+      <div className="fixed bottom-24 right-4 z-40 flex flex-col items-end gap-2">
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2 group">
-            <span className="text-xs text-gray-600 font-medium bg-white/90 backdrop-blur-sm border border-gray-200/50 px-2.5 py-1 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Add Water</span>
-            <Button size="icon" className="w-11 h-11 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg" onClick={handleWaterAdd}>
+            <span className="text-xs text-gray-600 dark:text-gray-300 font-medium bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 px-2.5 py-1 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Add Water</span>
+            <Button size="icon" className="w-11 h-11 rounded-full bg-cyan-500 hover:bg-cyan-600 text-white shadow-lg" onClick={handleWaterAdd}>
               <Droplets className="h-4 w-4" />
             </Button>
           </div>
           <div className="flex items-center gap-2 group">
-            <span className="text-xs text-gray-600 font-medium bg-white/90 backdrop-blur-sm border border-gray-200/50 px-2.5 py-1 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Search Meals</span>
+            <span className="text-xs text-gray-600 dark:text-gray-300 font-medium bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 px-2.5 py-1 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Search Meals</span>
             <Button size="icon" className="w-11 h-11 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg" onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot: 'lunch' }); }}>
               <Search className="h-4 w-4" />
             </Button>
           </div>
           <div className="flex items-center gap-2 group">
-            <span className="text-xs text-gray-600 font-medium bg-white/90 backdrop-blur-sm border border-gray-200/50 px-2.5 py-1 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Scan Food</span>
+            <span className="text-xs text-gray-600 dark:text-gray-300 font-medium bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 px-2.5 py-1 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Scan Food</span>
             <Button size="icon" className="w-11 h-11 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg" onClick={() => onNavigate('upload')}>
               <Camera className="h-4 w-4" />
             </Button>
@@ -644,7 +720,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
           <DialogHeader>
             <DialogTitle>Log Meal</DialogTitle>
             <DialogDescription className="flex items-center gap-2">
-              {logDialog.open && <span className="font-medium text-gray-700">{logDialog.mealName}</span>}
+              {logDialog.open && <span className="font-medium text-gray-700 dark:text-gray-300">{logDialog.mealName}</span>}
               {logDialog.open && logDialog.cuisine && <Badge variant="outline" className="text-xs">{logDialog.cuisine}</Badge>}
             </DialogDescription>
           </DialogHeader>
@@ -655,22 +731,22 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
             </div>
             {logDialog.open && logDialog.baseNutritionPer100g && (
               <div className="space-y-3">
-                <div className="bg-gray-50 rounded-xl p-3 text-sm space-y-1">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Per 100g</p>
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 text-sm space-y-1">
+                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Per 100g</p>
                   <div className="grid grid-cols-2 gap-2.5 text-xs">
-                    <span className="text-gray-600">Calories:</span><span className="font-bold text-gray-900">{logDialog.baseNutritionPer100g.calories} kcal</span>
-                    <span className="text-gray-600">Protein:</span><span className="font-bold text-blue-600">{logDialog.baseNutritionPer100g.proteinG}g</span>
-                    <span className="text-gray-600">Carbs:</span><span className="font-bold text-amber-600">{logDialog.baseNutritionPer100g.carbsG}g</span>
-                    <span className="text-gray-600">Fat:</span><span className="font-bold text-rose-600">{logDialog.baseNutritionPer100g.fatG}g</span>
+                    <span className="text-gray-600 dark:text-gray-400">Calories:</span><span className="font-bold text-gray-900 dark:text-gray-100">{logDialog.baseNutritionPer100g.calories} kcal</span>
+                    <span className="text-gray-600 dark:text-gray-400">Protein:</span><span className="font-bold text-blue-600">{logDialog.baseNutritionPer100g.proteinG}g</span>
+                    <span className="text-gray-600 dark:text-gray-400">Carbs:</span><span className="font-bold text-amber-600">{logDialog.baseNutritionPer100g.carbsG}g</span>
+                    <span className="text-gray-600 dark:text-gray-400">Fat:</span><span className="font-bold text-rose-600">{logDialog.baseNutritionPer100g.fatG}g</span>
                   </div>
                 </div>
-                <div className="bg-emerald-50 rounded-xl p-3 text-sm space-y-1 border border-emerald-100">
-                  <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1.5">Estimated for {servingGms}g serving</p>
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-3 text-sm space-y-1 border border-emerald-100 dark:border-emerald-800">
+                  <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide mb-1.5">Estimated for {servingGms}g serving</p>
                   <div className="grid grid-cols-2 gap-2.5 text-xs">
-                    <span className="text-gray-600">Calories:</span><span className="font-bold text-gray-900">{Math.round((logDialog.baseNutritionPer100g.calories / 100) * servingGms)} kcal</span>
-                    <span className="text-gray-600">Protein:</span><span className="font-bold text-blue-600">{Math.round((logDialog.baseNutritionPer100g.proteinG / 100) * servingGms * 10) / 10}g</span>
-                    <span className="text-gray-600">Carbs:</span><span className="font-bold text-amber-600">{Math.round((logDialog.baseNutritionPer100g.carbsG / 100) * servingGms * 10) / 10}g</span>
-                    <span className="text-gray-600">Fat:</span><span className="font-bold text-rose-600">{Math.round((logDialog.baseNutritionPer100g.fatG / 100) * servingGms * 10) / 10}g</span>
+                    <span className="text-gray-600 dark:text-gray-400">Calories:</span><span className="font-bold text-gray-900 dark:text-gray-100">{Math.round((logDialog.baseNutritionPer100g.calories / 100) * servingGms)} kcal</span>
+                    <span className="text-gray-600 dark:text-gray-400">Protein:</span><span className="font-bold text-blue-600">{Math.round((logDialog.baseNutritionPer100g.proteinG / 100) * servingGms * 10) / 10}g</span>
+                    <span className="text-gray-600 dark:text-gray-400">Carbs:</span><span className="font-bold text-amber-600">{Math.round((logDialog.baseNutritionPer100g.carbsG / 100) * servingGms * 10) / 10}g</span>
+                    <span className="text-gray-600 dark:text-gray-400">Fat:</span><span className="font-bold text-rose-600">{Math.round((logDialog.baseNutritionPer100g.fatG / 100) * servingGms * 10) / 10}g</span>
                   </div>
                 </div>
               </div>
@@ -715,26 +791,26 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
               <div className="space-y-2">
                 {searchLoading && <div className="flex justify-center py-6"><LoaderIcon className="h-5 w-5 animate-spin text-emerald-600" /></div>}
                 {!searchLoading && searchQuery && searchResults.length === 0 && (
-                  <p className="text-sm text-gray-400 text-center py-6">No results found</p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">No results found</p>
                 )}
                 {!searchLoading && searchResults.map((meal) => (
                   <div
                     key={meal.id}
-                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:bg-emerald-50/50 hover:border-emerald-100 transition-colors cursor-pointer"
+                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 hover:border-emerald-100 dark:hover:border-emerald-800 transition-colors cursor-pointer"
                     onClick={() => handleLogFromSearch(meal)}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-gray-800 truncate">{meal.name}</p>
-                        <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 font-medium border-gray-200 text-gray-500 shrink-0">{meal.cuisine}</Badge>
+                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{meal.name}</p>
+                        <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 font-medium border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 shrink-0">{meal.cuisine}</Badge>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                         <span>{meal.nutrition?.calories || 0} kcal/100g</span>
                         <span>&middot;</span>
                         <span className="text-blue-600 font-medium">P: {meal.nutrition?.proteinG || 0}g</span>
                       </div>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-gray-300 shrink-0" />
+                    <ChevronRight className="h-4 w-4 text-gray-300 dark:text-gray-600 shrink-0" />
                   </div>
                 ))}
               </div>
@@ -758,29 +834,29 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                   <Badge variant="outline" className="text-xs">{detailSheet.rec.meal.cuisine}</Badge>
                   <Badge variant="outline" className={`text-xs ${SLOT_BADGE_COLORS[detailSheet.rec.meal.mealType] || ''}`}>{detailSheet.rec.meal.mealType}</Badge>
                   {detailSheet.rec.meal.prepTimeMin && (
-                    <span className="text-xs text-gray-500 flex items-center gap-1"><Clock className="h-3 w-3" />{detailSheet.rec.meal.prepTimeMin} min</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1"><Clock className="h-3 w-3" />{detailSheet.rec.meal.prepTimeMin} min</span>
                   )}
                 </SheetDescription>
               </SheetHeader>
               <ScrollArea className="flex-1 px-4 pb-4">
                 <div className="space-y-4">
                   {detailSheet.rec.meal.description && (
-                    <p className="text-sm text-gray-600 leading-relaxed">{detailSheet.rec.meal.description}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{detailSheet.rec.meal.description}</p>
                   )}
                   {detailSheet.rec.baseNutritionPer100g && (
                     <div>
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Nutrition per 100g</h4>
+                      <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Nutrition per 100g</h4>
                       <NutritionFactsLabel nutrition={detailSheet.rec.baseNutritionPer100g} servingGms={100} label="Per 100g" />
                     </div>
                   )}
                   {detailSheet.rec.estimatedNutrition && (
-                    <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
-                      <h4 className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2">Recommended: {detailSheet.rec.recommendedServingGms}g serving</h4>
+                    <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-3 border border-emerald-100 dark:border-emerald-800">
+                      <h4 className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide mb-2">Recommended: {detailSheet.rec.recommendedServingGms}g serving</h4>
                       <div className="grid grid-cols-2 gap-1.5 text-xs">
-                        <span className="text-gray-600">Calories:</span><span className="font-bold">{detailSheet.rec.estimatedNutrition.calories} kcal</span>
-                        <span className="text-gray-600">Protein:</span><span className="font-bold text-blue-600">{detailSheet.rec.estimatedNutrition.proteinG}g</span>
-                        <span className="text-gray-600">Carbs:</span><span className="font-bold text-amber-600">{detailSheet.rec.estimatedNutrition.carbsG}g</span>
-                        <span className="text-gray-600">Fat:</span><span className="font-bold text-rose-600">{detailSheet.rec.estimatedNutrition.fatG}g</span>
+                        <span className="text-gray-600 dark:text-gray-400">Calories:</span><span className="font-bold">{detailSheet.rec.estimatedNutrition.calories} kcal</span>
+                        <span className="text-gray-600 dark:text-gray-400">Protein:</span><span className="font-bold text-blue-600">{detailSheet.rec.estimatedNutrition.proteinG}g</span>
+                        <span className="text-gray-600 dark:text-gray-400">Carbs:</span><span className="font-bold text-amber-600">{detailSheet.rec.estimatedNutrition.carbsG}g</span>
+                        <span className="text-gray-600 dark:text-gray-400">Fat:</span><span className="font-bold text-rose-600">{detailSheet.rec.estimatedNutrition.fatG}g</span>
                       </div>
                     </div>
                   )}

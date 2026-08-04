@@ -128,9 +128,9 @@ export function CalorieRing({ consumed, target }: { consumed: number; target: nu
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <Flame className={`h-5 w-5 mb-1 ${pct > 1 ? 'text-rose-500' : 'text-orange-500'}`} />
-        <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">{consumed}</span>
-        <span className="text-xs text-gray-500 dark:text-gray-400">of {target} kcal</span>
-        <span className={`text-xs font-semibold mt-1 ${pct >= 1 ? 'text-rose-600' : 'text-emerald-600'}`}>{pct >= 1 ? 'Goal reached!' : `${remaining} left`}</span>
+        <span className="text-3xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">{consumed}</span>
+        <span className="text-xs text-gray-600 dark:text-gray-300 font-medium">of {target} kcal</span>
+        <span className={`text-xs font-semibold mt-1 ${pct >= 1 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-emerald-600 dark:text-emerald-400'}`}>{pct >= 1 ? 'Goal reached!' : `${remaining} kcal remaining`}</span>
       </div>
     </div>
   );

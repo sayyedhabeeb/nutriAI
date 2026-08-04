@@ -55,7 +55,7 @@ export default function NutriAIPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50/50 dark:bg-gray-950">
-      <main className="flex-1 pb-20">
+      <main className="flex-1 pb-24">
         <AnimatePresence mode="wait">
           {view === 'auth' && <AuthView key="auth" onAuth={(v: ViewType) => { setView(v); if (v === 'dashboard') setActiveTab('dashboard'); }} />}
           {view === 'onboarding' && <OnboardingView key="onboarding" onComplete={() => { setView('dashboard'); setActiveTab('dashboard'); }} />}
@@ -69,8 +69,8 @@ export default function NutriAIPage() {
       </main>
 
       {view !== 'auth' && view !== 'onboarding' && (
-        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-200/60 dark:border-gray-800 safe-area-bottom">
-          <div className="max-w-lg mx-auto flex items-center h-16 px-1">
+        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-200/60 dark:border-gray-800 safe-area-bottom shadow-[0_-4px_20px_rgba(0,0,0,0.05)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.3)]">
+          <div className="max-w-lg mx-auto flex items-center h-[68px] px-1">
             {([
               { tab: 'dashboard' as TabType, icon: Home, label: 'Home' },
               { tab: 'foodlog' as TabType, icon: List, label: 'Log' },
@@ -83,20 +83,19 @@ export default function NutriAIPage() {
                 key={tab}
                 onClick={() => handleTabChange(tab)}
                 className={`relative flex flex-col items-center justify-center gap-0.5 flex-1 h-full min-h-[44px] transition-colors ${
-                  activeTab === tab ? 'text-emerald-600' : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
+                  activeTab === tab
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
                 }`}
               >
-                <div className="relative">
+                <div className={`flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-xl transition-colors ${
+                  activeTab === tab
+                    ? 'bg-emerald-50 dark:bg-emerald-900/30'
+                    : ''
+                }`}>
                   <Icon className="h-5 w-5" strokeWidth={activeTab === tab ? 2.5 : 2} />
-                  {activeTab === tab && (
-                    <motion.div
-                      layoutId="nav-dot"
-                      className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-600"
-                      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                    />
-                  )}
+                  <span className={`text-[10px] ${activeTab === tab ? 'font-semibold' : 'font-medium'}`}>{label}</span>
                 </div>
-                <span className={`text-[10px] ${activeTab === tab ? 'font-semibold' : 'font-medium'}`}>{label}</span>
               </button>
             ))}
             <div className="ml-1 flex items-center">

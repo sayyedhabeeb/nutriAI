@@ -110,7 +110,7 @@ export function UploadView() {
           className={`min-h-[280px] border-2 border-dashed transition-colors cursor-pointer flex items-center justify-center p-8 ${
             dragOver
               ? 'border-emerald-400 bg-emerald-50/30 dark:bg-emerald-900/20'
-              : 'border-gray-300 dark:border-gray-600 hover:border-emerald-400 dark:hover:border-emerald-500 hover:bg-emerald-50/30 dark:hover:bg-emerald-900/20'
+              : 'border-emerald-200 dark:border-emerald-700 hover:border-emerald-400 dark:hover:border-emerald-500 bg-gradient-to-b from-emerald-50/30 to-transparent dark:from-emerald-900/10'
           } ${imagePreview ? 'p-4' : ''}`}
         >
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])} />
@@ -125,12 +125,13 @@ export function UploadView() {
                 <Camera className="h-8 w-8 text-emerald-400 dark:text-emerald-500" />
               </div>
               <div>
-                <p className="text-lg font-bold text-gray-800 dark:text-gray-200">Scan Your Food</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Take a photo or upload an image to identify your meal</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Take a photo or upload an image to identify your meal</p>
+                <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-2">Tap to Upload</p>
               </div>
+              <p className="text-xs text-gray-400 dark:text-gray-500">Supports JPG, PNG, WebP</p>
               <div className="flex gap-2 justify-center">
                 {['JPG', 'PNG', 'WebP'].map((fmt) => (
-                  <span key={fmt} className="px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-xs font-medium text-gray-400 dark:text-gray-500">{fmt}</span>
+                  <span key={fmt} className="px-2 py-0.5 rounded-full text-[10px] text-gray-300 dark:text-gray-600">{fmt}</span>
                 ))}
               </div>
             </div>
@@ -139,11 +140,11 @@ export function UploadView() {
       </Card>
 
       {/* How it works — Connected Step Indicator */}
-      <Card className="rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
+      <Card className="rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-gray-50/50 dark:bg-gray-800/30 p-5">
         <h3 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-6">How it works</h3>
         <div className="relative">
           {/* Connecting line behind circles */}
-          <div className="absolute top-4 left-[calc(16.67%+16px)] right-[calc(16.67%+16px)] h-0.5 bg-emerald-200 dark:bg-emerald-800 -z-0" />
+          <div className="absolute top-[18px] left-[calc(16.67%+18px)] right-[calc(16.67%+18px)] h-0.5 bg-emerald-200 dark:bg-emerald-800 -z-0" />
           <div className="grid grid-cols-3 gap-4 relative z-10">
             {[
               { step: 1, icon: Camera, title: 'Upload Photo', desc: 'Take or select a food photo' },
@@ -151,8 +152,10 @@ export function UploadView() {
               { step: 3, icon: UtensilsCrossed, title: 'Log Meal', desc: 'One-tap meal logging' },
             ].map((item) => (
               <div key={item.step} className="flex flex-col items-center text-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-emerald-600 text-white text-sm font-bold flex items-center justify-center ring-4 ring-white dark:ring-gray-900">{item.step}</div>
-                <item.icon className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />
+                <div className="w-9 h-9 rounded-full bg-emerald-600 text-white text-sm font-bold flex items-center justify-center ring-4 ring-white dark:ring-gray-900 shadow-sm shadow-emerald-200 dark:shadow-emerald-900/30">{item.step}</div>
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center">
+                  <item.icon className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
+                </div>
                 <div>
                   <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{item.title}</p>
                   <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 leading-tight">{item.desc}</p>
@@ -164,7 +167,7 @@ export function UploadView() {
       </Card>
 
       {/* Tips section */}
-      <Card className="rounded-2xl shadow-sm border border-amber-100 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/10 p-5">
+      <Card className="rounded-2xl shadow-md border border-amber-100 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/10 p-5">
         <div className="flex items-start gap-3">
           <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0 mt-0.5">
             <Lightbulb className="h-4 w-4 text-amber-600 dark:text-amber-400" />

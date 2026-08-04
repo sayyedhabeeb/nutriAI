@@ -5,8 +5,8 @@ import { format, parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip, ResponsiveContainer,
+  BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -205,15 +205,13 @@ export function ProgressView() {
           </div>
           <h1 className="text-xl font-bold text-gray-900">Progress</h1>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-xl gap-1.5 text-gray-600 hover:text-emerald-700"
+        <button
           onClick={() => setExportOpen(true)}
+          className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5"
         >
-          <Download className="h-4 w-4" />
+          <Download className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Export</span>
-        </Button>
+        </button>
       </div>
 
       {/* Export Dialog */}
@@ -258,14 +256,14 @@ export function ProgressView() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="w-full rounded-xl">
-          <TabsTrigger value="weekly" className="flex-1 rounded-lg">Weekly</TabsTrigger>
-          <TabsTrigger value="monthly" className="flex-1 rounded-lg">Monthly</TabsTrigger>
+          <TabsTrigger value="weekly" className="flex-1 rounded-lg data-[state=active]:shadow-sm">Weekly</TabsTrigger>
+          <TabsTrigger value="monthly" className="flex-1 rounded-lg text-gray-500 dark:text-gray-400 data-[state=active]:text-foreground data-[state=active]:shadow-sm">Monthly</TabsTrigger>
         </TabsList>
       </Tabs>
 
       {/* Calorie Chart */}
-      <Card className="p-5 rounded-2xl shadow-sm border border-gray-100/80 bg-white">
-        <h3 className="text-base font-semibold text-gray-800 mb-3">Calorie Intake</h3>
+      <Card className="p-5 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+        <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3">Calorie Intake</h3>
         <div className="h-48">
           {allCaloriesZero ? (
             <div className="h-full flex flex-col items-center justify-center py-8 text-gray-400">
@@ -275,8 +273,8 @@ export function ProgressView() {
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} barCategoryGap="20%">
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
                 <Tooltip
                   contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
                 />
@@ -286,8 +284,11 @@ export function ProgressView() {
                     <stop offset="100%" stopColor="#34d399" stopOpacity={0.8} />
                   </linearGradient>
                 </defs>
-                <Bar dataKey="calories" fill="url(#barGrad)" radius={[6, 6, 0, 0]} name="Consumed" />
-                <Bar dataKey="target" fill="#e5e7eb" radius={[6, 6, 0, 0]} name="Target" />
+                <Bar dataKey="calories" fill="url(#barGrad)" radius={[4, 4, 0, 0]} name="Consumed" />
+                <Bar dataKey="target" fill="#e5e7eb" radius={[4, 4, 0, 0]} name="Target" />
+                {!allCaloriesZero && chartData[0]?.target > 0 && (
+                  <ReferenceLine y={chartData[0].target} stroke="#10b981" strokeDasharray="6 3" strokeOpacity={0.6} />
+                )}
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -295,60 +296,114 @@ export function ProgressView() {
       </Card>
 
       {/* Macro Pie + Weight Trend */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Card className="p-5 rounded-2xl shadow-sm border border-gray-100/80 bg-white">
-          <h3 className="text-base font-semibold text-gray-800 mb-2">Macro Breakdown</h3>
-          <div className="h-40">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Card className="p-5 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-2">Macro Breakdown</h3>
+          <div className="h-44 relative">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={macroData} cx="50%" cy="50%" innerRadius={35} outerRadius={55} dataKey="value" label={({ name, value }) => `${name}: ${value}g`} strokeWidth={2}>
+                <Pie data={macroData} cx="50%" cy="50%" innerRadius={38} outerRadius={60} dataKey="value" strokeWidth={2}>
                   {macroData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                 </Pie>
                 <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb' }} />
               </PieChart>
             </ResponsiveContainer>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span className="text-lg font-bold text-gray-800 dark:text-gray-100 tabular-nums">{Math.round(summary?.avgCalories || 0)}</span>
+              <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium">avg kcal</span>
+            </div>
+          </div>
+          <div className="flex justify-center gap-4 mt-1">
+            {macroData.map((m) => (
+              <div key={m.name} className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: m.color }} />
+                <span className="text-xs text-gray-600 dark:text-gray-400 font-medium">{m.name} {Math.round(m.value)}g</span>
+              </div>
+            ))}
           </div>
         </Card>
-        <Card className="p-5 rounded-2xl shadow-sm border border-gray-100/80 bg-white">
-          <h3 className="text-base font-semibold text-gray-800 mb-2">Weight Trend</h3>
+        <Card className="p-5 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-2">Weight Trend</h3>
           {noWeightData ? (
-            <div className="h-40 flex flex-col items-center justify-center py-8 text-gray-400">
+            <div className="h-44 flex flex-col items-center justify-center py-8 text-gray-400">
               <Scale className="h-10 w-10 mb-2 text-gray-200" />
               <p className="text-sm font-medium">Log your weight daily to track your progress!</p>
             </div>
           ) : (
-            <div className="h-40">
+            <div className="h-44">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={weightChartData}>
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis domain={['dataMin - 1', 'dataMax + 1']} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                <AreaChart data={weightChartData}>
+                  <defs>
+                    <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="#10b981" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                  <YAxis domain={['dataMin - 1', 'dataMax + 1']} tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb' }} />
-                  <Line type="monotone" dataKey="weight" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 5 }} />
-                </LineChart>
+                  <Area type="monotone" dataKey="weight" stroke="#10b981" strokeWidth={2.5} fill="url(#weightGrad)" dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 5 }} />
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           )}
         </Card>
       </div>
 
+      {/* Weekly Summary Insight */}
+      {summary && !allCaloriesZero && (
+        <Card className="p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-900/10 dark:to-teal-900/10">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-100/80 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+              <Lightbulb className="h-[18px] w-[18px] text-emerald-500" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">Weekly Insight</h3>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">
+                {(() => {
+                  const avgCal = Math.round(summary?.avgCalories || 0);
+                  const targetCal = chartData[0]?.target || 0;
+                  const avgProtein = Math.round(summary?.avgProtein || 0);
+                  const targetProtein = summary?.targetProtein ? Math.round(summary.targetProtein as number) : 0;
+                  const proteinPct = targetProtein > 0 ? Math.round((avgProtein / targetProtein) * 100) : 0;
+                  const bestDay = weeklyData.reduce((best: Record<string, unknown> | null, d) => {
+                    const cal = (d.consumed as Record<string, number>)?.calories || 0;
+                    const bestCal = best ? (best.consumed as Record<string, number>)?.calories || 0 : 0;
+                    return cal > bestCal ? d : best;
+                  }, null);
+                  const bestDayName = bestDay ? format(parseISO(bestDay.date as string), 'EEEE') : '';
+                  const parts = [`You averaged ${avgCal} kcal/day this week.`];
+                  if (proteinPct > 0) parts.push(`Protein intake was ${proteinPct}% of target.`);
+                  if (targetCal > 0 && avgCal < targetCal) parts.push(`You're ${targetCal - avgCal} kcal under daily target.`);
+                  else if (targetCal > 0 && avgCal > targetCal) parts.push(`You're ${avgCal - targetCal} kcal over daily target.`);
+                  if (bestDayName) parts.push(`Best day: ${bestDayName}.`);
+                  parts.push('Keep it up!');
+                  return parts.join(' ');
+                })()}
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Stats Cards */}
       <div className="grid grid-cols-2 gap-3">
         {statCards.map((s) => (
-          <Card key={s.label} className="p-4 rounded-2xl shadow-sm border border-gray-100/80 bg-white">
+          <Card key={s.label} className="p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
             <div className="flex items-center gap-2.5 mb-2">
               <div className={`w-10 h-10 ${s.iconBg} rounded-lg flex items-center justify-center`}>
                 <s.icon className={`h-5 w-5 ${s.iconColor}`} />
               </div>
-              <span className="text-xs text-gray-500 font-medium leading-tight">{s.label}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 font-medium leading-tight">{s.label}</span>
             </div>
-            <p className="text-2xl font-bold text-gray-900 pl-[60px]">{s.value}</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 pl-[60px] tabular-nums">{s.value}</p>
           </Card>
         ))}
       </div>
 
       {/* Achievements Grid */}
       {achievements.length > 0 && (
-        <Card className="p-4 rounded-2xl shadow-sm border border-gray-100/80 bg-white">
+        <Card className="p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
           <div className="flex items-center gap-2 mb-4">
             <Trophy className="h-4 w-4 text-amber-500" />
             <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">Achievements</h3>
@@ -389,7 +444,7 @@ export function ProgressView() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        <Card className="p-0 rounded-2xl shadow-sm border border-gray-100/80 bg-white overflow-hidden">
+        <Card className="p-0 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 overflow-hidden">
           {/* Table header */}
           <div className="bg-gray-50/80 px-5 py-3 border-b border-gray-100">
             <h3 className="text-base font-semibold text-gray-800">Calorie Breakdown</h3>
@@ -479,9 +534,9 @@ export function ProgressView() {
       </motion.div>
 
       {/* Water Tracking */}
-      <Card className="p-5 rounded-2xl shadow-sm border border-gray-100/80 bg-white">
+      <Card className="p-5 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
             <Droplets className="h-4 w-4 text-blue-500" /> Water Intake
           </h3>
           <span className="text-sm font-semibold text-gray-700">{waterGlasses} / 8 glasses</span>
@@ -548,8 +603,8 @@ export function ProgressView() {
       </Card>
 
       {/* Weight Logging */}
-      <Card className="p-5 rounded-2xl shadow-sm border border-gray-100/80 bg-white">
-        <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+      <Card className="p-5 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+        <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
           <Scale className="h-4 w-4 text-purple-500" /> Log Weight
         </h3>
         <div className="flex gap-2">

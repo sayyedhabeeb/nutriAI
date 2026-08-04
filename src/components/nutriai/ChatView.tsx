@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Sparkles, Utensils, TrendingUp, Lightbulb, Loader2 } from 'lucide-react';
+import { Send, Sparkles, Utensils, TrendingUp, Lightbulb, Loader2, Dumbbell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -233,8 +233,11 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
         {!hasUserMessages && !loading ? (
           /* Warm centered empty state */
           <div className="flex flex-col items-center justify-center h-full -mt-8">
-            <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-4 animate-pulse">
-              <Sparkles className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+            <div className="relative mb-4">
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-emerald-200 to-teal-200 dark:from-emerald-800 dark:to-teal-800 blur-md opacity-40" />
+              <div className="relative w-16 h-16 rounded-full bg-white dark:bg-gray-900 flex items-center justify-center border border-emerald-100 dark:border-emerald-800 shadow-md animate-pulse">
+                <Sparkles className="h-9 w-9 text-emerald-600 dark:text-emerald-400" />
+              </div>
             </div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Hi, I&apos;m NutriAI!</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 text-center max-w-xs">Ask me about your diet, meal suggestions, or nutrition tips</p>
@@ -243,12 +246,26 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
                 <button
                   key={action.label}
                   onClick={() => sendMessage(action.message, action.isSuggestMeal)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 font-medium hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 dark:hover:bg-emerald-900/30 dark:hover:border-emerald-800 dark:hover:text-emerald-400 transition-colors"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 font-medium shadow-sm hover:shadow-md hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 dark:hover:bg-emerald-900/30 dark:hover:border-emerald-800 dark:hover:text-emerald-400 transition-colors"
                 >
                   <action.icon className="h-3.5 w-3.5" />
                   {action.label}
                 </button>
               ))}
+              <button
+                onClick={() => sendMessage('What should I eat right now based on my nutrition goals?')}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 font-medium shadow-sm hover:shadow-md hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 dark:hover:bg-emerald-900/30 dark:hover:border-emerald-800 dark:hover:text-emerald-400 transition-colors"
+              >
+                <Utensils className="h-3.5 w-3.5" />
+                What should I eat?
+              </button>
+              <button
+                onClick={() => sendMessage('How is my protein intake today compared to my target?')}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 font-medium shadow-sm hover:shadow-md hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 dark:hover:bg-emerald-900/30 dark:hover:border-emerald-800 dark:hover:text-emerald-400 transition-colors"
+              >
+                <Dumbbell className="h-3.5 w-3.5" />
+                How's my protein?
+              </button>
             </div>
           </div>
         ) : (
@@ -263,11 +280,17 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
                   transition={{ duration: 0.2 }}
                   className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
+                  {msg.role === 'ai' && (
+                    <div className="flex items-center gap-1 mb-1 pl-1">
+                      <Sparkles className="h-3 w-3 text-emerald-500" />
+                      <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">NutriAI</span>
+                    </div>
+                  )}
                   <div
                     className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
                       msg.role === 'user'
-                        ? 'bg-emerald-600 text-white rounded-br-md'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-bl-md'
+                        ? 'bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-br-md'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-bl-md border-l-2 border-emerald-200 dark:border-emerald-800'
                     }`}
                   >
                     {msg.content}
@@ -342,7 +365,7 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
               <button
                 key={action.label}
                 onClick={() => sendMessage(action.message, action.isSuggestMeal)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 font-medium whitespace-nowrap hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 dark:hover:bg-emerald-900/30 dark:hover:border-emerald-800 dark:hover:text-emerald-400 transition-colors shrink-0"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 font-medium whitespace-nowrap shadow-sm hover:shadow-md hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 dark:hover:bg-emerald-900/30 dark:hover:border-emerald-800 dark:hover:text-emerald-400 transition-colors shrink-0"
               >
                 <action.icon className="h-3.5 w-3.5" />
                 {action.label}
@@ -361,13 +384,13 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about nutrition..."
             disabled={loading}
-            className="flex-1 h-11 rounded-xl bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+            className="flex-1 h-12 rounded-xl bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-medium ring-1 ring-inset ring-gray-200 dark:ring-gray-700"
           />
           <Button
             type="submit"
             size="icon"
             disabled={!input.trim() || loading}
-            className="h-11 w-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 shrink-0"
+            className="h-12 w-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 shrink-0"
           >
             <Send className="h-4 w-4" />
           </Button>

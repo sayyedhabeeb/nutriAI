@@ -20,7 +20,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
-import { Camera, RotateCcw, Trash2, Plus, Search, ChevronDown, ChevronRight, Flame, Dumbbell, Wheat, Droplets } from 'lucide-react';
+import { Camera, RotateCcw, Trash2, Plus, Search, ChevronDown, ChevronRight, Flame, Dumbbell, Wheat, Droplets, UtensilsCrossed } from 'lucide-react';
 import { apiFetch } from './api';
 import { SLOTS, SLOT_LABELS, SLOT_ICONS, SLOT_BORDER_COLORS, fadeIn } from './constants';
 import type { FoodLogItem, SearchMeal } from './types';
@@ -59,6 +59,7 @@ export function FoodLogView() {
   const [searchLogServing, setSearchLogServing] = useState(100);
 
   const dates = Array.from({ length: 7 }, (_, i) => format(subDays(new Date(), 6 - i), 'yyyy-MM-dd'));
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
 
   const fetchLog = useCallback(async () => {
     setLoading(true);
@@ -152,7 +153,6 @@ export function FoodLogView() {
   const handleLogFromSearch = async () => {
     if (!logFromSearchDialog.open) return;
     const meal = logFromSearchDialog.meal;
-    setQuickSlot(quickSlot);
     try {
       await apiFetch('/api/food-logs', {
         method: 'POST',
@@ -172,7 +172,7 @@ export function FoodLogView() {
 
   return (
     <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-4">
-      <h1 className="text-xl font-bold text-gray-900">Food Log</h1>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Food Log</h1>
 
       {/* Feature 4: Search bar */}
       <motion.div
@@ -184,9 +184,9 @@ export function FoodLogView() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 shrink-0 pointer-events-none" />
           <button
             onClick={() => { setSearchQuery(''); setSearchResults([]); setSearchDialog(true); }}
-            className="w-full flex items-center gap-2 pl-10 pr-4 h-10 rounded-full bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors text-left"
+            className="w-full flex items-center gap-2 pl-10 pr-4 h-11 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-800 transition-all text-left"
           >
-            <span className="text-sm text-gray-400">Search meals to log...</span>
+            <span className="text-sm text-gray-400 dark:text-gray-500">Search meals to log...</span>
           </button>
         </div>
       </motion.div>
@@ -195,14 +195,15 @@ export function FoodLogView() {
       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         {dates.map((date) => {
           const isSelected = date === selectedDate;
+          const isToday = date === todayStr;
           return (
             <button
               key={date}
               onClick={() => setSelectedDate(date)}
               className={`flex flex-col items-center min-w-[52px] py-2 px-2 rounded-xl transition-all shrink-0 min-h-[44px] ${
                 isSelected
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200 dark:shadow-emerald-900/50'
+                  : `text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 ${isToday && !isSelected ? 'ring-1 ring-emerald-300 dark:ring-emerald-700' : ''}`
               }`}
             >
               <span className="text-[10px] font-medium uppercase">{format(parseISO(date), 'EEE')}</span>
@@ -211,24 +212,24 @@ export function FoodLogView() {
           );
         })}
       </div>
-      <div className="h-px bg-gray-200/60 -mt-1" />
+      <div className="h-px bg-gray-200/60 dark:bg-gray-800/60 -mt-1" />
 
       {/* Summary */}
-      <Card className="p-4 rounded-2xl shadow-sm border border-gray-100/80 bg-white">
+      <Card className="p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
         <div className="grid grid-cols-4 gap-2 text-center">
           {[
-            { label: 'Calories', val: foodLog?.totalCalories || 0, unit: 'kcal', color: 'text-orange-600', iconBg: 'bg-orange-100', Icon: Flame },
-            { label: 'Protein', val: foodLog?.totalProtein || 0, unit: 'g', color: 'text-blue-600', iconBg: 'bg-blue-100', Icon: Dumbbell },
-            { label: 'Carbs', val: foodLog?.totalCarbs || 0, unit: 'g', color: 'text-amber-600', iconBg: 'bg-amber-100', Icon: Wheat },
-            { label: 'Fat', val: foodLog?.totalFat || 0, unit: 'g', color: 'text-rose-600', iconBg: 'bg-rose-100', Icon: Droplets },
+            { label: 'Calories', val: foodLog?.totalCalories || 0, unit: 'kcal', color: 'text-orange-600 dark:text-orange-400', iconBg: 'bg-orange-100 dark:bg-orange-900/30', Icon: Flame },
+            { label: 'Protein', val: foodLog?.totalProtein || 0, unit: 'g', color: 'text-blue-600 dark:text-blue-400', iconBg: 'bg-blue-100 dark:bg-blue-900/30', Icon: Dumbbell },
+            { label: 'Carbs', val: foodLog?.totalCarbs || 0, unit: 'g', color: 'text-amber-600 dark:text-amber-400', iconBg: 'bg-amber-100 dark:bg-amber-900/30', Icon: Wheat },
+            { label: 'Fat', val: foodLog?.totalFat || 0, unit: 'g', color: 'text-rose-600 dark:text-rose-400', iconBg: 'bg-rose-100 dark:bg-rose-900/30', Icon: Droplets },
           ].map((s) => (
-            <div key={s.label} className="flex flex-col items-center gap-1.5">
-              <div className={`w-8 h-8 rounded-full ${s.iconBg} flex items-center justify-center`}>
+            <div key={s.label} className="flex flex-col items-center gap-1.5 border border-gray-100 dark:border-gray-800 rounded-xl p-2 shadow-sm">
+              <div className={`w-8 h-8 rounded-full ${s.iconBg} flex items-center justify-center`} >
                 <s.Icon className={`h-4 w-4 ${s.color}`} />
               </div>
               <div>
-                <p className={`text-lg font-bold ${s.color}`}>{Math.round(s.val)}</p>
-                <p className="text-xs text-gray-500 font-medium">{s.label}</p>
+                <p className={`text-lg font-bold ${s.color} tabular-nums`}>{Math.round(s.val)}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{s.label}</p>
               </div>
             </div>
           ))}
@@ -245,12 +246,12 @@ export function FoodLogView() {
 
       {/* Empty state */}
       {!loading && !hasItems && (
-        <Card className="p-8 text-center rounded-2xl shadow-sm border border-gray-100/80 bg-white">
-          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Camera className="h-8 w-8 text-gray-300" />
+        <Card className="p-8 text-center rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <UtensilsCrossed className="h-8 w-8 text-gray-300 dark:text-gray-600" />
           </div>
-          <p className="text-gray-700 font-semibold text-base">Start logging your meals!</p>
-          <p className="text-sm text-gray-400 mt-1">Search for meals or add a custom food</p>
+          <p className="text-gray-700 dark:text-gray-300 font-semibold text-base">No meals logged</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Search for meals or add a custom food</p>
         </Card>
       )}
 
@@ -259,33 +260,32 @@ export function FoodLogView() {
         const items = itemsBySlot[slot] || [];
         if (items.length === 0) return null;
         return (
-          <Card key={slot} className={`p-0 rounded-2xl shadow-sm border border-gray-100/80 border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden bg-white`}>
+          <Card key={slot} className={`p-0 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden bg-white dark:bg-gray-900`}>
             <div className="p-4 pb-2">
               <div className="flex items-center gap-2">
                 <span className="text-base">{SLOT_ICONS[slot]}</span>
-                <h3 className="font-semibold text-sm text-gray-900">{SLOT_LABELS[slot]}</h3>
-                <Badge variant="secondary" className="text-xs ml-auto bg-gray-100 text-gray-600">{items.length} item{items.length > 1 ? 's' : ''}</Badge>
+                <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100">{SLOT_LABELS[slot]}</h3>
+                <Badge variant="secondary" className="text-xs ml-auto bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">{items.length} item{items.length > 1 ? 's' : ''}</Badge>
               </div>
             </div>
             <div className="px-4 pb-3 space-y-3">
               {items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 border border-gray-100 group hover:shadow-sm hover:bg-gray-50/100 hover:border-gray-200/80 transition-all">
+                <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 group hover:shadow-sm hover:bg-gray-50/100 dark:hover:bg-gray-800/80 hover:border-gray-200/80 dark:hover:border-gray-700 transition-all">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{item.meal?.name || 'Unknown'}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{item.servingGms}g &middot; {Math.round(item.calories)} kcal &middot; P: {Math.round(item.proteinG * 10) / 10}g</p>
+                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{item.meal?.name || 'Unknown'}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-0.5">{item.servingGms}g &middot; {Math.round(item.calories)} kcal &middot; P: {Math.round(item.proteinG * 10) / 10}g</p>
                   </div>
                   <div className="flex items-center gap-0.5 shrink-0 ml-2">
-                    <Button
-                      variant="ghost" size="icon"
-                      className="h-7 w-7 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                    <button
+                      className="h-7 w-7 flex items-center justify-center rounded-lg text-emerald-600 dark:text-emerald-400 font-semibold text-xs hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
                       onClick={() => { setRelogDialog({ open: true, item }); setRelogSlot(item.mealSlot); }}
                       title="Log Again"
                     >
                       <RotateCcw className="h-3 w-3" />
-                    </Button>
+                    </button>
                     <Button
                       variant="ghost" size="icon"
-                      className="h-7 w-7 text-gray-300 hover:text-red-500 hover:bg-red-50"
+                      className="h-7 w-7 text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-40 hover:opacity-100 transition-opacity"
                       onClick={() => handleDelete(item.id)}
                     >
                       <Trash2 className="h-3 w-3" />
@@ -300,7 +300,7 @@ export function FoodLogView() {
 
       {/* Feature 1: Quick Add FAB (above nav) */}
       <motion.div
-        className="fixed bottom-20 right-4 z-40"
+        className="fixed bottom-24 right-4 z-40"
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.2 }}
@@ -366,7 +366,7 @@ export function FoodLogView() {
             {/* Collapsible macros */}
             <Collapsible open={showMacros} onOpenChange={setShowMacros}>
               <CollapsibleTrigger asChild>
-                <button className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium hover:text-emerald-700 transition-colors">
+                <button className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors">
                   <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showMacros ? 'rotate-180' : ''}`} />
                   {showMacros ? 'Hide' : 'Add'} protein, carbs & fat
                 </button>
@@ -383,15 +383,15 @@ export function FoodLogView() {
                     >
                       <div className="grid grid-cols-3 gap-2 pt-2">
                         <div className="space-y-1.5">
-                          <Label className="text-xs text-gray-500">Protein (g)</Label>
+                          <Label className="text-xs text-gray-500 dark:text-gray-400">Protein (g)</Label>
                           <Input type="number" placeholder="0" value={quickProtein} onChange={(e) => setQuickProtein(e.target.value)} min={0} className="h-10 rounded-lg text-sm" />
                         </div>
                         <div className="space-y-1.5">
-                          <Label className="text-xs text-gray-500">Carbs (g)</Label>
+                          <Label className="text-xs text-gray-500 dark:text-gray-400">Carbs (g)</Label>
                           <Input type="number" placeholder="0" value={quickCarbs} onChange={(e) => setQuickCarbs(e.target.value)} min={0} className="h-10 rounded-lg text-sm" />
                         </div>
                         <div className="space-y-1.5">
-                          <Label className="text-xs text-gray-500">Fat (g)</Label>
+                          <Label className="text-xs text-gray-500 dark:text-gray-400">Fat (g)</Label>
                           <Input type="number" placeholder="0" value={quickFat} onChange={(e) => setQuickFat(e.target.value)} min={0} className="h-10 rounded-lg text-sm" />
                         </div>
                       </div>
@@ -436,12 +436,12 @@ export function FoodLogView() {
               <div className="space-y-2">
                 {searchLoading && <div className="flex justify-center py-6"><SpinnerIcon /></div>}
                 {!searchLoading && searchQuery && searchResults.length === 0 && (
-                  <p className="text-sm text-gray-400 text-center py-6">No results found</p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">No results found</p>
                 )}
                 {!searchLoading && searchResults.map((meal) => (
                   <div
                     key={meal.id}
-                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:bg-emerald-50/50 hover:border-emerald-100 transition-colors cursor-pointer"
+                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 hover:border-emerald-100 dark:hover:border-emerald-800 transition-colors cursor-pointer"
                     onClick={() => {
                       setSearchLogServing(meal.baseServingGms || 100);
                       setLogFromSearchDialog({ open: true, meal });
@@ -449,16 +449,16 @@ export function FoodLogView() {
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-gray-800 truncate">{meal.name}</p>
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium border-gray-200 text-gray-500 shrink-0">{meal.cuisine}</Badge>
+                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{meal.name}</p>
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 shrink-0">{meal.cuisine}</Badge>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                         <span>{meal.nutrition?.calories || 0} kcal/100g</span>
                         <span>&middot;</span>
                         <span className="text-blue-600 font-medium">P: {meal.nutrition?.proteinG || 0}g</span>
                       </div>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-gray-300 shrink-0" />
+                    <ChevronRight className="h-4 w-4 text-gray-300 dark:text-gray-600 shrink-0" />
                   </div>
                 ))}
               </div>
@@ -473,7 +473,7 @@ export function FoodLogView() {
           <DialogHeader>
             <DialogTitle>Log Meal</DialogTitle>
             <DialogDescription className="flex items-center gap-2">
-              {logFromSearchDialog.open && <span className="font-medium text-gray-700">{logFromSearchDialog.meal.name}</span>}
+              {logFromSearchDialog.open && <span className="font-medium text-gray-700 dark:text-gray-300">{logFromSearchDialog.meal.name}</span>}
               {logFromSearchDialog.open && <Badge variant="outline" className="text-xs">{logFromSearchDialog.meal.cuisine}</Badge>}
             </DialogDescription>
           </DialogHeader>
@@ -483,13 +483,13 @@ export function FoodLogView() {
               <Input type="number" value={searchLogServing} onChange={(e) => setSearchLogServing(Number(e.target.value))} min={10} max={1000} className="h-11 rounded-xl" />
             </div>
             {logFromSearchDialog.open && logFromSearchDialog.meal.nutrition && (
-              <div className="bg-emerald-50 rounded-xl p-3 text-sm space-y-1 border border-emerald-100">
-                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1.5">Estimated for {searchLogServing}g serving</p>
+              <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-3 text-sm space-y-1 border border-emerald-100 dark:border-emerald-800">
+                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide mb-1.5">Estimated for {searchLogServing}g serving</p>
                 <div className="grid grid-cols-2 gap-1 text-xs">
-                  <span className="text-gray-600">Calories:</span><span className="font-bold text-gray-900">{Math.round((logFromSearchDialog.meal.nutrition!.calories / 100) * searchLogServing)} kcal</span>
-                  <span className="text-gray-600">Protein:</span><span className="font-bold text-blue-600">{Math.round((logFromSearchDialog.meal.nutrition!.proteinG / 100) * searchLogServing * 10) / 10}g</span>
-                  <span className="text-gray-600">Carbs:</span><span className="font-bold text-amber-600">{Math.round((logFromSearchDialog.meal.nutrition!.carbsG / 100) * searchLogServing * 10) / 10}g</span>
-                  <span className="text-gray-600">Fat:</span><span className="font-bold text-rose-600">{Math.round((logFromSearchDialog.meal.nutrition!.fatG / 100) * searchLogServing * 10) / 10}g</span>
+                  <span className="text-gray-600 dark:text-gray-400">Calories:</span><span className="font-bold text-gray-900 dark:text-gray-100">{Math.round((logFromSearchDialog.meal.nutrition!.calories / 100) * searchLogServing)} kcal</span>
+                  <span className="text-gray-600 dark:text-gray-400">Protein:</span><span className="font-bold text-blue-600">{Math.round((logFromSearchDialog.meal.nutrition!.proteinG / 100) * searchLogServing * 10) / 10}g</span>
+                  <span className="text-gray-600 dark:text-gray-400">Carbs:</span><span className="font-bold text-amber-600">{Math.round((logFromSearchDialog.meal.nutrition!.carbsG / 100) * searchLogServing * 10) / 10}g</span>
+                  <span className="text-gray-600 dark:text-gray-400">Fat:</span><span className="font-bold text-rose-600">{Math.round((logFromSearchDialog.meal.nutrition!.fatG / 100) * searchLogServing * 10) / 10}g</span>
                 </div>
               </div>
             )}

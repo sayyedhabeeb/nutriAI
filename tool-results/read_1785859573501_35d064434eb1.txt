@@ -1,0 +1,592 @@
+     1→'use client';
+     2→
+     3→import React, { useState, useEffect, useCallback } from 'react';
+     4→import { format, parseISO } from 'date-fns';
+     5→import { motion, AnimatePresence } from 'framer-motion';
+     6→import { toast } from 'sonner';
+     7→import {
+     8→  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+     9→  XAxis, YAxis, Tooltip, ResponsiveContainer,
+    10→} from 'recharts';
+    11→import { Button } from '@/components/ui/button';
+    12→import { Card } from '@/components/ui/card';
+    13→import { Input } from '@/components/ui/input';
+    14→import { Skeleton } from '@/components/ui/skeleton';
+    15→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+    16→import {
+    17→  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose,
+    18→} from '@/components/ui/dialog';
+    19→import { Label } from '@/components/ui/label';
+    20→import {
+    21→  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+    22→} from '@/components/ui/select';
+    23→import {
+    24→  TrendingUp, Flame, Dumbbell, Scale, Droplets, Plus, Minus,
+    25→  BarChart3, Download, Lightbulb, Trophy, Lock,
+    26→} from 'lucide-react';
+    27→import { apiFetch } from './api';
+    28→import { PIE_COLORS, fadeIn } from './constants';
+    29→
+    30→export function ProgressView() {
+    31→  const [tab, setTab] = useState('weekly');
+    32→  const [weeklyData, setWeeklyData] = useState<Record<string, unknown>[]>([]);
+    33→  const [summary, setSummary] = useState<Record<string, unknown> | null>(null);
+    34→  const [weightLogs, setWeightLogs] = useState<Record<string, unknown>[]>([]);
+    35→  const [waterGlasses, setWaterGlasses] = useState(0);
+    36→  const [loading, setLoading] = useState(true);
+    37→  const [weightInput, setWeightInput] = useState('');
+    38→  const [weightNotes, setWeightNotes] = useState('');
+    39→  const [justFilledIndex, setJustFilledIndex] = useState<number | null>(null);
+    40→
+    41→  // Achievements state
+    42→  const [achievements, setAchievements] = useState<{ id: string; name: string; description: string; icon: string; earned: boolean; earnedDate?: string }[]>([]);
+    43→
+    44→  // Export dialog state
+    45→  const [exportOpen, setExportOpen] = useState(false);
+    46→  const [exportFormat, setExportFormat] = useState('csv');
+    47→  const [exportDays, setExportDays] = useState('7');
+    48→  const [exporting, setExporting] = useState(false);
+    49→
+    50→  const fetchProgress = useCallback(async () => {
+    51→    setLoading(true);
+    52→    try {
+    53→      const [weekData, sumData, wLogs, waterData] = await Promise.all([
+    54→        apiFetch('/api/progress/weekly'),
+    55→        apiFetch(`/api/progress/summary?period=${tab === 'monthly' ? 'month' : 'week'}`),
+    56→        apiFetch('/api/weight-log?limit=30'),
+    57→        apiFetch('/api/water-log'),
+    58→      ]);
+    59→      setWeeklyData(weekData || []);
+    60→      setSummary(sumData?.summary || null);
+    61→      setWeightLogs(wLogs || []);
+    62→      setWaterGlasses(waterData?.glassesConsumed || 0);
+    63→
+    64→      // Fetch achievements
+    65→      try {
+    66→        const achData = await apiFetch('/api/achievements');
+    67→        setAchievements(achData.achievements || []);
+    68→      } catch {
+    69→        // Silent fail
+    70→      }
+    71→    } catch { toast.error('Failed to load progress'); }
+    72→    finally { setLoading(false); }
+    73→  }, [tab]);
+    74→
+    75→  useEffect(() => { fetchProgress(); }, [fetchProgress]);
+    76→
+    77→  const handleAddWater = async (delta: number) => {
+    78→    const newCount = waterGlasses + delta;
+    79→    if (newCount < 0) return;
+    80→    if (delta > 0) {
+    81→      setJustFilledIndex(waterGlasses);
+    82→      setTimeout(() => setJustFilledIndex(null), 600);
+    83→      try {
+    84→        await apiFetch('/api/water-log', { method: 'POST', body: JSON.stringify({ glasses: delta }) });
+    85→        setWaterGlasses(newCount);
+    86→        toast.success(`\uD83D\uDCA7 +${delta} glass${delta > 1 ? 'es' : ''} of water`);
+    87→      } catch { toast.error('Failed to log water'); }
+    88→    } else {
+    89→      setWaterGlasses(Math.max(0, newCount));
+    90→    }
+    91→  };
+    92→
+    93→  const handleLogWeight = async () => {
+    94→    if (!weightInput || Number(weightInput) <= 0) return;
+    95→    try {
+    96→      await apiFetch('/api/weight-log', { method: 'POST', body: JSON.stringify({ weightKg: Number(weightInput), notes: weightNotes || null }) });
+    97→      toast.success('Weight logged!');
+    98→      setWeightInput('');
+    99→      setWeightNotes('');
+   100→      fetchProgress();
+   101→    } catch (err) { toast.error((err as Error).message); }
+   102→  };
+   103→
+   104→  const handleExport = async () => {
+   105→    setExporting(true);
+   106→    try {
+   107→      const token = localStorage.getItem('nutriai_session');
+   108→      const url = `/api/export?format=${exportFormat}&days=${exportDays}`;
+   109→      const res = await fetch(url, {
+   110→        headers: { Authorization: `Bearer ${token}` },
+   111→      });
+   112→      if (!res.ok) throw new Error('Export failed');
+   113→      const blob = await res.blob();
+   114→      const ext = exportFormat === 'csv' ? 'csv' : 'json';
+   115→      const contentType = exportFormat === 'csv' ? 'text/csv' : 'application/json';
+   116→      const blobUrl = URL.createObjectURL(new Blob([blob], { type: contentType }));
+   117→      const a = document.createElement('a');
+   118→      a.href = blobUrl;
+   119→      a.download = `nutriai-export-${exportDays}days.${ext}`;
+   120→      document.body.appendChild(a);
+   121→      a.click();
+   122→      document.body.removeChild(a);
+   123→      URL.revokeObjectURL(blobUrl);
+   124→      toast.success('Data exported successfully!');
+   125→      setExportOpen(false);
+   126→    } catch {
+   127→      toast.error('Failed to export data');
+   128→    } finally {
+   129→      setExporting(false);
+   130→    }
+   131→  };
+   132→
+   133→  const chartData = weeklyData.map((d) => {
+   134→    const consumed = d.consumed as Record<string, number>;
+   135→    const targets = d.targets as Record<string, number> | null;
+   136→    return {
+   137→      date: format(parseISO(d.date as string), 'EEE'),
+   138→      calories: consumed?.calories || 0,
+   139→      target: targets?.calories || 0,
+   140→    };
+   141→  });
+   142→
+   143→  const allCaloriesZero = chartData.every((d) => d.calories === 0 && d.target === 0);
+   144→
+   145→  const macroData = [
+   146→    { name: 'Protein', value: summary?.avgProtein || 0, color: PIE_COLORS[0] },
+   147→    { name: 'Carbs', value: summary?.avgCarbs || 0, color: PIE_COLORS[1] },
+   148→    { name: 'Fat', value: summary?.avgFat || 0, color: PIE_COLORS[2] },
+   149→  ];
+   150→
+   151→  const weightChartData = weightLogs.slice().reverse().slice(-7).map((w) => ({
+   152→    date: format(parseISO(w.logDate as string), 'MMM d'),
+   153→    weight: w.weightKg as number,
+   154→  }));
+   155→
+   156→  const noWeightData = weightChartData.length < 2;
+   157→
+   158→  // Calorie breakdown table data - filter out zero-eaten days
+   159→  const breakdownData = weeklyData
+   160→    .map((d) => {
+   161→      const consumed = d.consumed as Record<string, number>;
+   162→      const targets = d.targets as Record<string, number> | null;
+   163→      const consumedCal = consumed?.calories || 0;
+   164→      const targetCal = targets?.calories || 0;
+   165→      const diff = consumedCal - targetCal;
+   166→      const pct = targetCal > 0 ? Math.round((consumedCal / targetCal) * 100) : 0;
+   167→      return {
+   168→        date: d.date as string,
+   169→        consumedCal,
+   170→        targetCal,
+   171→        diff,
+   172→        pct: Math.min(pct, 150),
+   173→      };
+   174→    })
+   175→    .filter((d) => d.consumedCal > 0);
+   176→
+   177→  const weeklyTotalConsumed = breakdownData.reduce((sum, d) => sum + d.consumedCal, 0);
+   178→  const weeklyTotalTarget = breakdownData.reduce((sum, d) => sum + d.targetCal, 0);
+   179→  const weeklyTotalDiff = weeklyTotalConsumed - weeklyTotalTarget;
+   180→
+   181→  const statCards = [
+   182→    { label: 'Avg Daily Calories', value: `${Math.round(summary?.avgCalories || 0)}`, icon: Flame, iconBg: 'bg-orange-100', iconColor: 'text-orange-600' },
+   183→    { label: 'Avg Protein', value: `${Math.round(summary?.avgProtein || 0)}g`, icon: Dumbbell, iconBg: 'bg-blue-100', iconColor: 'text-blue-600' },
+   184→    { label: 'Total Days', value: `${summary?.totalDays || 0}`, icon: TrendingUp, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
+   185→    { label: 'Current Weight', value: summary?.currentWeight ? `${summary.currentWeight}kg` : 'N/A', icon: Scale, iconBg: 'bg-purple-100', iconColor: 'text-purple-600' },
+   186→  ];
+   187→
+   188→  if (loading) {
+   189→    return (
+   190→      <div className="p-4 max-w-lg mx-auto space-y-4">
+   191→        <Skeleton className="h-8 w-32 rounded-xl" />
+   192→        <Skeleton className="h-64 w-full rounded-2xl" />
+   193→        <div className="grid grid-cols-2 gap-4"><Skeleton className="h-28 w-full rounded-2xl" /><Skeleton className="h-28 w-full rounded-2xl" /></div>
+   194→      </div>
+   195→    );
+   196→  }
+   197→
+   198→  return (
+   199→    <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-5">
+   200→      {/* Header */}
+   201→      <div className="flex items-center justify-between">
+   202→        <div className="flex items-center gap-2">
+   203→          <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
+   204→            <TrendingUp className="h-5 w-5 text-emerald-600" />
+   205→          </div>
+   206→          <h1 className="text-xl font-bold text-gray-900">Progress</h1>
+   207→        </div>
+   208→        <Button
+   209→          variant="outline"
+   210→          size="sm"
+   211→          className="rounded-xl gap-1.5 text-gray-600 hover:text-emerald-700"
+   212→          onClick={() => setExportOpen(true)}
+   213→        >
+   214→          <Download className="h-4 w-4" />
+   215→          <span className="hidden sm:inline">Export</span>
+   216→        </Button>
+   217→      </div>
+   218→
+   219→      {/* Export Dialog */}
+   220→      <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+   221→        <DialogContent className="sm:max-w-sm rounded-2xl">
+   222→          <DialogHeader>
+   223→            <DialogTitle>Export Data</DialogTitle>
+   224→          </DialogHeader>
+   225→          <div className="space-y-4 py-2">
+   226→            <div className="space-y-1.5">
+   227→              <Label className="text-sm font-medium">Format</Label>
+   228→              <Select value={exportFormat} onValueChange={setExportFormat}>
+   229→                <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+   230→                <SelectContent>
+   231→                  <SelectItem value="csv">CSV Spreadsheet</SelectItem>
+   232→                  <SelectItem value="json">JSON</SelectItem>
+   233→                </SelectContent>
+   234→              </Select>
+   235→            </div>
+   236→            <div className="space-y-1.5">
+   237→              <Label className="text-sm font-medium">Period</Label>
+   238→              <Select value={exportDays} onValueChange={setExportDays}>
+   239→                <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+   240→                <SelectContent>
+   241→                  <SelectItem value="7">Last 7 days</SelectItem>
+   242→                  <SelectItem value="14">Last 14 days</SelectItem>
+   243→                  <SelectItem value="30">Last 30 days</SelectItem>
+   244→                </SelectContent>
+   245→              </Select>
+   246→            </div>
+   247→          </div>
+   248→          <DialogFooter className="gap-2 sm:gap-0">
+   249→            <DialogClose asChild>
+   250→              <Button variant="outline" className="rounded-xl">Cancel</Button>
+   251→            </DialogClose>
+   252→            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl" onClick={handleExport} disabled={exporting}>
+   253→              {exporting ? 'Exporting...' : 'Download'}
+   254→            </Button>
+   255→          </DialogFooter>
+   256→        </DialogContent>
+   257→      </Dialog>
+   258→
+   259→      <Tabs value={tab} onValueChange={setTab}>
+   260→        <TabsList className="w-full rounded-xl">
+   261→          <TabsTrigger value="weekly" className="flex-1 rounded-lg">Weekly</TabsTrigger>
+   262→          <TabsTrigger value="monthly" className="flex-1 rounded-lg">Monthly</TabsTrigger>
+   263→        </TabsList>
+   264→      </Tabs>
+   265→
+   266→      {/* Calorie Chart */}
+   267→      <Card className="p-5 rounded-2xl shadow-sm border border-gray-100/80 bg-white">
+   268→        <h3 className="text-base font-semibold text-gray-800 mb-3">Calorie Intake</h3>
+   269→        <div className="h-48">
+   270→          {allCaloriesZero ? (
+   271→            <div className="h-full flex flex-col items-center justify-center py-8 text-gray-400">
+   272→              <BarChart3 className="h-12 w-12 mb-3 text-gray-200" />
+   273→              <p className="text-sm font-medium">Start logging meals to see your calorie trends!</p>
+   274→            </div>
+   275→          ) : (
+   276→            <ResponsiveContainer width="100%" height="100%">
+   277→              <BarChart data={chartData} barCategoryGap="20%">
+   278→                <XAxis dataKey="date" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+   279→                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+   280→                <Tooltip
+   281→                  contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+   282→                />
+   283→                <defs>
+   284→                  <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+   285→                    <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
+   286→                    <stop offset="100%" stopColor="#34d399" stopOpacity={0.8} />
+   287→                  </linearGradient>
+   288→                </defs>
+   289→                <Bar dataKey="calories" fill="url(#barGrad)" radius={[6, 6, 0, 0]} name="Consumed" />
+   290→                <Bar dataKey="target" fill="#e5e7eb" radius={[6, 6, 0, 0]} name="Target" />
+   291→              </BarChart>
+   292→            </ResponsiveContainer>
+   293→          )}
+   294→        </div>
+   295→      </Card>
+   296→
+   297→      {/* Macro Pie + Weight Trend */}
+   298→      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   299→        <Card className="p-5 rounded-2xl shadow-sm border border-gray-100/80 bg-white">
+   300→          <h3 className="text-base font-semibold text-gray-800 mb-2">Macro Breakdown</h3>
+   301→          <div className="h-40">
+   302→            <ResponsiveContainer width="100%" height="100%">
+   303→              <PieChart>
+   304→                <Pie data={macroData} cx="50%" cy="50%" innerRadius={35} outerRadius={55} dataKey="value" label={({ name, value }) => `${name}: ${value}g`} strokeWidth={2}>
+   305→                  {macroData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+   306→                </Pie>
+   307→                <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb' }} />
+   308→              </PieChart>
+   309→            </ResponsiveContainer>
+   310→          </div>
+   311→        </Card>
+   312→        <Card className="p-5 rounded-2xl shadow-sm border border-gray-100/80 bg-white">
+   313→          <h3 className="text-base font-semibold text-gray-800 mb-2">Weight Trend</h3>
+   314→          {noWeightData ? (
+   315→            <div className="h-40 flex flex-col items-center justify-center py-8 text-gray-400">
+   316→              <Scale className="h-10 w-10 mb-2 text-gray-200" />
+   317→              <p className="text-sm font-medium">Log your weight daily to track your progress!</p>
+   318→            </div>
+   319→          ) : (
+   320→            <div className="h-40">
+   321→              <ResponsiveContainer width="100%" height="100%">
+   322→                <LineChart data={weightChartData}>
+   323→                  <XAxis dataKey="date" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+   324→                  <YAxis domain={['dataMin - 1', 'dataMax + 1']} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+   325→                  <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb' }} />
+   326→                  <Line type="monotone" dataKey="weight" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 5 }} />
+   327→                </LineChart>
+   328→              </ResponsiveContainer>
+   329→            </div>
+   330→          )}
+   331→        </Card>
+   332→      </div>
+   333→
+   334→      {/* Stats Cards */}
+   335→      <div className="grid grid-cols-2 gap-3">
+   336→        {statCards.map((s) => (
+   337→          <Card key={s.label} className="p-4 rounded-2xl shadow-sm border border-gray-100/80 bg-white">
+   338→            <div className="flex items-center gap-2.5 mb-2">
+   339→              <div className={`w-10 h-10 ${s.iconBg} rounded-lg flex items-center justify-center`}>
+   340→                <s.icon className={`h-5 w-5 ${s.iconColor}`} />
+   341→              </div>
+   342→              <span className="text-xs text-gray-500 font-medium leading-tight">{s.label}</span>
+   343→            </div>
+   344→            <p className="text-2xl font-bold text-gray-900 pl-[60px]">{s.value}</p>
+   345→          </Card>
+   346→        ))}
+   347→      </div>
+   348→
+   349→      {/* Achievements Grid */}
+   350→      {achievements.length > 0 && (
+   351→        <Card className="p-4 rounded-2xl shadow-sm border border-gray-100/80 bg-white">
+   352→          <div className="flex items-center gap-2 mb-4">
+   353→            <Trophy className="h-4 w-4 text-amber-500" />
+   354→            <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">Achievements</h3>
+   355→            <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">{achievements.filter((a) => a.earned).length}/8 Unlocked</span>
+   356→          </div>
+   357→          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+   358→            {achievements.map((ach) => (
+   359→              <div
+   360→                key={ach.id}
+   361→                className={`relative p-3 rounded-xl border transition-colors ${
+   362→                  ach.earned
+   363→                    ? 'bg-white dark:bg-gray-900 border-l-4 border-l-emerald-500 border-t-0 border-r-0 border-b-0 border-emerald-200 dark:border-gray-700'
+   364→                    : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 opacity-50'
+   365→                }`}
+   366→              >
+   367→                <div className="flex items-center gap-2 mb-1">
+   368→                  {ach.earned ? (
+   369→                    <span className="text-3xl leading-none">{ach.icon}</span>
+   370→                  ) : (
+   371→                    <Lock className="h-6 w-6 text-gray-400 dark:text-gray-500" />
+   372→                  )}
+   373→                </div>
+   374→                <p className={`text-sm font-semibold ${ach.earned ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`}>
+   375→                  {ach.name}
+   376→                </p>
+   377→                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">
+   378→                  {ach.description}
+   379→                </p>
+   380→              </div>
+   381→            ))}
+   382→          </div>
+   383→        </Card>
+   384→      )}
+   385→
+   386→      {/* Calorie Breakdown Table */}
+   387→      <motion.div
+   388→        initial={{ opacity: 0, y: 8 }}
+   389→        animate={{ opacity: 1, y: 0 }}
+   390→        transition={{ delay: 0.2 }}
+   391→      >
+   392→        <Card className="p-0 rounded-2xl shadow-sm border border-gray-100/80 bg-white overflow-hidden">
+   393→          {/* Table header */}
+   394→          <div className="bg-gray-50/80 px-5 py-3 border-b border-gray-100">
+   395→            <h3 className="text-base font-semibold text-gray-800">Calorie Breakdown</h3>
+   396→            <p className="text-xs text-gray-400 mt-0.5">This week&apos;s daily calorie tracking</p>
+   397→          </div>
+   398→
+   399→          {breakdownData.length === 0 ? (
+   400→            <div className="py-10 flex flex-col items-center justify-center text-gray-400">
+   401→              <Flame className="h-10 w-10 mb-2 text-gray-200" />
+   402→              <p className="text-sm font-medium">No meals logged yet this week</p>
+   403→              <p className="text-xs text-gray-300 mt-1">Start logging meals to see your breakdown</p>
+   404→            </div>
+   405→          ) : (
+   406→            <>
+   407→              {/* Column headers */}
+   408→              <div className="grid grid-cols-12 gap-1 px-5 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+   409→                <div className="col-span-3">Date</div>
+   410→                <div className="col-span-3 text-right">Eaten</div>
+   411→                <div className="col-span-3 text-right">Target</div>
+   412→                <div className="col-span-3 text-right">Diff</div>
+   413→              </div>
+   414→
+   415→              {/* Table rows */}
+   416→              <div className="divide-y divide-gray-50">
+   417→                {breakdownData.map((row, idx) => {
+   418→                  const isOver = row.diff > 0;
+   419→                  const isToday = row.date === format(new Date(), 'yyyy-MM-dd');
+   420→                  return (
+   421→                    <div
+   422→                      key={row.date}
+   423→                      className={`grid grid-cols-12 gap-1 py-3 px-4 items-center text-xs hover:bg-gray-50/50 transition-colors ${
+   424→                        isToday
+   425→                          ? 'bg-emerald-50/80 border-l-[3px] border-l-emerald-500'
+   426→                          : ''
+   427→                      }`}
+   428→                    >
+   429→                      {/* Date column */}
+   430→                      <div className="col-span-3 flex items-center gap-1.5">
+   431→                        {isToday && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />}
+   432→                        <span className={`${isToday ? 'font-semibold text-emerald-700' : 'text-gray-700'}`}>{
+   433→                          format(parseISO(row.date), 'EEE d')
+   434→                        }</span>
+   435→                      </div>
+   436→
+   437→                      {/* Consumed */}
+   438→                      <div className="col-span-3 text-right font-medium text-gray-800">
+   439→                        {row.consumedCal.toLocaleString()}
+   440→                        <span className="text-gray-400 ml-0.5">kcal</span>
+   441→                      </div>
+   442→
+   443→                      {/* Target */}
+   444→                      <div className="col-span-3 text-right text-gray-500">
+   445→                        {row.targetCal.toLocaleString()}
+   446→                      </div>
+   447→
+   448→                      {/* Difference + mini bar */}
+   449→                      <div className="col-span-3 flex flex-col items-end gap-1">
+   450→                        <span className={`font-medium ${isOver ? 'text-red-500' : 'text-emerald-600'}`}>{
+   451→                          isOver ? '+' : ''}{row.diff}
+   452→                        </span>
+   453→                        <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+   454→                          <motion.div
+   455→                            className={`h-full rounded-full ${isOver ? 'bg-red-400' : 'bg-emerald-400'}`}
+   456→                            initial={{ width: 0 }}
+   457→                            animate={{ width: `${Math.min(row.pct, 100)}%` }}
+   458→                            transition={{ duration: 0.6, delay: idx * 0.05 }}
+   459→                          />
+   460→                        </div>
+   461→                      </div>
+   462→                    </div>
+   463→                  );
+   464→                })}
+   465→              </div>
+   466→
+   467→              {/* Weekly total row */}
+   468→              <div className="grid grid-cols-12 gap-1 px-5 py-3 bg-gray-50 border-t border-gray-200 text-xs font-bold">
+   469→                <div className="col-span-3 text-gray-700">Total</div>
+   470→                <div className="col-span-3 text-right text-gray-900">{weeklyTotalConsumed.toLocaleString()}</div>
+   471→                <div className="col-span-3 text-right text-gray-500">{weeklyTotalTarget.toLocaleString()}</div>
+   472→                <div className={`col-span-3 text-right ${weeklyTotalDiff > 0 ? 'text-red-500' : 'text-emerald-600'}`}>{
+   473→                  weeklyTotalDiff > 0 ? '+' : ''}{weeklyTotalDiff}
+   474→                </div>
+   475→              </div>
+   476→            </>
+   477→          )}
+   478→        </Card>
+   479→      </motion.div>
+   480→
+   481→      {/* Water Tracking */}
+   482→      <Card className="p-5 rounded-2xl shadow-sm border border-gray-100/80 bg-white">
+   483→        <div className="flex items-center justify-between mb-4">
+   484→          <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+   485→            <Droplets className="h-4 w-4 text-blue-500" /> Water Intake
+   486→          </h3>
+   487→          <span className="text-sm font-semibold text-gray-700">{waterGlasses} / 8 glasses</span>
+   488→        </div>
+   489→        <div className="flex items-center justify-center gap-4">
+   490→          <Button
+   491→            size="icon"
+   492→            variant="outline"
+   493→            className="h-10 w-10 rounded-xl"
+   494→            onClick={() => handleAddWater(-1)}
+   495→            disabled={waterGlasses <= 0}
+   496→          >
+   497→            <Minus className="h-4 w-4" />
+   498→          </Button>
+   499→          <div className="flex gap-2 flex-wrap justify-center">
+   500→            {Array.from({ length: 8 }, (_, i) => {
+   501→              const isFilled = i < waterGlasses;
+   502→              const isJustFilled = justFilledIndex === i;
+   503→              return (
+   504→                <motion.div
+   505→                  key={i}
+   506→                  className="relative"
+   507→                  animate={isJustFilled ? { scale: [1, 1.25, 1] } : {}}
+   508→                  transition={{ duration: 0.4, ease: 'easeOut' }}
+   509→                >
+   510→                  <motion.div
+   511→                    className={`w-7 h-9 rounded-md border-2 flex items-center justify-center transition-colors ${
+   512→                      isFilled
+   513→                        ? 'bg-blue-100 border-blue-300'
+   514→                        : 'bg-gray-50 border-gray-200'
+   515→                    }`}
+   516→                    animate={{
+   517→                      backgroundColor: isJustFilled ? ['#bfdbfe', '#dbeafe'] : undefined,
+   518→                    }}
+   519→                    transition={{ duration: 0.4 }}
+   520→                  >
+   521→                    <Droplets
+   522→                      className={`h-4 w-4 transition-colors ${
+   523→                        isFilled ? 'text-blue-500' : 'text-gray-200'
+   524→                      }`}
+   525→                    />
+   526→                  </motion.div>
+   527→                  {isJustFilled && (
+   528→                    <motion.div
+   529→                      className="absolute inset-0 rounded-md bg-blue-400/20"
+   530→                      initial={{ opacity: 1, scale: 0.8 }}
+   531→                      animate={{ opacity: 0, scale: 1.4 }}
+   532→                      transition={{ duration: 0.6 }}
+   533→                    />
+   534→                  )}
+   535→                </motion.div>
+   536→              );
+   537→            })}
+   538→          </div>
+   539→          <Button
+   540→            size="icon"
+   541→            className="h-10 w-10 bg-blue-500 hover:bg-blue-600 rounded-xl"
+   542→            onClick={() => handleAddWater(1)}
+   543→            disabled={waterGlasses >= 16}
+   544→          >
+   545→            <Plus className="h-4 w-4" />
+   546→          </Button>
+   547→        </div>
+   548→      </Card>
+   549→
+   550→      {/* Weight Logging */}
+   551→      <Card className="p-5 rounded-2xl shadow-sm border border-gray-100/80 bg-white">
+   552→        <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+   553→          <Scale className="h-4 w-4 text-purple-500" /> Log Weight
+   554→        </h3>
+   555→        <div className="flex gap-2">
+   556→          <Input
+   557→            type="number"
+   558→            placeholder="e.g., 74.5"
+   559→            value={weightInput}
+   560→            onChange={(e) => setWeightInput(e.target.value)}
+   561→            className="flex-1 rounded-xl h-11"
+   562→          />
+   563→          <Input
+   564→            placeholder="Optional notes..."
+   565→            value={weightNotes}
+   566→            onChange={(e) => setWeightNotes(e.target.value)}
+   567→            className="flex-1 rounded-xl h-11"
+   568→          />
+   569→          <Button
+   570→            className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl min-h-[44px] font-semibold px-5"
+   571→            onClick={handleLogWeight}
+   572→            disabled={!weightInput}
+   573→          >
+   574→            Log
+   575→          </Button>
+   576→        </div>
+   577→        {weightLogs.length > 0 && (
+   578→          <div className="mt-4 space-y-1">
+   579→            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-2">Recent Entries</p>
+   580→            {weightLogs.slice(0, 5).map((w) => (
+   581→              <div key={w.id as string} className="flex justify-between text-xs text-gray-600 py-2 px-3 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors rounded">
+   582→                <span>{format(parseISO(w.logDate as string), 'MMM d, yyyy')}</span>
+   583→                <span className="font-semibold">{w.weightKg as number} kg</span>
+   584→              </div>
+   585→            ))}
+   586→          </div>
+   587→        )}
+   588→      </Card>
+   589→    </motion.div>
+   590→  );
+   591→}
+   592→
