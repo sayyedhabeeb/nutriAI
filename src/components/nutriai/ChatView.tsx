@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Sparkles, Utensils, TrendingUp, Lightbulb, Loader2, Dumbbell } from 'lucide-react';
+import { Send, Sparkles, Utensils, TrendingUp, Lightbulb, Loader2, Dumbbell, Camera, CalendarDays, Scale } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +40,8 @@ const QUICK_ACTIONS = [
   { label: 'Suggest a meal', icon: Utensils, message: 'Suggest a healthy meal I can eat right now based on my current nutrition intake.', isSuggestMeal: true },
   { label: 'Am I on track?', icon: TrendingUp, message: 'Am I on track to hit my daily nutrition goals today?' },
   { label: 'Nutrition tips', icon: Lightbulb, message: 'Give me a quick nutrition tip that can help me improve my diet.' },
+  { label: 'My meal plan', icon: CalendarDays, message: 'Show me my meal plan for today and suggest alternatives if needed.' },
+  { label: 'Log my weight', icon: Scale, message: 'I want to update my weight. How should I track it?' },
 ];
 
 export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void }) {
@@ -216,7 +218,7 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
   const lastAiMessage = [...messages].reverse().find(m => m.role === 'ai');
 
   return (
-    <motion.div {...fadeIn} className="flex flex-col h-[calc(100vh-5rem)] max-w-lg mx-auto bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-950">
+    <motion.div {...fadeIn} className="flex flex-col h-[calc(100vh-5rem)] max-w-lg mx-auto bg-gradient-to-b from-white via-white to-gray-50/80 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950">
       {/* Header */}
       <div className="p-4 pb-3 flex items-center gap-3">
         <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-sm">
@@ -241,31 +243,17 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
             </div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Hi, I&apos;m NutriAI!</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 text-center max-w-xs">Ask me about your diet, meal suggestions, or nutrition tips</p>
-            <div className="flex flex-wrap gap-2 mt-6 justify-center">
+            <div className="grid grid-cols-2 gap-2 w-full max-w-xs mt-4 justify-center">
               {QUICK_ACTIONS.map((action) => (
                 <button
                   key={action.label}
                   onClick={() => sendMessage(action.message, action.isSuggestMeal)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 font-medium shadow-sm hover:shadow-md hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 dark:hover:bg-emerald-900/30 dark:hover:border-emerald-800 dark:hover:text-emerald-400 transition-colors"
+                  className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-gradient-to-br from-white to-gray-50/80 dark:from-gray-800 dark:to-gray-800/50 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 font-medium shadow-sm hover:shadow-md hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 dark:hover:bg-emerald-900/30 dark:hover:border-emerald-800 dark:hover:text-emerald-400 transition-colors"
                 >
                   <action.icon className="h-3.5 w-3.5" />
                   {action.label}
                 </button>
               ))}
-              <button
-                onClick={() => sendMessage('What should I eat right now based on my nutrition goals?')}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 font-medium shadow-sm hover:shadow-md hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 dark:hover:bg-emerald-900/30 dark:hover:border-emerald-800 dark:hover:text-emerald-400 transition-colors"
-              >
-                <Utensils className="h-3.5 w-3.5" />
-                What should I eat?
-              </button>
-              <button
-                onClick={() => sendMessage('How is my protein intake today compared to my target?')}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 font-medium shadow-sm hover:shadow-md hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 dark:hover:bg-emerald-900/30 dark:hover:border-emerald-800 dark:hover:text-emerald-400 transition-colors"
-              >
-                <Dumbbell className="h-3.5 w-3.5" />
-                How's my protein?
-              </button>
             </div>
           </div>
         ) : (
@@ -378,6 +366,14 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
       {/* Input bar */}
       <div className="p-4 pt-2 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
         <form onSubmit={handleSubmit} className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onNavigate?.('upload')}
+            className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-200 dark:hover:border-emerald-800 transition-colors shrink-0"
+            title="Scan food photo"
+          >
+            <Camera className="h-4 w-4" />
+          </button>
           <Input
             ref={inputRef}
             value={input}

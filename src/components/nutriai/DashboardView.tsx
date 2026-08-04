@@ -299,17 +299,17 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
 
       {/* ═══ Quick Stats Row ═══ */}
       <div className="grid grid-cols-3 gap-2.5">
-        <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100/60 dark:border-gray-800/60 shadow-sm text-center">
-          <p className="text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">{mealsLoggedToday}</p>
-          <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Meals Logged</p>
+        <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100/60 dark:border-gray-800/60 border-t-2 border-t-emerald-400 shadow-sm text-center">
+          <p className="text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">{mealsLoggedToday}</p>
+          <p className="text-[11px] text-gray-600 dark:text-gray-400 font-semibold">Meals Logged</p>
         </div>
-        <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100/60 dark:border-gray-800/60 shadow-sm text-center">
-          <p className="text-lg font-bold text-cyan-600 dark:text-cyan-400 tabular-nums">{waterCount}</p>
-          <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Glasses</p>
+        <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100/60 dark:border-gray-800/60 border-t-2 border-t-cyan-400 shadow-sm text-center">
+          <p className="text-xl font-bold text-cyan-600 dark:text-cyan-400 tabular-nums">{waterCount}</p>
+          <p className="text-[11px] text-gray-600 dark:text-gray-400 font-semibold">Glasses</p>
         </div>
-        <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100/60 dark:border-gray-800/60 shadow-sm text-center">
-          <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{streak}</p>
-          <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">Day Streak</p>
+        <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100/60 dark:border-gray-800/60 border-t-2 border-t-amber-400 shadow-sm text-center">
+          <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{streak}</p>
+          <p className="text-[11px] text-gray-600 dark:text-gray-400 font-semibold">Day Streak</p>
         </div>
       </div>
 
@@ -319,9 +319,14 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
           <CalorieRing consumed={consumedCal} target={targetCal} />
         </div>
         {pctConsumed >= 1 && (
-          <p className="text-center text-sm text-rose-600 font-medium mt-2">
-            You&apos;ve reached your calorie goal! Great job! {'\uD83C\uDF89'}
-          </p>
+          <motion.p
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 200 }}
+            className="text-center text-sm text-emerald-600 dark:text-emerald-400 font-bold mt-3"
+          >
+            You&apos;ve reached your calorie goal! Great job! 🎉
+          </motion.p>
         )}
       </Card>
 
@@ -368,7 +373,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
             {[1, 2, 3, 4, 5, 6, 7, 8].map((g) => (
               <div
                 key={g}
-                className={`h-6 flex-1 rounded-md transition-colors ${g <= waterCount ? 'bg-cyan-400 dark:bg-cyan-500' : 'bg-gray-100 dark:bg-gray-800'}`}
+                className={`h-6 flex-1 rounded-lg transition-all duration-500 ${g <= waterCount ? 'bg-gradient-to-t from-cyan-500 to-cyan-300 dark:from-cyan-600 dark:to-cyan-400' : 'bg-gray-100 dark:bg-gray-800'}`}
               />
             ))}
           </div>
@@ -688,30 +693,6 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
             </Card>
           );
         })}
-      </div>
-
-      {/* ═══ FAB buttons ═══ */}
-      <div className="fixed bottom-24 right-4 z-40 flex flex-col items-end gap-2">
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-2 group">
-            <span className="text-xs text-gray-600 dark:text-gray-300 font-medium bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 px-2.5 py-1 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Add Water</span>
-            <Button size="icon" className="w-11 h-11 rounded-full bg-cyan-500 hover:bg-cyan-600 text-white shadow-lg" onClick={handleWaterAdd}>
-              <Droplets className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="flex items-center gap-2 group">
-            <span className="text-xs text-gray-600 dark:text-gray-300 font-medium bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 px-2.5 py-1 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Search Meals</span>
-            <Button size="icon" className="w-11 h-11 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg" onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot: 'lunch' }); }}>
-              <Search className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="flex items-center gap-2 group">
-            <span className="text-xs text-gray-600 dark:text-gray-300 font-medium bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 px-2.5 py-1 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Scan Food</span>
-            <Button size="icon" className="w-11 h-11 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg" onClick={() => onNavigate('upload')}>
-              <Camera className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
       </div>
 
       {/* ═══ Log Meal Dialog ═══ */}

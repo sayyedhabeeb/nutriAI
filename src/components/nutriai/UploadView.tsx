@@ -121,7 +121,7 @@ export function UploadView() {
             </div>
           ) : (
             <div className="space-y-4 text-center">
-              <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center mx-auto border border-emerald-100 dark:border-emerald-800">
+              <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center mx-auto border border-emerald-100 dark:border-emerald-800 animate-[bounce_3s_ease-in-out_infinite]">
                 <Camera className="h-8 w-8 text-emerald-400 dark:text-emerald-500" />
               </div>
               <div>
@@ -191,6 +191,13 @@ export function UploadView() {
           </div>
         </div>
       </Card>
+
+      {/* Empty state note */}
+      {!imagePreview && !results.length && (
+        <p className="text-center text-xs text-gray-400 dark:text-gray-500">
+          No recent scans. Upload a food photo to get started.
+        </p>
+      )}
 
       {/* Recognize Button */}
       {imageFile && !results.length && (

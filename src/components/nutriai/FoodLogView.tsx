@@ -31,6 +31,7 @@ export function FoodLogView() {
   const [loading, setLoading] = useState(true);
   const [relogDialog, setRelogDialog] = useState<{ open: boolean; item: FoodLogItem } | { open: false }>({ open: false });
   const [relogSlot, setRelogSlot] = useState('lunch');
+  const [nutritionTargets, setNutritionTargets] = useState<Record<string, number>>({});
 
   // Feature 1: Quick Add Custom Food
   const [quickAddDialog, setQuickAddDialog] = useState(false);
@@ -60,6 +61,18 @@ export function FoodLogView() {
 
   const dates = Array.from({ length: 7 }, (_, i) => format(subDays(new Date(), 6 - i), 'yyyy-MM-dd'));
   const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+  useEffect(() => {
+    apiFetch('/api/nutrition/daily').then((d: Record<string, unknown>) => {
+      const targets = d.targets as Record<string, number> | undefined;
+      setNutritionTargets({
+        calories: targets?.calories || 0,
+        proteinG: targets?.proteinG || 0,
+        carbsG: targets?.carbsG || 0,
+        fatG: targets?.fatG || 0,
+      });
+    }).catch(() => {});
+  }, []);
 
   const fetchLog = useCallback(async () => {
     setLoading(true);
@@ -208,11 +221,27 @@ export function FoodLogView() {
             >
               <span className="text-[10px] font-medium uppercase">{format(parseISO(date), 'EEE')}</span>
               <span className={`text-sm font-bold ${isSelected ? '' : ''}`}>{format(parseISO(date), 'd')}</span>
+              {isToday && !isSelected && (
+                <span className="w-1 h-1 rounded-full bg-emerald-500 mt-0.5" />
+              )}
             </button>
           );
         })}
       </div>
       <div className="h-px bg-gray-200/60 dark:bg-gray-800/60 -mt-1" />
+      <div className="flex justify-between items-center mb-1">
+        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+          {format(parseISO(dates[0]), 'MMM d')} – {format(parseISO(dates[dates.length - 1]), 'MMM d')}
+        </span>
+        {selectedDate !== todayStr && (
+          <button
+            onClick={() => setSelectedDate(todayStr)}
+            className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold hover:underline"
+          >
+            Today
+          </button>
+        )}
+      </div>
 
       {/* Summary */}
       <Card className="p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
@@ -222,17 +251,29 @@ export function FoodLogView() {
             { label: 'Protein', val: foodLog?.totalProtein || 0, unit: 'g', color: 'text-blue-600 dark:text-blue-400', iconBg: 'bg-blue-100 dark:bg-blue-900/30', Icon: Dumbbell },
             { label: 'Carbs', val: foodLog?.totalCarbs || 0, unit: 'g', color: 'text-amber-600 dark:text-amber-400', iconBg: 'bg-amber-100 dark:bg-amber-900/30', Icon: Wheat },
             { label: 'Fat', val: foodLog?.totalFat || 0, unit: 'g', color: 'text-rose-600 dark:text-rose-400', iconBg: 'bg-rose-100 dark:bg-rose-900/30', Icon: Droplets },
-          ].map((s) => (
-            <div key={s.label} className="flex flex-col items-center gap-1.5 border border-gray-100 dark:border-gray-800 rounded-xl p-2 shadow-sm">
-              <div className={`w-8 h-8 rounded-full ${s.iconBg} flex items-center justify-center`} >
-                <s.Icon className={`h-4 w-4 ${s.color}`} />
-              </div>
-              <div>
+          ].map((s) => {
+            const targetKey = s.unit === 'kcal' ? 'calories' : s.label === 'Protein' ? 'proteinG' : s.label === 'Carbs' ? 'carbsG' : 'fatG';
+            const targetVal = nutritionTargets[targetKey] || 0;
+            return (
+              <div key={s.label} className="flex flex-col items-center gap-1.5 border border-gray-100 dark:border-gray-800 rounded-xl p-2.5 shadow-sm">
+                <div className={`w-8 h-8 rounded-full ${s.iconBg} flex items-center justify-center`}>
+                  <s.Icon className={`h-4 w-4 ${s.color}`} />
+                </div>
                 <p className={`text-lg font-bold ${s.color} tabular-nums`}>{Math.round(s.val)}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{s.label}</p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">{s.label}</p>
+                {targetVal > 0 && (
+                  <div className="w-full h-1 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${
+                        s.label === 'Calories' ? 'bg-orange-500' : s.label === 'Protein' ? 'bg-blue-500' : s.label === 'Carbs' ? 'bg-amber-500' : 'bg-rose-500'
+                      }`}
+                      style={{ width: `${Math.min(100, Math.round(s.val / targetVal * 100))}%` }}
+                    />
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </Card>
 
@@ -272,8 +313,12 @@ export function FoodLogView() {
               {items.map((item) => (
                 <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 group hover:shadow-sm hover:bg-gray-50/100 dark:hover:bg-gray-800/80 hover:border-gray-200/80 dark:hover:border-gray-700 transition-all">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{item.meal?.name || 'Unknown'}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-0.5">{item.servingGms}g &middot; {Math.round(item.calories)} kcal &middot; P: {Math.round(item.proteinG * 10) / 10}g</p>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{item.meal?.name || 'Unknown'}</p>
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{item.servingGms}g</p>
+                  </div>
+                  <div className="text-right shrink-0 mr-2">
+                    <p className="text-sm font-bold text-gray-800 dark:text-gray-200 tabular-nums">{Math.round(item.calories)}</p>
+                    <p className="text-[10px] text-gray-400 dark:text-gray-500">kcal</p>
                   </div>
                   <div className="flex items-center gap-0.5 shrink-0 ml-2">
                     <button

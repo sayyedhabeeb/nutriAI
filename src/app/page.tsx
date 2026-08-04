@@ -88,18 +88,18 @@ export default function NutriAIPage() {
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
                 }`}
               >
-                <div className={`flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-xl transition-colors ${
+                <div className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-all duration-200 ${
                   activeTab === tab
-                    ? 'bg-emerald-50 dark:bg-emerald-900/30'
+                    ? 'bg-emerald-50 dark:bg-emerald-900/30 shadow-sm'
                     : ''
                 }`}>
-                  <Icon className="h-5 w-5" strokeWidth={activeTab === tab ? 2.5 : 2} />
+                  <Icon className={`h-5 w-5 transition-transform duration-200 ${activeTab === tab ? 'scale-110' : ''}`} strokeWidth={activeTab === tab ? 2.5 : 1.8} />
                   <span className={`text-[10px] ${activeTab === tab ? 'font-semibold' : 'font-medium'}`}>{label}</span>
                 </div>
               </button>
             ))}
             <div className="ml-1 flex items-center">
-              <ThemeToggle />
+              <ThemeToggle aria-label="Toggle theme" />
             </div>
           </div>
         </nav>

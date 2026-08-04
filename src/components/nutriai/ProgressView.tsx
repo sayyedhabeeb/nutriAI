@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select';
 import {
   TrendingUp, Flame, Dumbbell, Scale, Droplets, Plus, Minus,
-  BarChart3, Download, Lightbulb, Trophy, Lock,
+  BarChart3, Download, Lightbulb, Trophy, Lock, CalendarDays,
 } from 'lucide-react';
 import { apiFetch } from './api';
 import { PIE_COLORS, fadeIn } from './constants';
@@ -142,6 +142,9 @@ export function ProgressView() {
 
   const allCaloriesZero = chartData.every((d) => d.calories === 0 && d.target === 0);
 
+  const nonZeroDays = weeklyData.filter((d) => (d.consumed as Record<string, number>)?.calories > 0).length;
+  const isSparse = weeklyData.length > 0 && nonZeroDays <= 1;
+
   const macroData = [
     { name: 'Protein', value: summary?.avgProtein || 0, color: PIE_COLORS[0] },
     { name: 'Carbs', value: summary?.avgCarbs || 0, color: PIE_COLORS[1] },
@@ -179,10 +182,10 @@ export function ProgressView() {
   const weeklyTotalDiff = weeklyTotalConsumed - weeklyTotalTarget;
 
   const statCards = [
-    { label: 'Avg Daily Calories', value: `${Math.round(summary?.avgCalories || 0)}`, icon: Flame, iconBg: 'bg-orange-100', iconColor: 'text-orange-600' },
-    { label: 'Avg Protein', value: `${Math.round(summary?.avgProtein || 0)}g`, icon: Dumbbell, iconBg: 'bg-blue-100', iconColor: 'text-blue-600' },
-    { label: 'Total Days', value: `${summary?.totalDays || 0}`, icon: TrendingUp, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
-    { label: 'Current Weight', value: summary?.currentWeight ? `${summary.currentWeight}kg` : 'N/A', icon: Scale, iconBg: 'bg-purple-100', iconColor: 'text-purple-600' },
+    { label: 'Avg Daily Calories', value: `${Math.round(summary?.avgCalories || 0)}`, icon: Flame, iconBg: 'bg-orange-100 dark:bg-orange-900/30', iconColor: 'text-orange-600 dark:text-orange-400' },
+    { label: 'Avg Protein', value: `${Math.round(summary?.avgProtein || 0)}g`, icon: Dumbbell, iconBg: 'bg-blue-100 dark:bg-blue-900/30', iconColor: 'text-blue-600 dark:text-blue-400' },
+    { label: 'Total Days', value: `${summary?.totalDays || 0}`, icon: CalendarDays, iconBg: 'bg-emerald-100 dark:bg-emerald-900/30', iconColor: 'text-emerald-600 dark:text-emerald-400' },
+    { label: 'Current Weight', value: summary?.currentWeight ? `${summary.currentWeight}kg` : 'N/A', icon: Scale, iconBg: 'bg-purple-100 dark:bg-purple-900/30', iconColor: 'text-purple-600 dark:text-purple-400' },
   ];
 
   if (loading) {
@@ -207,9 +210,9 @@ export function ProgressView() {
         </div>
         <button
           onClick={() => setExportOpen(true)}
-          className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5"
+          className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm hover:shadow-md rounded-xl px-3.5 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all flex items-center gap-2"
         >
-          <Download className="h-3.5 w-3.5" />
+          <Download className="h-4 w-4" />
           <span className="hidden sm:inline">Export</span>
         </button>
       </div>
@@ -264,7 +267,12 @@ export function ProgressView() {
       {/* Calorie Chart */}
       <Card className="p-5 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
         <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3">Calorie Intake</h3>
-        <div className="h-48">
+        <div className="h-48 relative">
+          {isSparse && !allCaloriesZero && (
+            <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/70 dark:bg-gray-900/70 rounded-lg">
+              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">Log meals to see your weekly trends</p>
+            </div>
+          )}
           {allCaloriesZero ? (
             <div className="h-full flex flex-col items-center justify-center py-8 text-gray-400">
               <BarChart3 className="h-12 w-12 mb-3 text-gray-200" />
@@ -389,15 +397,15 @@ export function ProgressView() {
       {/* Stats Cards */}
       <div className="grid grid-cols-2 gap-3">
         {statCards.map((s) => (
-          <Card key={s.label} className="p-4 rounded-2xl shadow-md border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
-            <div className="flex items-center gap-2.5 mb-2">
-              <div className={`w-10 h-10 ${s.iconBg} rounded-lg flex items-center justify-center`}>
-                <s.icon className={`h-5 w-5 ${s.iconColor}`} />
-              </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400 font-medium leading-tight">{s.label}</span>
+          <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl bg-gray-50/80 dark:bg-gray-800/30">
+            <div className={`w-9 h-9 rounded-lg ${s.iconBg} flex items-center justify-center shrink-0`}>
+              <s.icon className={`h-4 w-4 ${s.iconColor}`} />
             </div>
-            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 pl-[60px] tabular-nums">{s.value}</p>
-          </Card>
+            <div>
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium uppercase">{s.label}</p>
+              <p className="text-base font-bold text-gray-900 dark:text-gray-100 tabular-nums">{s.value}</p>
+            </div>
+          </div>
         ))}
       </div>
 

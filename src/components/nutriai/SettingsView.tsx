@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Settings, User, Target, Heart, Loader2, LogOut } from 'lucide-react';
+import { Settings, User, Target, Heart, Loader2, LogOut, AlertTriangle } from 'lucide-react';
 import { apiFetch } from './api';
 import {
   ALLERGENS, CUISINES, GOAL_TYPES, ACTIVITY_LEVELS, DIET_TYPES, DIET_LABELS,
@@ -262,7 +262,7 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
                     className={`rounded-lg text-sm border px-3 py-2.5 font-medium transition-colors min-h-[44px] ${
                       isSelected
                         ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
-                        : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        : 'bg-gray-50/80 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
                     }`}
                   >
                     {a}
@@ -281,11 +281,27 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
       {/* Logout */}
       <Button
         variant="outline"
-        className="w-full border-2 border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 min-h-[44px] rounded-xl font-semibold shadow-sm"
+        className="w-full border-2 border-red-200 dark:border-red-800/80 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 min-h-[44px] rounded-xl font-semibold shadow-sm"
         onClick={onLogout}
       >
         <LogOut className="mr-2 h-4 w-4" />Log Out
       </Button>
+
+      {/* Danger Zone */}
+      <Card className="rounded-2xl shadow-md border border-red-100 dark:border-red-900/30 bg-white dark:bg-gray-900 p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <AlertTriangle className="h-4 w-4 text-red-500" />
+          <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Danger Zone</span>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Once you delete your account, there is no going back. All your data will be permanently removed.</p>
+        <Button
+          variant="outline"
+          className="w-full border-2 border-red-200 dark:border-red-800/80 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 min-h-[44px] rounded-xl font-semibold"
+          onClick={() => toast.error('Account deletion is disabled in demo mode')}
+        >
+          Delete My Account
+        </Button>
+      </Card>
     </motion.div>
   );
 }
