@@ -1,6 +1,5 @@
 import { db } from '@/lib/db';
 import { success, serverError } from '@/lib/response';
-import { Prisma } from '@prisma/client';
 
 export async function GET(request: Request) {
   try {
@@ -13,63 +12,91 @@ export async function GET(request: Request) {
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
     const skip = (page - 1) * limit;
 
-    const where: Prisma.MealWhereInput = { isActive: true };
+    // For SQLite: get all meals and filter in-memory for search reliability
+    // SQLite LIKE is case-insensitive by default for ASCII
+    let meals = await db.meal.findMany({
+      where: { isActive: true },
+      include: { nutrition: true, servings: true, aliases: true, tags: true },
+      orderBy: { name: 'asc' },
+    });
 
-    // Search by name or alias
+    // Filter by search query
     if (q) {
-      where.OR = [
-        { name: { contains: q, mode: 'insensitive' } },
-        { aliases: { some: { aliasName: { contains: q, mode: 'insensitive' } } } },
-      ];
+      const qLower = q.toLowerCase();
+      meals = meals.filter(m =>
+        m.name.toLowerCase().includes(qLower) ||
+        m.aliases.some(a => a.aliasName.toLowerCase().includes(qLower)) ||
+        (m.description && m.description.toLowerCase().includes(qLower)) ||
+        m.tags.some(t => t.tagName.toLowerCase().includes(qLower))
+      );
     }
 
     // Filter by cuisine
     if (cuisine) {
-      where.cuisine = { contains: cuisine, mode: 'insensitive' };
+      const c = cuisine.toLowerCase();
+      meals = meals.filter(m => m.cuisine.toLowerCase().includes(c));
     }
 
     // Filter by meal type
     if (mealType) {
-      where.mealType = { contains: mealType, mode: 'insensitive' };
+      const mt = mealType.toLowerCase();
+      meals = meals.filter(m => m.mealType.toLowerCase().includes(mt));
     }
 
     // Filter by diet type
     if (dietType) {
       switch (dietType.toLowerCase()) {
         case 'veg':
-          where.isVeg = true;
+        case 'vegetarian':
+          meals = meals.filter(m => m.isVeg || m.isVegan);
           break;
         case 'vegan':
-          where.isVegan = true;
+          meals = meals.filter(m => m.isVegan);
           break;
         case 'eggetarian':
-          where.isEggetarian = true;
+          meals = meals.filter(m => m.isVeg || m.isEggetarian || m.isVegan);
           break;
       }
     }
 
-    const [meals, total] = await Promise.all([
-      db.meal.findMany({
-        where,
-        include: {
-          nutrition: true,
-          servings: true,
-        },
-        skip,
-        take: limit,
-        orderBy: { name: 'asc' },
-      }),
-      db.meal.count({ where }),
-    ]);
+    const total = meals.length;
+    const paginated = meals.slice(skip, skip + limit);
+
+    // Clean up relations for response (avoid circular refs)
+    const clean = paginated.map(m => ({
+      id: m.id,
+      name: m.name,
+      description: m.description,
+      mealType: m.mealType,
+      cuisine: m.cuisine,
+      isVeg: m.isVeg,
+      isVegan: m.isVegan,
+      isEggetarian: m.isEggetarian,
+      baseServingGms: m.baseServingGms,
+      prepTimeMin: m.prepTimeMin,
+      imageUrl: m.imageUrl,
+      source: m.source,
+      nutrition: m.nutrition ? {
+        calories: m.nutrition.calories,
+        proteinG: m.nutrition.proteinG,
+        carbsG: m.nutrition.carbsG,
+        fatG: m.nutrition.fatG,
+        fiberG: m.nutrition.fiberG,
+        sugarG: m.nutrition.sugarG,
+        sodiumMg: m.nutrition.sodiumMg,
+        perServingGms: m.nutrition.perServingGms,
+      } : null,
+      servings: m.servings.map(s => ({
+        id: s.id,
+        servingName: s.servingName,
+        servingGms: s.servingGms,
+        multiplier: s.multiplier,
+      })),
+    }));
 
     return success({
-      meals,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      meals: clean,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (err) {
     console.error('Meal search error:', err);

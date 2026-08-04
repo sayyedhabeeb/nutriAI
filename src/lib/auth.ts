@@ -10,8 +10,16 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
-// Simple in-memory session store for Next.js API routes
-const sessions = new Map<string, { userId: string; createdAt: number; expiresAt: number }>();
+// Persistent session store using globalThis to survive HMR
+const globalForSessions = globalThis as unknown as {
+  __nutriaiSessions: Map<string, { userId: string; createdAt: number; expiresAt: number }> | undefined;
+};
+
+if (!globalForSessions.__nutriaiSessions) {
+  globalForSessions.__nutriaiSessions = new Map();
+}
+
+const sessions = globalForSessions.__nutriaiSessions;
 
 export function createSession(userId: string): string {
   const sessionId = crypto.randomUUID();
@@ -19,7 +27,7 @@ export function createSession(userId: string): string {
   sessions.set(sessionId, {
     userId,
     createdAt: now,
-    expiresAt: now + 7 * 24 * 60 * 60 * 1000, // 7 days
+    expiresAt: now + 7 * 24 * 60 * 60 * 1000,
   });
   return sessionId;
 }
@@ -40,7 +48,8 @@ export function destroySession(sessionId: string): void {
 }
 
 // Clean expired sessions periodically
-if (typeof globalThis !== 'undefined') {
+if (typeof globalThis !== 'undefined' && !(globalThis as Record<string, unknown>).__nutriaiSessionCleanup) {
+  (globalThis as Record<string, unknown>).__nutriaiSessionCleanup = true;
   setInterval(() => {
     const now = Date.now();
     for (const [key, session] of sessions) {
