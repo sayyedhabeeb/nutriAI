@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select';
 import {
   TrendingUp, Flame, Dumbbell, Scale, Droplets, Plus, Minus,
-  BarChart3, Download, Lightbulb,
+  BarChart3, Download, Lightbulb, Trophy, Lock,
 } from 'lucide-react';
 import { apiFetch } from './api';
 import { PIE_COLORS, fadeIn } from './constants';
@@ -37,6 +37,9 @@ export function ProgressView() {
   const [weightInput, setWeightInput] = useState('');
   const [weightNotes, setWeightNotes] = useState('');
   const [justFilledIndex, setJustFilledIndex] = useState<number | null>(null);
+
+  // Achievements state
+  const [achievements, setAchievements] = useState<{ id: string; name: string; description: string; icon: string; earned: boolean; earnedDate?: string }[]>([]);
 
   // Export dialog state
   const [exportOpen, setExportOpen] = useState(false);
@@ -57,6 +60,14 @@ export function ProgressView() {
       setSummary(sumData?.summary || null);
       setWeightLogs(wLogs || []);
       setWaterGlasses(waterData?.glassesConsumed || 0);
+
+      // Fetch achievements
+      try {
+        const achData = await apiFetch('/api/achievements');
+        setAchievements(achData.achievements || []);
+      } catch {
+        // Silent fail
+      }
     } catch { toast.error('Failed to load progress'); }
     finally { setLoading(false); }
   }, [tab]);
@@ -334,6 +345,43 @@ export function ProgressView() {
           </Card>
         ))}
       </div>
+
+      {/* Achievements Grid */}
+      {achievements.length > 0 && (
+        <Card className="p-4 rounded-2xl shadow-sm border border-gray-100/80 bg-white">
+          <div className="flex items-center gap-2 mb-4">
+            <Trophy className="h-4 w-4 text-amber-500" />
+            <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">Achievements</h3>
+            <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">{achievements.filter((a) => a.earned).length}/8 Unlocked</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {achievements.map((ach) => (
+              <div
+                key={ach.id}
+                className={`relative p-3 rounded-xl border transition-colors ${
+                  ach.earned
+                    ? 'bg-white dark:bg-gray-900 border-l-4 border-l-emerald-500 border-t-0 border-r-0 border-b-0 border-emerald-200 dark:border-gray-700'
+                    : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 opacity-50'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  {ach.earned ? (
+                    <span className="text-3xl leading-none">{ach.icon}</span>
+                  ) : (
+                    <Lock className="h-6 w-6 text-gray-400 dark:text-gray-500" />
+                  )}
+                </div>
+                <p className={`text-sm font-semibold ${ach.earned ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`}>
+                  {ach.name}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">
+                  {ach.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Calorie Breakdown Table */}
       <motion.div

@@ -14,6 +14,7 @@ import { UploadView } from '@/components/nutriai/UploadView';
 import { ProgressView } from '@/components/nutriai/ProgressView';
 import { SettingsView } from '@/components/nutriai/SettingsView';
 import { ChatView } from '@/components/nutriai/ChatView';
+import { ThemeToggle } from '@/components/nutriai/ThemeToggle';
 
 export default function NutriAIPage() {
   const [view, setView] = useState<ViewType>('auth');
@@ -53,7 +54,7 @@ export default function NutriAIPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50/50">
+    <div className="min-h-screen flex flex-col bg-gray-50/50 dark:bg-gray-950">
       <main className="flex-1 pb-20">
         <AnimatePresence mode="wait">
           {view === 'auth' && <AuthView key="auth" onAuth={(v: ViewType) => { setView(v); if (v === 'dashboard') setActiveTab('dashboard'); }} />}
@@ -68,8 +69,8 @@ export default function NutriAIPage() {
       </main>
 
       {view !== 'auth' && view !== 'onboarding' && (
-        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-gray-200/60 safe-area-bottom">
-          <div className="max-w-lg mx-auto flex justify-around items-center h-16">
+        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-200/60 dark:border-gray-800 safe-area-bottom">
+          <div className="max-w-lg mx-auto flex items-center h-16 px-1">
             {([
               { tab: 'dashboard' as TabType, icon: Home, label: 'Home' },
               { tab: 'foodlog' as TabType, icon: List, label: 'Log' },
@@ -81,8 +82,8 @@ export default function NutriAIPage() {
               <button
                 key={tab}
                 onClick={() => handleTabChange(tab)}
-                className={`relative flex flex-col items-center justify-center gap-0.5 w-full h-full min-h-[44px] transition-colors ${
-                  activeTab === tab ? 'text-emerald-600' : 'text-gray-400 hover:text-gray-600'
+                className={`relative flex flex-col items-center justify-center gap-0.5 flex-1 h-full min-h-[44px] transition-colors ${
+                  activeTab === tab ? 'text-emerald-600' : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
                 }`}
               >
                 <div className="relative">
@@ -98,6 +99,9 @@ export default function NutriAIPage() {
                 <span className={`text-[10px] ${activeTab === tab ? 'font-semibold' : 'font-medium'}`}>{label}</span>
               </button>
             ))}
+            <div className="ml-1 flex items-center">
+              <ThemeToggle />
+            </div>
           </div>
         </nav>
       )}

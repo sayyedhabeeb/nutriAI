@@ -24,7 +24,7 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
-  User, Search, Droplets, Camera, Clock, Zap, ChevronRight, Lightbulb, Sparkles, ChevronDown, Loader2,
+  User, Search, Droplets, Camera, Clock, Zap, ChevronRight, Lightbulb, Sparkles, ChevronDown, Loader2, Trophy, Lock,
 } from 'lucide-react';
 import { apiFetch } from './api';
 import {
@@ -68,6 +68,9 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
     open: boolean;
     rec: MealRecommendation;
   } | { open: false }>({ open: false });
+
+  // Achievements state
+  const [achievements, setAchievements] = useState<{ id: string; name: string; description: string; icon: string; earned: boolean; earnedDate?: string }[]>([]);
 
   // Meal plan state (Feature 2)
   const [mealPlan, setMealPlan] = useState<{
@@ -116,6 +119,14 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
         setMealPlan({ exists: plan.exists, items: plan.items || [] });
       } catch {
         setMealPlan(null);
+      }
+
+      // Fetch achievements
+      try {
+        const ach = await apiFetch('/api/achievements');
+        setAchievements(ach.achievements || []);
+      } catch {
+        // Silent fail
       }
     } catch {
       toast.error('Failed to load dashboard');
@@ -476,6 +487,49 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
           )}
         </Card>
       </motion.div>
+
+      {/* ═══ Achievements Row ═══ */}
+      {achievements.length > 0 && (
+        <Card className="p-4 rounded-2xl shadow-sm border border-gray-100/80">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-amber-500" />
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Achievements</h3>
+            </div>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {achievements.filter((a) => a.earned).length}/8 Unlocked
+            </span>
+          </div>
+          {achievements.every((a) => !a.earned) ? (
+            <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-2">Start logging meals to earn badges!</p>
+          ) : (
+            <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              {achievements.map((ach) => (
+                <div
+                  key={ach.id}
+                  className={`shrink-0 w-16 flex flex-col items-center gap-1 p-2 rounded-xl border transition-colors ${
+                    ach.earned
+                      ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'
+                      : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-40'
+                  }`
+                }
+                >
+                  {ach.earned ? (
+                    <span className="text-2xl leading-none">{ach.icon}</span>
+                  ) : (
+                    <Lock className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                  )}
+                  <span className={`text-[10px] font-medium text-center leading-tight ${
+                    ach.earned ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-400 dark:text-gray-500'
+                  }`}>
+                    {ach.earned ? ach.name : 'Locked'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* ═══ Meal Slots with gradient headers & search buttons ═══ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

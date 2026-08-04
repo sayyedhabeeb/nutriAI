@@ -24,51 +24,51 @@ export function NutritionFactsLabel({
   };
 
   return (
-    <div className="border-2 border-gray-800 rounded-lg p-0 bg-white">
-      <div className="px-3 py-2.5 border-b-[3px] border-gray-800">
-        <h4 className="text-lg font-extrabold text-gray-900 tracking-tight">Nutrition Facts</h4>
+    <div className="border-2 border-gray-800 dark:border-gray-600 rounded-lg p-0 bg-white dark:bg-gray-900">
+      <div className="px-3 py-2.5 border-b-[3px] border-gray-800 dark:border-gray-600">
+        <h4 className="text-lg font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">Nutrition Facts</h4>
       </div>
-      <div className="px-3 py-1.5 border-b border-gray-300 flex justify-between">
-        <span className="text-sm font-medium text-gray-700">Serving Size</span>
-        <span className="text-sm font-bold text-gray-900">{servingGms}g</span>
+      <div className="px-3 py-1.5 border-b border-gray-300 dark:border-gray-700 flex justify-between">
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Serving Size</span>
+        <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{servingGms}g</span>
       </div>
-      <div className="px-3 py-2 border-b-2 border-gray-800 flex justify-between">
-        <span className="text-sm font-medium text-gray-700">{label || 'Per Serving'}</span>
-        <span className="text-sm font-bold text-gray-900">{scaled.calories} kcal</span>
+      <div className="px-3 py-2 border-b-2 border-gray-800 dark:border-gray-600 flex justify-between">
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{label || 'Per Serving'}</span>
+        <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{scaled.calories} kcal</span>
       </div>
-      <div className="px-3 py-1.5 border-b border-gray-200 flex justify-between">
-        <span className="text-xs font-bold text-gray-900">Total Fat</span>
-        <span className="text-xs font-bold text-gray-900">{scaled.fatG}g</span>
+      <div className="px-3 py-1.5 border-b border-gray-200 dark:border-gray-700 flex justify-between">
+        <span className="text-xs font-bold text-gray-900 dark:text-gray-100">Total Fat</span>
+        <span className="text-xs font-bold text-gray-900 dark:text-gray-100">{scaled.fatG}g</span>
       </div>
-      <div className="px-3 py-1.5 border-b border-gray-200 pl-6 flex justify-between">
-        <span className="text-xs text-gray-600">Protein</span>
-        <span className="text-xs text-gray-900 font-medium">{scaled.proteinG}g</span>
+      <div className="px-3 py-1.5 border-b border-gray-200 dark:border-gray-700 pl-6 flex justify-between">
+        <span className="text-xs text-gray-600 dark:text-gray-400">Protein</span>
+        <span className="text-xs text-gray-900 dark:text-gray-100 font-medium">{scaled.proteinG}g</span>
       </div>
-      <div className="px-3 py-1.5 border-b border-gray-200 flex justify-between">
-        <span className="text-xs font-bold text-gray-900">Total Carbohydrate</span>
-        <span className="text-xs font-bold text-gray-900">{scaled.carbsG}g</span>
+      <div className="px-3 py-1.5 border-b border-gray-200 dark:border-gray-700 flex justify-between">
+        <span className="text-xs font-bold text-gray-900 dark:text-gray-100">Total Carbohydrate</span>
+        <span className="text-xs font-bold text-gray-900 dark:text-gray-100">{scaled.carbsG}g</span>
       </div>
       {scaled.sugarG !== null && (
-        <div className="px-3 py-1 border-b border-gray-200 pl-6 flex justify-between">
-          <span className="text-xs text-gray-600">Total Sugars</span>
-          <span className="text-xs text-gray-900 font-medium">{scaled.sugarG}g</span>
+        <div className="px-3 py-1 border-b border-gray-200 dark:border-gray-700 pl-6 flex justify-between">
+          <span className="text-xs text-gray-600 dark:text-gray-400">Total Sugars</span>
+          <span className="text-xs text-gray-900 dark:text-gray-100 font-medium">{scaled.sugarG}g</span>
         </div>
       )}
       {scaled.fiberG !== null && (
-        <div className="px-3 py-1 border-b border-gray-200 pl-6 flex justify-between">
-          <span className="text-xs text-gray-600">Dietary Fiber</span>
-          <span className="text-xs text-gray-900 font-medium">{scaled.fiberG}g</span>
+        <div className="px-3 py-1 border-b border-gray-200 dark:border-gray-700 pl-6 flex justify-between">
+          <span className="text-xs text-gray-600 dark:text-gray-400">Dietary Fiber</span>
+          <span className="text-xs text-gray-900 dark:text-gray-100 font-medium">{scaled.fiberG}g</span>
         </div>
       )}
       {scaled.sodiumMg !== null && (
-        <div className="px-3 py-1.5 border-b border-gray-200 flex justify-between">
-          <span className="text-xs font-bold text-gray-900">Sodium</span>
-          <span className="text-xs font-bold text-gray-900">{scaled.sodiumMg}mg</span>
+        <div className="px-3 py-1.5 border-b border-gray-200 dark:border-gray-700 flex justify-between">
+          <span className="text-xs font-bold text-gray-900 dark:text-gray-100">Sodium</span>
+          <span className="text-xs font-bold text-gray-900 dark:text-gray-100">{scaled.sodiumMg}mg</span>
         </div>
       )}
       <div className="px-3 py-2 flex justify-between">
-        <span className="text-xs font-bold text-gray-900">Calories</span>
-        <span className="text-xs font-bold text-gray-900">{scaled.calories}</span>
+        <span className="text-xs font-bold text-gray-900 dark:text-gray-100">Calories</span>
+        <span className="text-xs font-bold text-gray-900 dark:text-gray-100">{scaled.calories}</span>
       </div>
     </div>
   );
@@ -113,7 +113,7 @@ export function CalorieRing({ consumed, target }: { consumed: number; target: nu
           </filter>
         </defs>
         {/* Background track */}
-        <circle cx="90" cy="90" r={radius} fill="none" stroke="#e5e7eb" strokeWidth="12" />
+        <circle cx="90" cy="90" r={radius} fill="none" className="stroke-gray-200 dark:stroke-gray-700" strokeWidth="12" />
         {/* Animated progress arc */}
         <motion.circle
           cx="90" cy="90" r={radius} fill="none"
@@ -128,8 +128,8 @@ export function CalorieRing({ consumed, target }: { consumed: number; target: nu
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <Flame className={`h-5 w-5 mb-1 ${pct > 1 ? 'text-rose-500' : 'text-orange-500'}`} />
-        <span className="text-3xl font-bold text-gray-900">{consumed}</span>
-        <span className="text-xs text-gray-500">of {target} kcal</span>
+        <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">{consumed}</span>
+        <span className="text-xs text-gray-500 dark:text-gray-400">of {target} kcal</span>
         <span className={`text-xs font-semibold mt-1 ${pct >= 1 ? 'text-rose-600' : 'text-emerald-600'}`}>{pct >= 1 ? 'Goal reached!' : `${remaining} left`}</span>
       </div>
     </div>
