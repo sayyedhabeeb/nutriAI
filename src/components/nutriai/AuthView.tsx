@@ -64,6 +64,20 @@ export function AuthView({ onAuth }: { onAuth: (v: ViewType) => void }) {
           <p className="text-emerald-100 text-sm mt-1">AI-Powered Nutrition Tracker</p>
         </div>
         <CardContent className="pt-6 px-6 pb-6">
+          <div className="flex gap-3 mb-4">
+            <Button variant="outline" className="flex-1 h-11 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium" onClick={() => toast.info('Google Sign-In coming soon!')}>
+              <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25L12.25 2.67c-1.06-.55-2.2-.83-3.38-.83-3.03 0-5.78 1.14-7.81 3.01C.56 7.21.09 9.1.09 11.25c0 3.66-2.09 6.84-5.15 8.41-1.08.56-2.2.83-3.38.83-1.88 0-3.6-.66-5.01-1.76l-.08-.07c-.03-.03-.06-.04-.1-.06l-4.2-3.68c-.73-.65-1.78-.95-2.79-.75-1.01.2-2.05.77-2.94 1.62-.89 1.85-.89 3.27.39 4.69 1.19l.08.07c.03.03.06.04.1.06 2.08 1.84 3.6 3.6 5.15 3.6 1.74 0 3.36-.68 4.59-1.91l2.6-2.6z" fill="currentColor"/></svg>
+              Google
+            </Button>
+            <Button variant="outline" className="flex-1 h-11 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium" onClick={() => toast.info('Apple Sign-In coming soon!')}>
+              <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24"><path d="M17.05 20.28c-.98.95-2.05-1.83-3.16-2.48l-.01-.01a9.98 9.98 0 0 0-2.59-.67c-3.16 0-6.04 1.19-8.21 3.15" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round"/><path d="M9 12h.01M15 12h.01" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round"/></svg>
+              Apple
+            </Button>
+          </div>
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200 dark:border-gray-700" /></div>
+            <div className="relative flex justify-center text-xs"><span className="bg-white dark:bg-gray-900 px-3 text-gray-400 dark:text-gray-500">or sign in with email</span></div>
+          </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div className="space-y-2">

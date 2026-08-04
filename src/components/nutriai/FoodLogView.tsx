@@ -197,7 +197,7 @@ export function FoodLogView() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 shrink-0 pointer-events-none" />
           <button
             onClick={() => { setSearchQuery(''); setSearchResults([]); setSearchDialog(true); }}
-            className="w-full flex items-center gap-2 pl-10 pr-4 h-11 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-800 transition-all text-left"
+            className="w-full flex items-center gap-2 pl-10 pr-4 h-11 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-gray-700 hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-800 transition-all text-left"
           >
             <span className="text-sm text-gray-400 dark:text-gray-500">Search meals to log...</span>
           </button>
@@ -244,7 +244,7 @@ export function FoodLogView() {
       </div>
 
       {/* Summary */}
-      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 backdrop-blur-sm">
         <div className="grid grid-cols-4 gap-2 text-center">
           {[
             { label: 'Calories', val: foodLog?.totalCalories || 0, unit: 'kcal', color: 'text-orange-600 dark:text-orange-400', iconBg: 'bg-orange-100 dark:bg-orange-900/30', Icon: Flame },
@@ -288,7 +288,7 @@ export function FoodLogView() {
       {/* Empty state */}
       {!loading && !hasItems && (
         <Card className="p-8 text-center rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
-          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-bounce [animation-duration:3s]">
             <UtensilsCrossed className="h-8 w-8 text-gray-300 dark:text-gray-600" />
           </div>
           <p className="text-gray-700 dark:text-gray-300 font-semibold text-base">No meals logged</p>

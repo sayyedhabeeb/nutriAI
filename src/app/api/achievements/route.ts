@@ -13,6 +13,10 @@ const ACHIEVEMENT_DEFS = [
   { id: 'consistency_king', name: 'Consistency King', description: 'Logged meals for 14+ days total', icon: '👑' },
   { id: 'weight_watcher', name: 'Weight Watcher', description: 'Logged weight for 5+ days', icon: '⚖️' },
   { id: 'explorer', name: 'Explorer', description: 'Logged meals from 5+ different cuisines', icon: '🌍' },
+  { id: 'explorer_2', name: 'World Traveler', description: 'Try meals from 3+ different cuisines', icon: '🌏' },
+  { id: 'streak_14', name: 'Two Week Warrior', description: '14-day logging streak', icon: '🔥' },
+  { id: 'calorie_king', name: 'Calorie King', description: 'Hit calorie goal for 7 days', icon: '👑' },
+  { id: 'water_master', name: 'Hydration Master', description: 'Log 8+ glasses for 5 days', icon: '💧' },
 ];
 
 function getTodayStr(): string {
@@ -112,6 +116,34 @@ export async function GET(request: Request) {
     });
     const uniqueCuisines = new Set(cuisines.map((c) => c.meal?.cuisine).filter(Boolean));
     results['explorer'] = { earned: uniqueCuisines.size >= 5 };
+
+    // 9. World Traveler - meals from 3+ different cuisines
+    results['explorer_2'] = { earned: uniqueCuisines.size >= 3 };
+
+    // 10. Two Week Warrior - 14-day logging streak
+    results['streak_14'] = { earned: streak >= 14 };
+
+    // 11. Calorie King - hit calorie goal for 7 days
+    const calorieGoalDays = await db.dailyNutrition.findMany({
+      where: {
+        userId,
+        consumedCalories: { gte: 1 },
+        targetCalories: { gte: 1 },
+      },
+      select: { date: true, consumedCalories: true, targetCalories: true },
+    });
+    const calorieHitDays = calorieGoalDays.filter(
+      (d) => d.consumedCalories >= d.targetCalories
+    );
+    results['calorie_king'] = { earned: calorieHitDays.length >= 7 };
+
+    // 12. Hydration Master - log 8+ glasses for 5 days
+    const hydrationMasterDays = await db.waterLog.findMany({
+      where: { userId, glassesConsumed: { gte: 8 } },
+      select: { logDate: true },
+      distinct: ['logDate'],
+    });
+    results['water_master'] = { earned: hydrationMasterDays.length >= 5 };
 
     const achievements = ACHIEVEMENT_DEFS.map((def) => {
       const result = results[def.id];

@@ -185,7 +185,7 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
           mealSlot: logSlot,
         }),
       });
-      toast.success(`Logged ${logDialog.meal.name}!`);
+      toast.success('🍽️ Logged ' + logDialog.meal.name + '!');
       setLogDialog({ open: false });
       // Add AI confirmation message
       addAiMessage(`Great! I've logged ${logDialog.meal.name} for you. Keep going!`);

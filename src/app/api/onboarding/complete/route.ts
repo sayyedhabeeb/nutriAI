@@ -41,9 +41,15 @@ export async function POST(request: Request) {
       return error(`Invalid activityLevel. Must be one of: ${validActivities.join(', ')}`);
     }
 
-    // Create UserGoal
-    const goal = await db.userGoal.create({
-      data: {
+    // Create or update UserGoal (idempotent)
+    const goal = await db.userGoal.upsert({
+      where: { userId: session.userId },
+      update: {
+        goalType,
+        activityLevel,
+        workoutFrequency: workoutFrequency || null,
+      },
+      create: {
         userId: session.userId,
         goalType,
         activityLevel,
@@ -51,9 +57,15 @@ export async function POST(request: Request) {
       },
     });
 
-    // Create UserPreference
-    const preference = await db.userPreference.create({
-      data: {
+    // Create or update UserPreference (idempotent)
+    const preference = await db.userPreference.upsert({
+      where: { userId: session.userId },
+      update: {
+        cuisinePreference: cuisinePreference || null,
+        dietType: dietType || null,
+        budgetLevel: budgetLevel || null,
+      },
+      create: {
         userId: session.userId,
         cuisinePreference: cuisinePreference || null,
         dietType: dietType || null,
@@ -93,9 +105,16 @@ export async function POST(request: Request) {
 
     const today = getTodayStr();
 
-    // Create DailyNutrition for today
-    await db.dailyNutrition.create({
-      data: {
+    // Create or update DailyNutrition for today (idempotent)
+    await db.dailyNutrition.upsert({
+      where: { userId_date: { userId: session.userId, date: today } },
+      update: {
+        targetCalories: targets.calories,
+        targetProtein: targets.proteinG,
+        targetCarbs: targets.carbsG,
+        targetFat: targets.fatG,
+      },
+      create: {
         userId: session.userId,
         date: today,
         targetCalories: targets.calories,

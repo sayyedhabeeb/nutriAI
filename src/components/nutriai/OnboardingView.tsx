@@ -92,10 +92,10 @@ export function OnboardingView({ onComplete }: { onComplete: () => void }) {
               <div key={s.num} className="flex items-center gap-2">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
                   step >= s.num ? 'bg-white text-emerald-600' : 'bg-white/20 text-white/60'
-                }`}>
+                } ${step > s.num ? 'animate-[scaleIn_0.3s_ease-out]' : ''}`}>
                   {step > s.num ? <Check className="h-4 w-4" /> : s.num}
                 </div>
-                {s.num < 3 && <div className={`w-8 h-0.5 ${step > s.num ? 'bg-white' : 'bg-white/30'}`} />}
+                {s.num < 3 && <div className={`w-10 h-0.5 ${step > s.num ? 'bg-white' : 'bg-white/30'}`} />}
               </div>
             ))}
           </div>

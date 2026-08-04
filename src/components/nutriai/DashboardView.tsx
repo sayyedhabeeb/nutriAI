@@ -319,19 +319,21 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
           <CalorieRing consumed={consumedCal} target={targetCal} />
         </div>
         {pctConsumed >= 1 && (
-          <motion.p
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 200 }}
-            className="text-center text-sm text-emerald-600 dark:text-emerald-400 font-bold mt-3"
-          >
-            You&apos;ve reached your calorie goal! Great job! 🎉
-          </motion.p>
+          <div className="text-center rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 px-3 py-2">
+            <motion.p
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 200 }}
+              className="text-sm text-emerald-600 dark:text-emerald-400 font-bold"
+            >
+              You&apos;ve reached your calorie goal! Great job! 🎉
+            </motion.p>
+          </div>
         )}
       </Card>
 
       {/* ═══ Macro Progress Bars ═══ */}
-      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 space-y-3 mb-5">
+      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm space-y-3 mb-5">
         <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">Today&apos;s Macros</h3>
         {[
           { label: 'Protein', val: consumedProtein, target: targetProtein, from: '#3b82f6', to: '#60a5fa', unit: 'g' },
@@ -394,7 +396,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
       >
-        <Card className={`p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 ${pctConsumed > 1 ? 'bg-amber-50/50 dark:bg-amber-900/10' : pctConsumed >= 0.75 ? 'bg-emerald-50/50 dark:bg-emerald-900/10' : 'bg-blue-50/50 dark:bg-blue-900/10'}`}>
+        <Card className={`p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 backdrop-blur-sm ${pctConsumed > 1 ? 'bg-amber-50/50 dark:bg-amber-900/10' : pctConsumed >= 0.75 ? 'bg-emerald-50/50 dark:bg-emerald-900/10' : 'bg-blue-50/50 dark:bg-blue-900/10'}`}>
           <div className="flex items-start gap-3">
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${pctConsumed > 1 ? 'bg-amber-100/80 dark:bg-amber-900/30' : pctConsumed >= 0.75 ? 'bg-emerald-100/80 dark:bg-emerald-900/30' : 'bg-blue-100/80 dark:bg-blue-900/30'}`}>
               <Lightbulb className={`h-4.5 w-4.5 ${pctConsumed > 1 ? 'text-amber-500' : pctConsumed >= 0.75 ? 'text-emerald-500' : 'text-blue-500'}`} />
@@ -579,7 +581,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
               <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Achievements</h3>
             </div>
             <span className="text-xs text-gray-500 dark:text-gray-400">
-              {achievements.filter((a) => a.earned).length}/8 Unlocked
+              {achievements.filter((a) => a.earned).length}/12 Unlocked
             </span>
           </div>
           {achievements.every((a) => !a.earned) ? (

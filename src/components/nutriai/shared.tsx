@@ -98,6 +98,8 @@ export function CalorieRing({ consumed, target }: { consumed: number; target: nu
           transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
         />
       )}
+      {/* Soft glow background */}
+      <div className="absolute w-[160px] h-[160px] rounded-full bg-gradient-to-br from-emerald-100/40 to-teal-100/40 dark:from-emerald-900/20 dark:to-teal-900/20 blur-xl" />
       <svg width="190" height="190" viewBox="0 0 190 190" className="-rotate-90">
         <defs>
           <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
@@ -128,7 +130,7 @@ export function CalorieRing({ consumed, target }: { consumed: number; target: nu
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <Flame className={`h-4 w-4 mb-1 ${pct > 1 ? 'text-rose-500' : 'text-orange-500'}`} />
-        <span className="text-3xl font-extrabold text-gray-900 dark:text-gray-100 tabular-nums tracking-tight">{consumed}</span>
+        <span className="text-4xl font-extrabold text-gray-900 dark:text-gray-100 tabular-nums tracking-tight">{consumed}</span>
         <span className="text-[11px] text-gray-400 dark:text-gray-500 font-medium mt-0.5">
           of <span className="text-gray-600 dark:text-gray-300 font-semibold">{target}</span> kcal
         </span>
