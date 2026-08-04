@@ -12,20 +12,20 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 }
 
 // Session CRUD via Prisma (survives Turbopack module isolation)
-export function createSession(userId: string): string {
+export async function createSession(userId: string): Promise<string> {
   const sessionId = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  db.session.create({ data: { userId, expiresAt } });
+  await db.session.create({ data: { id: sessionId, userId, expiresAt } });
   return sessionId;
 }
 
-export function getSession(sessionId: string | null): { userId: string } | null {
+export async function getSession(sessionId: string | null): Promise<{ userId: string } | null> {
   if (!sessionId) return null;
   try {
-    const session = db.session.findUnique({ where: { id: sessionId } });
+    const session = await db.session.findUnique({ where: { id: sessionId } });
     if (!session) return null;
     if (new Date(session.expiresAt) < new Date()) {
-      db.session.delete({ where: { id: sessionId } });
+      await db.session.delete({ where: { id: sessionId } });
       return null;
     }
     return { userId: session.userId };
@@ -34,22 +34,22 @@ export function getSession(sessionId: string | null): { userId: string } | null 
    }
 }
 
-export function destroySession(sessionId: string): void {
+export async function destroySession(sessionId: string): Promise<void> {
   try {
-    db.session.delete({ where: { id: sessionId } });
+    await db.session.delete({ where: { id: sessionId } });
   } catch {}
 }
 
 // Clean expired sessions periodically
 if (!(globalThis as Record<string, unknown>).__nutriaiSessionCleanup) {
   (globalThis as Record<string, unknown>).__nutriaiSessionCleanup = true;
-  setInterval(() => {
+  setInterval(async () => {
     const expired = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    try { db.session.deleteMany({ where: { expiresAt: { lt: expired } } }); } catch {}
+    try { await db.session.deleteMany({ where: { expiresAt: { lt: expired } } }); } catch {}
   }, 60 * 60 * 1000);
 }
 
-export function getSessionFromRequest(request: Request): { userId: string } | null {
+export async function getSessionFromRequest(request: Request): Promise<{ userId: string } | null> {
   const authHeader = request.headers.get('authorization');
   if (authHeader?.startsWith('Bearer ')) {
     return getSession(authHeader.slice(7));

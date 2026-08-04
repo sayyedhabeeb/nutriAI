@@ -9,7 +9,7 @@ const VISION_PROMPT = `You are a food recognition assistant. Identify cooked foo
 
 export async function POST(request: Request) {
   try {
-    const session = getSessionFromRequest(request);
+    const session = await getSessionFromRequest(request);
     if (!session) return unauthorized();
 
     const formData = await request.formData();

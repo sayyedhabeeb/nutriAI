@@ -4,7 +4,7 @@ import { success, unauthorized, serverError } from '@/lib/response';
 
 export async function GET(request: Request) {
   try {
-    const session = getSessionFromRequest(request);
+    const session = await getSessionFromRequest(request);
     if (!session) {
       return unauthorized();
     }

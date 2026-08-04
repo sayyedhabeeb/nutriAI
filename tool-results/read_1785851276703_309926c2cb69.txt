@@ -1,0 +1,502 @@
+   625→    meal: MealRecommendation;
+   626→    slot: string;
+   627→    baseNutritionPer100g: { calories: number; proteinG: number; carbsG: number; fatG: number } | null;
+   628→    mealName: string;
+   629→    cuisine: string;
+   630→    mealType: string;
+   631→    description?: string | null;
+   632→    isVeg?: boolean;
+   633→    isVegan?: boolean;
+   634→  } | { open: false }>({ open: false });
+   635→  const [servingGms, setServingGms] = useState(100);
+   636→
+   637→  // Meal search dialog state (per-slot)
+   638→  const [slotSearchDialog, setSlotSearchDialog] = useState<{ open: boolean; slot: string } | { open: false }>({ open: false });
+   639→  const [searchQuery, setSearchQuery] = useState('');
+   640→  const [searchResults, setSearchResults] = useState<SearchMeal[]>([]);
+   641→  const [searchLoading, setSearchLoading] = useState(false);
+   642→  const [searchDebounce, setSearchDebounce] = useState<NodeJS.Timeout | null>(null);
+   643→
+   644→  // Meal detail sheet
+   645→  const [detailSheet, setDetailSheet] = useState<{
+   646→    open: boolean;
+   647→    rec: MealRecommendation;
+   648→  } | { open: false }>({ open: false });
+   649→
+   650→  const fetchData = useCallback(async () => {
+   651→    try {
+   652→      const [me, nut, summaryData] = await Promise.all([
+   653→        apiFetch('/api/auth/me'),
+   654→        apiFetch('/api/nutrition/daily'),
+   655→        apiFetch('/api/progress/summary?period=week').catch(() => ({ summary: { totalDays: 0 } })),
+   656→      ]);
+   657→      setUser(me);
+   658→      setNutrition(nut);
+   659→
+   660→      // Calculate streak from weekly data
+   661→      const weeklyData = await apiFetch('/api/progress/weekly').catch(() => [] as Record<string, unknown>[]);
+   662→      let streakCount = 0;
+   663→      for (let i = (weeklyData as Record<string, unknown>[]).length - 1; i >= 0; i--) {
+   664→        const day = weeklyData[i];
+   665→        const consumed = (day.consumed as Record<string, number>)?.calories || 0;
+   666→        if (consumed > 0) streakCount++;
+   667→        else break;
+   668→      }
+   669→      setStreak(streakCount);
+   670→
+   671→      const recs = await Promise.all(
+   672→        SLOTS.map(async (slot) => {
+   673→          try {
+   674→            const r = await apiFetch(`/api/recommendations?slot=${slot}`);
+   675→            return { slot, recs: r.recommendations || [] };
+   676→          } catch { return { slot, recs: [] }; }
+   677→        })
+   678→      );
+   679→      const recMap: Record<string, MealRecommendation[]> = {};
+   680→      for (const r of recs) recMap[r.slot] = r.recs;
+   681→      setRecommendations(recMap);
+   682→    } catch {
+   683→      toast.error('Failed to load dashboard');
+   684→    } finally {
+   685→      setLoading(false);
+   686→    }
+   687→  }, []);
+   688→
+   689→  useEffect(() => { fetchData(); }, [fetchData]);
+   690→
+   691→  const handleLogMeal = async () => {
+   692→    if (!logDialog.open) return;
+   693→    try {
+   694→      await apiFetch('/api/food-logs', {
+   695→        method: 'POST',
+   696→        body: JSON.stringify({ mealId: logDialog.meal.meal.id, servingGms, mealSlot: logDialog.slot }),
+   697→      });
+   698→      toast.success(`Logged ${logDialog.mealName}!`);
+   699→      setLogDialog({ open: false });
+   700→      fetchData();
+   701→    } catch (err) { toast.error((err as Error).message); }
+   702→  };
+   703→
+   704→  // Per-slot search with debounce
+   705→  const handleSlotSearch = (query: string) => {
+   706→    setSearchQuery(query);
+   707→    if (searchDebounce) clearTimeout(searchDebounce);
+   708→    if (!query.trim()) { setSearchResults([]); return; }
+   709→    const timer = setTimeout(async () => {
+   710→ setSearchLoading(true);
+   711→      try {
+   712→        const res = await apiFetch(`/api/meals/search?q=${encodeURIComponent(query)}`);
+   713→        setSearchResults((res.meals || []) as SearchMeal[]);
+   714→      } catch { toast.error('Search failed'); }
+   715→      finally { setSearchLoading(false); }
+   716→    }, 350);
+   717→    setSearchDebounce(timer);
+   718→  };
+   719→
+   720→  const handleLogFromSearch = (meal: SearchMeal) => {
+   721→    const slot = slotSearchDialog.open ? slotSearchDialog.slot : 'lunch';
+   722→    setServingGms(meal.baseServingGms || 100);
+   723→    setLogDialog({
+   724→      open: true,
+   725→      meal: {
+   726→        meal: { id: meal.id, name: meal.name, mealType: meal.mealType, cuisine: meal.cuisine, imageUrl: null, prepTimeMin: meal.prepTimeMin, isVeg: meal.isVeg, isVegan: meal.isVegan },
+   727→        score: 0, recommendedServingGms: meal.baseServingGms || 100, estimatedNutrition: meal.nutrition ? { calories: meal.nutrition.calories, proteinG: meal.nutrition.proteinG, carbsG: meal.nutrition.carbsG, fatG: meal.nutrition.fatG } : null,
+   728→        baseNutritionPer100g: meal.nutrition ? { calories: meal.nutrition.calories, proteinG: meal.nutrition.proteinG, carbsG: meal.nutrition.carbsG, fatG: meal.nutrition.fatG } : null,
+   729→      },
+   730→      slot,
+   731→      baseNutritionPer100g: meal.nutrition || null,
+   732→      mealName: meal.name,
+   733→      cuisine: meal.cuisine,
+   734→      mealType: meal.mealType,
+   735→      isVeg: meal.isVeg,
+   736→      isVegan: meal.isVegan,
+   737→    });
+   738→    setSlotSearchDialog({ open: false });
+   739→    setSearchQuery('');
+   740→    setSearchResults([]);
+   741→  };
+   742→
+   743→  const handleWaterAdd = async () => {
+   744→    try {
+   745→      await apiFetch('/api/water-log', { method: 'POST', body: JSON.stringify({ glasses: 1 }) });
+   746→      toast.success('\uD83D\uDCA7 +1 glass of water');
+   747→    } catch { toast.error('Failed to log water'); }
+   748→  };
+   749→
+   750→  const firstName = (user?.profile as Record<string, unknown> | null)?.firstName || (user?.name as string) || 'there';
+   751→  const todayStr = format(new Date(), 'EEEE, MMMM d');
+   752→
+   753→  if (loading) {
+   754→    return (
+   755→      <div className="p-4 max-w-lg mx-auto space-y-4">
+   756→        <Skeleton className="h-8 w-56 rounded-xl" />
+   757→        <div className="flex justify-center"><Skeleton className="h-[180px] w-[180px] rounded-full" /></div>
+   758→        <div className="space-y-3"><Skeleton className="h-10 w-full rounded-xl" /><Skeleton className="h-10 w-full rounded-xl" /><Skeleton className="h-10 w-full rounded-xl" /></div>
+   759→        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><Skeleton className="h-56 w-full rounded-xl" /><Skeleton className="h-56 w-full rounded-xl" /></div>
+   760→      </div>
+   761→    );
+   762→  }
+   763→
+   764→  const targetCal = nutrition?.targets?.calories || 0;
+   765→  const consumedCal = nutrition?.consumed?.calories || 0;
+   766→
+   767→  return (
+   768→    <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-4">
+   769→      {/* Greeting Section with Date & Streak */}
+   770→      <div className="flex items-start justify-between">
+   771→        <div>
+   772→          <h1 className="text-xl font-bold text-gray-900">Hi, {firstName}! &#x1F44B;</h1>
+   773→          <p className="text-sm text-gray-500 mt-0.5">{todayStr}</p>
+   774→        </div>
+   775→        <div className="flex items-center gap-2">
+   776→          {streak > 0 && (
+   777→            <Badge className="bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 gap-1">
+   778→              <Zap className="h-3 w-3" />{streak} day{streak > 1 ? 's' : ''}
+   779→            </Badge>
+   780→          )}
+   781→          <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+   782→            <User className="h-5 w-5 text-emerald-600" />
+   783→          </div>
+   784→        </div>
+   785→      </div>
+   786→
+   787→      {/* Calorie Ring */}
+   788→      <Card className="p-6 rounded-xl shadow-sm">
+   789→        <div className="flex justify-center">
+   790→          <CalorieRing consumed={consumedCal} target={targetCal} />
+   791→        </div>
+   792→      </Card>
+   793→
+   794→      {/* Macro Progress Bars with gradient & percentage */}
+   795→      <Card className="p-4 rounded-xl shadow-sm space-y-3">
+   796→        <h3 className="text-sm font-semibold text-gray-700">Today&apos;s Macros</h3>
+   797→        {[
+   798→          { label: 'Protein', val: nutrition?.consumed?.proteinG || 0, target: nutrition?.targets?.proteinG || 0, from: '#3b82f6', to: '#60a5fa', unit: 'g' },
+   799→          { label: 'Carbs', val: nutrition?.consumed?.carbsG || 0, target: nutrition?.targets?.carbsG || 0, from: '#f59e0b', to: '#fbbf24', unit: 'g' },
+   800→          { label: 'Fat', val: nutrition?.consumed?.fatG || 0, target: nutrition?.targets?.fatG || 0, from: '#f43f5e', to: '#fb7185', unit: 'g' },
+   801→        ].map((m) => {
+   802→          const pct = Math.min(Math.round((m.val / (m.target || 1)) * 100), 100);
+   803→          return (
+   804→            <div key={m.label}>
+   805→              <div className="flex justify-between text-xs mb-1.5">
+   806→                <span className="text-gray-600 font-medium">{m.label}</span>
+   807→                <span className="text-gray-500">{m.val}{m.unit} / {m.target}{m.unit} &middot; {pct}%</span>
+   808→              </div>
+   809→              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+   810→                <motion.div
+   811→                  className="h-full rounded-full"
+   812→                  style={{ background: `linear-gradient(90deg, ${m.from}, ${m.to})` }}
+   813→                  initial={{ width: 0 }}
+   814→                  animate={{ width: `${pct}%` }}
+   815→                  transition={{ duration: 0.8 }}
+   816→                />
+   817→              </div>
+   818→            </div>
+   819→          );
+   820→        })}
+   821→      </Card>
+   822→
+   823→      {/* Meal Slots with colored left borders & search buttons */}
+   824→      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   825→        {SLOTS.map((slot) => {
+   826→          const recs = recommendations[slot] || [];
+   827→          return (
+   828→            <Card key={slot} className={`p-0 rounded-xl shadow-sm border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden`}>
+   829→              <div className="p-4 pb-2">
+   830→                <div className="flex items-center justify-between mb-2">
+   831→                  <div className="flex items-center gap-2">
+   832→                    <span className="text-base">{SLOT_ICONS[slot]}</span>
+   833→                    <h3 className="font-semibold text-sm text-gray-900">{SLOT_LABELS[slot]}</h3>
+   834→                  </div>
+   835→                  <Button
+   836→                    variant="ghost" size="icon"
+   837→                    className="h-8 w-8 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50"
+   838→                    onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot }); }}
+   839→                  >
+   840→                    <Search className="h-4 w-4" />
+   841→                  </Button>
+   842→                </div>
+   843→              </div>
+   844→              <div className="px-4 pb-3 space-y-2 max-h-64 overflow-y-auto">
+   845→                {recs.length === 0 && (
+   846→                  <div className="text-center py-3">
+   847→                    <p className="text-xs text-gray-400">No recommendations</p>
+   848→                    <Button variant="ghost" size="sm" className="text-emerald-600 text-xs mt-1 hover:bg-emerald-50" onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot }); }}>
+   849→                      <Search className="h-3 w-3 mr-1" />Search for meals
+   850→                    </Button>
+   851→                  </div>
+   852→                )}
+   853→                {recs.map((rec) => (
+   854→                  <div
+   855→                    key={rec.meal.id}
+   856→                    className="p-2.5 rounded-xl border border-gray-100 bg-white space-y-1.5 hover:shadow-sm hover:border-emerald-100 transition-all cursor-pointer"
+   857→                    onClick={() => setDetailSheet({ open: true, rec })}
+   858→                  >
+   859→                    <div className="flex items-start justify-between gap-2">
+   860→                      <p className="text-sm font-medium text-gray-800 leading-tight line-clamp-1">{rec.meal.name}</p>
+   861→                      <div className="flex items-center gap-1 shrink-0">
+   862→                        {rec.meal.isVeg && <span className="text-green-600 text-xs font-bold border border-green-300 rounded px-1">V</span>}
+   863→                        {rec.meal.isVegan && <span className="text-green-700 text-xs font-bold border border-green-400 rounded px-1">VG</span>}
+   864→                      </div>
+   865→                    </div>
+   866→                    <div className="flex items-center gap-2 flex-wrap">
+   867→                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium border-gray-200 text-gray-500">{rec.meal.cuisine}</Badge>
+   868→                      {rec.meal.prepTimeMin && (
+   869→                        <span className="text-[10px] text-gray-400 flex items-center gap-0.5"><Clock className="h-3 w-3" />{rec.meal.prepTimeMin}m</span>
+   870→                      )}
+   871→                    </div>
+   872→                    <div className="flex items-center gap-2 text-[11px] text-gray-500">
+   873→                      <span className="font-medium text-gray-700">{rec.baseNutritionPer100g?.calories || 0} kcal/100g</span>
+   874→                      <span>&middot;</span>
+   875→                      <span>P: {rec.baseNutritionPer100g?.proteinG || 0}g</span>
+   876→                      {rec.estimatedNutrition && (
+   877→                        <span>&middot; <span className="text-emerald-600">~{rec.estimatedNutrition.calories} kcal ({rec.recommendedServingGms}g)</span></span>
+   878→                      )}
+   879→                    </div>
+   880→                    <Button
+   881→                      size="sm"
+   882→                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs min-h-[32px] rounded-lg mt-1 font-medium"
+   883→                      onClick={(e) => {
+   884→                        e.stopPropagation();
+   885→                        setServingGms(rec.recommendedServingGms);
+   886→                        setLogDialog({
+   887→                          open: true, meal: rec, slot,
+   888→                          baseNutritionPer100g: rec.baseNutritionPer100g,
+   889→                          mealName: rec.meal.name,
+   890→                          cuisine: rec.meal.cuisine,
+   891→                          mealType: rec.meal.mealType,
+   892→                          description: rec.meal.description,
+   893→                          isVeg: rec.meal.isVeg,
+   894→                          isVegan: rec.meal.isVegan,
+   895→                        });
+   896→                      }}
+   897→                    >
+   898→                      I Ate This
+   899→                    </Button>
+   900→                  </div>
+   901→                ))}
+   902→              </div>
+   903→            </Card>
+   904→          );
+   905→        })}
+   906→      </div>
+   907→
+   908→      {/* FAB buttons */}
+   909→      <div className="fixed bottom-20 right-4 z-40 flex flex-col gap-2">
+   910→        <Button size="icon" className="w-12 h-12 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg" onClick={handleWaterAdd}>
+   911→          <Droplets className="h-5 w-5" />
+   912→        </Button>
+   913→        <Button size="icon" className="w-12 h-12 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg" onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot: 'lunch' }); }}>
+   914→          <Search className="h-5 w-5" />
+   915→        </Button>
+   916→        <Button size="icon" className="w-12 h-12 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg" onClick={() => onNavigate('upload')}>
+   917→          <Camera className="h-5 w-5" />
+   918→        </Button>
+   919→      </div>
+   920→
+   921→      {/* ═══ Log Meal Dialog with Nutrition Facts Label ═══ */}
+   922→      <Dialog open={logDialog.open} onOpenChange={(open) => setLogDialog(open ? logDialog : { open: false })}>
+   923→        <DialogContent className="max-w-md">
+   924→          <DialogHeader>
+   925→            <DialogTitle>Log Meal</DialogTitle>
+   926→            <DialogDescription className="flex items-center gap-2">
+   927→              {logDialog.open && <span className="font-medium text-gray-700">{logDialog.mealName}</span>}
+   928→              {logDialog.open && logDialog.cuisine && <Badge variant="outline" className="text-xs">{logDialog.cuisine}</Badge>}
+   929→            </DialogDescription>
+   930→          </DialogHeader>
+   931→          <div className="space-y-4">
+   932→            <div className="space-y-2">
+   933→              <Label className="text-sm font-medium">Serving Size (grams)</Label>
+   934→              <Input type="number" value={servingGms} onChange={(e) => setServingGms(Number(e.target.value))} min={10} max={1000} className="h-11 rounded-xl" />
+   935→            </div>
+   936→
+   937→            {/* Per-100g vs Estimated nutrition display */}
+   938→            {logDialog.open && logDialog.baseNutritionPer100g && (
+   939→              <div className="space-y-3">
+   940→                {/* Per 100g info */}
+   941→                <div className="bg-gray-50 rounded-xl p-3 text-sm space-y-1">
+   942→                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Per 100g</p>
+   943→                  <div className="grid grid-cols-2 gap-1 text-xs">
+   944→                    <span className="text-gray-600">Calories:</span><span className="font-bold text-gray-900">{logDialog.baseNutritionPer100g.calories} kcal</span>
+   945→                    <span className="text-gray-600">Protein:</span><span className="font-bold text-blue-600">{logDialog.baseNutritionPer100g.proteinG}g</span>
+   946→                    <span className="text-gray-600">Carbs:</span><span className="font-bold text-amber-600">{logDialog.baseNutritionPer100g.carbsG}g</span>
+   947→                    <span className="text-gray-600">Fat:</span><span className="font-bold text-rose-600">{logDialog.baseNutritionPer100g.fatG}g</span>
+   948→                  </div>
+   949→                </div>
+   950→                {/* Estimated for serving */}
+   951→                <div className="bg-emerald-50 rounded-xl p-3 text-sm space-y-1 border border-emerald-100">
+   952→                  <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1.5">Estimated for {servingGms}g serving</p>
+   953→                  <div className="grid grid-cols-2 gap-1 text-xs">
+   954→                    <span className="text-gray-600">Calories:</span><span className="font-bold text-gray-900">{Math.round((logDialog.baseNutritionPer100g.calories / 100) * servingGms)} kcal</span>
+   955→                    <span className="text-gray-600">Protein:</span><span className="font-bold text-blue-600">{Math.round((logDialog.baseNutritionPer100g.proteinG / 100) * servingGms * 10) / 10}g</span>
+   956→                    <span className="text-gray-600">Carbs:</span><span className="font-bold text-amber-600">{Math.round((logDialog.baseNutritionPer100g.carbsG / 100) * servingGms * 10) / 10}g</span>
+   957→                    <span className="text-gray-600">Fat:</span><span className="font-bold text-rose-600">{Math.round((logDialog.baseNutritionPer100g.fatG / 100) * servingGms * 10) / 10}g</span>
+   958→                  </div>
+   959→                </div>
+   960→              </div>
+   961→            )}
+   962→
+   963→            {/* Nutrition Facts Label */}
+   964→            {logDialog.open && logDialog.baseNutritionPer100g && (
+   965→              <NutritionFactsLabel
+   966→                nutrition={logDialog.baseNutritionPer100g}
+   967→                servingGms={servingGms}
+   968→                label="Per Serving"
+   969→              />
+   970→            )}
+   971→
+   972→            <div className="space-y-2">
+   973→              <Label className="text-sm font-medium">Meal Slot</Label>
+   974→              <Select value={logDialog.open ? logDialog.slot : 'lunch'} onValueChange={(v) => logDialog.open && setLogDialog({ ...logDialog, slot: v })}>
+   975→                <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+   976→                <SelectContent>{SLOTS.map((s) => <SelectItem key={s} value={s}>{SLOT_LABELS[s]}</SelectItem>)}</SelectContent>
+   977→              </Select>
+   978→            </div>
+   979→          </div>
+   980→          <DialogFooter>
+   981→            <Button variant="outline" onClick={() => setLogDialog({ open: false })} className="rounded-xl">Cancel</Button>
+   982→            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold" onClick={handleLogMeal}>Log It</Button>
+   983→          </DialogFooter>
+   984→        </DialogContent>
+   985→      </Dialog>
+   986→
+   987→      {/* ═══ Per-Slot Meal Search Dialog ═══ */}
+   988→      <Dialog open={slotSearchDialog.open} onOpenChange={(open) => { if (!open) { setSlotSearchDialog({ open: false }); setSearchQuery(''); setSearchResults([]); } }}>
+   989→        <DialogContent className="max-w-md">
+   990→          <DialogHeader>
+   991→            <DialogTitle>Search Meals</DialogTitle>
+   992→            <DialogDescription>Find and log a meal for {slotSearchDialog.open ? SLOT_LABELS[slotSearchDialog.slot] : ''}</DialogDescription>
+   993→          </DialogHeader>
+   994→          <div className="space-y-3">
+   995→            <div className="relative">
+   996→              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+   997→              <Input
+   998→                placeholder="Search meals..."
+   999→                value={searchQuery}
+  1000→                onChange={(e) => handleSlotSearch(e.target.value)}
+  1001→                className="h-11 rounded-xl pl-9"
+  1002→                autoFocus
+  1003→              />
+  1004→            </div>
+  1005→            <ScrollArea className="max-h-72">
+  1006→              <div className="space-y-2">
+  1007→                {searchLoading && <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-emerald-600" /></div>}
+  1008→                {!searchLoading && searchQuery && searchResults.length === 0 && (
+  1009→                  <p className="text-sm text-gray-400 text-center py-6">No results found</p>
+  1010→                )}
+  1011→                {!searchLoading && searchResults.map((meal) => (
+  1012→                  <div
+  1013→                    key={meal.id}
+  1014→                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:bg-emerald-50/50 hover:border-emerald-100 transition-colors cursor-pointer"
+  1015→                    onClick={() => handleLogFromSearch(meal)}
+  1016→                  >
+  1017→                    <div className="flex-1 min-w-0">
+  1018→                      <div className="flex items-center gap-2">
+  1019→                        <p className="text-sm font-medium text-gray-800 truncate">{meal.name}</p>
+  1020→                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium border-gray-200 text-gray-500 shrink-0">{meal.cuisine}</Badge>
+  1021→                      </div>
+  1022→                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+  1023→                        <span>{meal.nutrition?.calories || 0} kcal/100g</span>
+  1024→                        <span>&middot;</span>
+  1025→                        <span className="text-blue-600 font-medium">P: {meal.nutrition?.proteinG || 0}g</span>
+  1026→                      </div>
+  1027→                    </div>
+  1028→                    <ChevronRight className="h-4 w-4 text-gray-300 shrink-0" />
+  1029→                  </div>
+  1030→                ))}
+  1031→              </div>
+  1032→            </ScrollArea>
+  1033→          </div>
+  1034→        </DialogContent>
+  1035→      </Dialog>
+  1036→
+  1037→      {/* ═══ Meal Detail Sheet ═══ */}
+  1038→      <Sheet open={detailSheet.open} onOpenChange={(open) => { if (!open) setDetailSheet({ open: false }); }}>
+  1039→        <SheetContent side="bottom" className="max-w-lg mx-auto rounded-t-2xl max-h-[85vh]">
+  1040→          {detailSheet.open && (
+  1041→            <>
+  1042→              <SheetHeader className="pt-2">
+  1043→                <div className="flex items-center gap-2 pr-8">
+  1044→                  {detailSheet.rec.meal.isVeg && <span className="text-green-600 text-xs font-bold border border-green-300 rounded px-1.5 py-0.5">Veg</span>}
+  1045→                  {detailSheet.rec.meal.isVegan && <span className="text-green-700 text-xs font-bold border border-green-400 rounded px-1.5 py-0.5">Vegan</span>}
+  1046→                </div>
+  1047→                <SheetTitle className="text-lg">{detailSheet.rec.meal.name}</SheetTitle>
+  1048→                <SheetDescription className="flex items-center gap-2 flex-wrap">
+  1049→                  <Badge variant="outline" className="text-xs">{detailSheet.rec.meal.cuisine}</Badge>
+  1050→                  <Badge variant="outline" className={`text-xs ${SLOT_BADGE_COLORS[detailSheet.rec.meal.mealType] || ''}`}>{detailSheet.rec.meal.mealType}</Badge>
+  1051→                  {detailSheet.rec.meal.prepTimeMin && (
+  1052→                    <span className="text-xs text-gray-500 flex items-center gap-1"><Clock className="h-3 w-3" />{detailSheet.rec.meal.prepTimeMin} min</span>
+  1053→                  )}
+  1054→                </SheetDescription>
+  1055→              </SheetHeader>
+  1056→              <ScrollArea className="flex-1 px-4 pb-4">
+  1057→                <div className="space-y-4">
+  1058→                  {detailSheet.rec.meal.description && (
+  1059→                    <p className="text-sm text-gray-600 leading-relaxed">{detailSheet.rec.meal.description}</p>
+  1060→                  )}
+  1061→
+  1062→                  {/* Per 100g nutrition */}
+  1063→                  {detailSheet.rec.baseNutritionPer100g && (
+  1064→                    <div>
+  1065→                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Nutrition per 100g</h4>
+  1066→                      <NutritionFactsLabel nutrition={detailSheet.rec.baseNutritionPer100g} servingGms={100} label="Per 100g" />
+  1067→                    </div>
+  1068→                  )}
+  1069→
+  1070→                  {/* Estimated for recommended serving */}
+  1071→                  {detailSheet.rec.estimatedNutrition && (
+  1072→                    <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
+  1073→                      <h4 className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2">Recommended: {detailSheet.rec.recommendedServingGms}g serving</h4>
+  1074→                      <div className="grid grid-cols-2 gap-1.5 text-xs">
+  1075→                        <span className="text-gray-600">Calories:</span><span className="font-bold">{detailSheet.rec.estimatedNutrition.calories} kcal</span>
+  1076→                        <span className="text-gray-600">Protein:</span><span className="font-bold text-blue-600">{detailSheet.rec.estimatedNutrition.proteinG}g</span>
+  1077→                        <span className="text-gray-600">Carbs:</span><span className="font-bold text-amber-600">{detailSheet.rec.estimatedNutrition.carbsG}g</span>
+  1078→                        <span className="text-gray-600">Fat:</span><span className="font-bold text-rose-600">{detailSheet.rec.estimatedNutrition.fatG}g</span>
+  1079→                      </div>
+  1080→                    </div>
+  1081→                  )}
+  1082→                </div>
+  1083→              </ScrollArea>
+  1084→              <SheetFooter className="border-t pt-3">
+  1085→                <Button
+  1086→                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold min-h-[44px]"
+  1087→                  onClick={() => {
+  1088→                    const r = detailSheet.rec;
+  1089→                    setServingGms(r.recommendedServingGms);
+  1090→                    setLogDialog({
+  1091→                      open: true, meal: r, slot: r.meal.mealType,
+  1092→                      baseNutritionPer100g: r.baseNutritionPer100g,
+  1093→                      mealName: r.meal.name, cuisine: r.meal.cuisine,
+  1094→                      mealType: r.meal.mealType, description: r.meal.description,
+  1095→                      isVeg: r.meal.isVeg, isVegan: r.meal.isVegan,
+  1096→                    });
+  1097→                    setDetailSheet({ open: false });
+  1098→                  }}
+  1099→                >
+  1100→                  Log This Meal
+  1101→                </Button>
+  1102→              </SheetFooter>
+  1103→            </>
+  1104→          )}
+  1105→        </SheetContent>
+  1106→      </Sheet>
+  1107→    </motion.div>
+  1108→  );
+  1109→}
+  1110→
+  1111→// ═══════════════════════════════════════════════════════════
+  1112→// FOOD LOG VIEW (with Quick Re-log)
+  1113→// ═══════════════════════════════════════════════════════════
+  1114→function FoodLogView() {
+  1115→  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  1116→  const [foodLog, setFoodLog] = useState<Record<string, unknown> | null>(null);
+  1117→  const [loading, setLoading] = useState(true);
+  1118→  const [relogDialog, setRelogDialog] = useState<{ open: boolean; item: FoodLogItem } | { open: false }>({ open: false });
+  1119→  const [relogSlot, setRelogSlot] = useState('lunch');
+  1120→
+  1121→  const dates = Array.from({ length: 7 }, (_, i) => format(subDays(new Date(), 6 - i), 'yyyy-MM-dd'));
+  1122→
+  1123→  const fetchLog = useCallback(async () => {
+  1124→    setLoading(true);
+
+[showing lines 625-1124 of 1899; use offset=1125 with limit to continue reading]

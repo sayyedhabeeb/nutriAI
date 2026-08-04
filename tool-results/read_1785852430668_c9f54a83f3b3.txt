@@ -1,0 +1,562 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import React, { useState, useEffect, useCallback } from 'react';
+     4→     4→import { format } from 'date-fns';
+     5→     5→import { motion } from 'framer-motion';
+     6→     6→import { toast } from 'sonner';
+     7→     7→import { Button } from '@/components/ui/button';
+     8→     8→import { Card } from '@/components/ui/card';
+     9→     9→import { Input } from '@/components/ui/input';
+    10→    10→import { Label } from '@/components/ui/label';
+    11→    11→import { Badge } from '@/components/ui/badge';
+    12→    12→import { Skeleton } from '@/components/ui/skeleton';
+    13→    13→import { ScrollArea } from '@/components/ui/scroll-area';
+    14→    14→import {
+    15→    15→  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+    16→    16→} from '@/components/ui/dialog';
+    17→    17→import {
+    18→    18→  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+    19→    19→} from '@/components/ui/select';
+    20→    20→import {
+    21→    21→  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter,
+    22→    22→} from '@/components/ui/sheet';
+    23→    23→import {
+    24→    24→  User, Search, Droplets, Camera, Clock, Zap, ChevronRight,
+    25→    25→} from 'lucide-react';
+    26→    26→import { apiFetch } from './api';
+    27→    27→import {
+    28→    28→  SLOTS, SLOT_LABELS, SLOT_ICONS, SLOT_BORDER_COLORS, SLOT_BADGE_COLORS,
+    29→    29→  SLOT_GRADIENT_COLORS, fadeIn,
+    30→    30→} from './constants';
+    31→    31→import { CalorieRing, NutritionFactsLabel } from './shared';
+    32→    32→import type { ViewType, NutritionData, MealRecommendation, SearchMeal } from './types';
+    33→    33→
+    34→    34→export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => void }) {
+    35→    35→  const [user, setUser] = useState<Record<string, unknown> | null>(null);
+    36→    36→  const [nutrition, setNutrition] = useState<NutritionData | null>(null);
+    37→    37→  const [recommendations, setRecommendations] = useState<Record<string, MealRecommendation[]>>({});
+    38→    38→  const [loading, setLoading] = useState(true);
+    39→    39→  const [streak, setStreak] = useState(0);
+    40→    40→
+    41→    41→  // Log meal dialog state
+    42→    42→  const [logDialog, setLogDialog] = useState<{
+    43→    43→    open: boolean;
+    44→    44→    meal: MealRecommendation;
+    45→    45→    slot: string;
+    46→    46→    baseNutritionPer100g: { calories: number; proteinG: number; carbsG: number; fatG: number } | null;
+    47→    47→    mealName: string;
+    48→    48→    cuisine: string;
+    49→    49→    mealType: string;
+    50→    50→    description?: string | null;
+    51→    51→    isVeg?: boolean;
+    52→    52→    isVegan?: boolean;
+    53→    53→  } | { open: false }>({ open: false });
+    54→    54→  const [servingGms, setServingGms] = useState(100);
+    55→    55→
+    56→    56→  // Meal search dialog state (per-slot)
+    57→    57→  const [slotSearchDialog, setSlotSearchDialog] = useState<{ open: boolean; slot: string } | { open: false }>({ open: false });
+    58→    58→  const [searchQuery, setSearchQuery] = useState('');
+    59→    59→  const [searchResults, setSearchResults] = useState<SearchMeal[]>([]);
+    60→    60→  const [searchLoading, setSearchLoading] = useState(false);
+    61→    61→  const [searchDebounce, setSearchDebounce] = useState<ReturnType<typeof setTimeout> | null>(null);
+    62→    62→
+    63→    63→  // Meal detail sheet
+    64→    64→  const [detailSheet, setDetailSheet] = useState<{
+    65→    65→    open: boolean;
+    66→    66→    rec: MealRecommendation;
+    67→    67→  } | { open: false }>({ open: false });
+    68→    68→
+    69→    69→  const fetchData = useCallback(async () => {
+    70→    70→    try {
+    71→    71→      const [me, nut, summaryData] = await Promise.all([
+    72→    72→        apiFetch('/api/auth/me'),
+    73→    73→        apiFetch('/api/nutrition/daily'),
+    74→    74→        apiFetch('/api/progress/summary?period=week').catch(() => ({ summary: { totalDays: 0 } })),
+    75→    75→      ]);
+    76→    76→      setUser(me);
+    77→    77→      setNutrition(nut);
+    78→    78→
+    79→    79→      // Calculate streak from weekly data
+    80→    80→      const weeklyData = await apiFetch('/api/progress/weekly').catch(() => [] as Record<string, unknown>[]);
+    81→    81→      let streakCount = 0;
+    82→    82→      for (let i = (weeklyData as Record<string, unknown>[]).length - 1; i >= 0; i--) {
+    83→    83→        const day = weeklyData[i];
+    84→    84→        const consumed = (day.consumed as Record<string, number>)?.calories || 0;
+    85→    85→        if (consumed > 0) streakCount++;
+    86→    86→        else break;
+    87→    87→      }
+    88→    88→      setStreak(streakCount);
+    89→    89→
+    90→    90→      const recs = await Promise.all(
+    91→    91→        SLOTS.map(async (slot) => {
+    92→    92→          try {
+    93→    93→            const r = await apiFetch(`/api/recommendations?slot=${slot}`);
+    94→    94→            return { slot, recs: r.recommendations || [] };
+    95→    95→          } catch { return { slot, recs: [] }; }
+    96→    96→        })
+    97→    97→      );
+    98→    98→      const recMap: Record<string, MealRecommendation[]> = {};
+    99→    99→      for (const r of recs) recMap[r.slot] = r.recs;
+   100→   100→      setRecommendations(recMap);
+   101→   101→    } catch {
+   102→   102→      toast.error('Failed to load dashboard');
+   103→   103→    } finally {
+   104→   104→      setLoading(false);
+   105→   105→    }
+   106→   106→  }, []);
+   107→   107→
+   108→   108→  useEffect(() => { fetchData(); }, [fetchData]);
+   109→   109→
+   110→   110→  const handleLogMeal = async () => {
+   111→   111→    if (!logDialog.open) return;
+   112→   112→    try {
+   113→   113→      await apiFetch('/api/food-logs', {
+   114→   114→        method: 'POST',
+   115→   115→        body: JSON.stringify({ mealId: logDialog.meal.meal.id, servingGms, mealSlot: logDialog.slot }),
+   116→   116→      });
+   117→   117→      toast.success(`Logged ${logDialog.mealName}!`);
+   118→   118→      setLogDialog({ open: false });
+   119→   119→      fetchData();
+   120→   120→    } catch (err) { toast.error((err as Error).message); }
+   121→   121→  };
+   122→   122→
+   123→   123→  // Per-slot search with debounce
+   124→   124→  const handleSlotSearch = (query: string) => {
+   125→   125→    setSearchQuery(query);
+   126→   126→    if (searchDebounce) clearTimeout(searchDebounce);
+   127→   127→    if (!query.trim()) { setSearchResults([]); return; }
+   128→   128→    const timer = setTimeout(async () => {
+   129→   129→      setSearchLoading(true);
+   130→   130→      try {
+   131→   131→        const res = await apiFetch(`/api/meals/search?q=${encodeURIComponent(query)}`);
+   132→   132→        setSearchResults((res.meals || []) as SearchMeal[]);
+   133→   133→      } catch { toast.error('Search failed'); }
+   134→   134→      finally { setSearchLoading(false); }
+   135→   135→    }, 350);
+   136→   136→    setSearchDebounce(timer);
+   137→   137→  };
+   138→   138→
+   139→   139→  const handleLogFromSearch = (meal: SearchMeal) => {
+   140→   140→    const slot = slotSearchDialog.open ? slotSearchDialog.slot : 'lunch';
+   141→   141→    setServingGms(meal.baseServingGms || 100);
+   142→   142→    setLogDialog({
+   143→   143→      open: true,
+   144→   144→      meal: {
+   145→   145→        meal: { id: meal.id, name: meal.name, mealType: meal.mealType, cuisine: meal.cuisine, imageUrl: null, prepTimeMin: meal.prepTimeMin, isVeg: meal.isVeg, isVegan: meal.isVegan },
+   146→   146→        score: 0, recommendedServingGms: meal.baseServingGms || 100, estimatedNutrition: meal.nutrition ? { calories: meal.nutrition.calories, proteinG: meal.nutrition.proteinG, carbsG: meal.nutrition.carbsG, fatG: meal.nutrition.fatG } : null,
+   147→   147→        baseNutritionPer100g: meal.nutrition ? { calories: meal.nutrition.calories, proteinG: meal.nutrition.proteinG, carbsG: meal.nutrition.carbsG, fatG: meal.nutrition.fatG } : null,
+   148→   148→      },
+   149→   149→      slot,
+   150→   150→      baseNutritionPer100g: meal.nutrition || null,
+   151→   151→      mealName: meal.name,
+   152→   152→      cuisine: meal.cuisine,
+   153→   153→      mealType: meal.mealType,
+   154→   154→      isVeg: meal.isVeg,
+   155→   155→      isVegan: meal.isVegan,
+   156→   156→    });
+   157→   157→    setSlotSearchDialog({ open: false });
+   158→   158→    setSearchQuery('');
+   159→   159→    setSearchResults([]);
+   160→   160→  };
+   161→   161→
+   162→   162→  const handleWaterAdd = async () => {
+   163→   163→    try {
+   164→   164→      await apiFetch('/api/water-log', { method: 'POST', body: JSON.stringify({ glasses: 1 }) });
+   165→   165→      toast.success('\uD83D\uDCA7 +1 glass of water');
+   166→   166→    } catch { toast.error('Failed to log water'); }
+   167→   167→  };
+   168→   168→
+   169→   169→  const firstName = (user?.profile as Record<string, unknown> | null)?.firstName || (user?.name as string) || 'there';
+   170→   170→  const todayStr = format(new Date(), 'EEEE, MMMM d');
+   171→   171→
+   172→   172→  if (loading) {
+   173→   173→    return (
+   174→   174→      <div className="p-4 max-w-lg mx-auto space-y-4">
+   175→   175→        <Skeleton className="h-8 w-56 rounded-xl" />
+   176→   176→        <div className="flex justify-center"><Skeleton className="h-[180px] w-[180px] rounded-full" /></div>
+   177→   177→        <div className="space-y-3"><Skeleton className="h-10 w-full rounded-xl" /><Skeleton className="h-10 w-full rounded-xl" /><Skeleton className="h-10 w-full rounded-xl" /></div>
+   178→   178→        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><Skeleton className="h-56 w-full rounded-xl" /><Skeleton className="h-56 w-full rounded-xl" /></div>
+   179→   179→      </div>
+   180→   180→    );
+   181→   181→  }
+   182→   182→
+   183→   183→  const targetCal = nutrition?.targets?.calories || 0;
+   184→   184→  const consumedCal = nutrition?.consumed?.calories || 0;
+   185→   185→  const pctConsumed = targetCal > 0 ? consumedCal / targetCal : 0;
+   186→   186→
+   187→   187→  return (
+   188→   188→    <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-4">
+   189→   189→      {/* ═══ Hero Section with gradient bg & decorative blobs ═══ */}
+   190→   190→      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500/5 to-teal-500/5 p-5 border border-emerald-100/50">
+   191→   191→        {/* Decorative background blobs */}
+   192→   192→        <div className="absolute -top-8 -right-8 w-24 h-24 bg-emerald-200/20 rounded-full blur-2xl" />
+   193→   193→        <div className="absolute -bottom-6 -left-6 w-20 h-20 bg-teal-200/20 rounded-full blur-2xl" />
+   194→   194→        <div className="absolute top-1/2 right-1/4 w-12 h-12 bg-green-200/10 rounded-full blur-xl" />
+   195→   195→
+   196→   196→        <div className="relative flex items-start justify-between">
+   197→   197→          <div>
+   198→   198→            <h1 className="text-xl font-bold text-gray-900">Hi, {firstName}! {'\uD83D\uDC4B'}</h1>
+   199→   199→            <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-500">
+   200→   200→              <CalendarIcon className="h-3.5 w-3.5" />
+   201→   201→              <span>{todayStr}</span>
+   202→   202→            </div>
+   203→   203→          </div>
+   204→   204→          <div className="flex items-center gap-2">
+   205→   205→            {streak > 0 && (
+   206→   206→              <Badge className="bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 gap-1 shadow-sm">
+   207→   207→                <Zap className="h-3 w-3" />{streak} day{streak > 1 ? 's' : ''}
+   208→   208→              </Badge>
+   209→   209→            )}
+   210→   210→            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center shadow-sm">
+   211→   211→              <User className="h-5 w-5 text-emerald-600" />
+   212→   212→            </div>
+   213→   213→          </div>
+   214→   214→        </div>
+   215→   215→      </div>
+   216→   216→
+   217→   217→      {/* ═══ Calorie Ring Card ═══ */}
+   218→   218→      <Card className="p-6 rounded-xl shadow-sm">
+   219→   219→        <div className="flex justify-center">
+   220→   220→          <CalorieRing consumed={consumedCal} target={targetCal} />
+   221→   221→        </div>
+   222→   222→        {/* Progress message below ring */}
+   223→   223→        {pctConsumed >= 1 && (
+   224→   224→          <p className="text-center text-sm text-rose-600 font-medium mt-2">
+   225→   225→            You&apos;ve reached your calorie goal! Great job! {'\uD83C\uDF89'}
+   226→   226→          </p>
+   227→   227→        )}
+   228→   228→      </Card>
+   229→   229→
+   230→   230→      {/* ═══ Macro Progress Bars with gradient & percentage ═══ */}
+   231→   231→      <Card className="p-4 rounded-xl shadow-sm space-y-3">
+   232→   232→        <h3 className="text-sm font-semibold text-gray-700">Today&apos;s Macros</h3>
+   233→   233→        {[
+   234→   234→          { label: 'Protein', val: nutrition?.consumed?.proteinG || 0, target: nutrition?.targets?.proteinG || 0, from: '#3b82f6', to: '#60a5fa', unit: 'g' },
+   235→   235→          { label: 'Carbs', val: nutrition?.consumed?.carbsG || 0, target: nutrition?.targets?.carbsG || 0, from: '#f59e0b', to: '#fbbf24', unit: 'g' },
+   236→   236→          { label: 'Fat', val: nutrition?.consumed?.fatG || 0, target: nutrition?.targets?.fatG || 0, from: '#f43f5e', to: '#fb7185', unit: 'g' },
+   237→   237→        ].map((m) => {
+   238→   238→          const pct = Math.min(Math.round((m.val / (m.target || 1)) * 100), 100);
+   239→   239→          return (
+   240→   240→            <div key={m.label}>
+   241→   241→              <div className="flex justify-between text-xs mb-1.5">
+   242→   242→                <span className="text-gray-600 font-medium">{m.label}</span>
+   243→   243→                <span className="text-gray-500">{m.val}{m.unit} / {m.target}{m.unit} &middot; {pct}%</span>
+   244→   244→              </div>
+   245→   245→              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+   246→   246→                <motion.div
+   247→   247→                  className="h-full rounded-full"
+   248→   248→                  style={{ background: `linear-gradient(90deg, ${m.from}, ${m.to})` }}
+   249→   249→                  initial={{ width: 0 }}
+   250→   250→                  animate={{ width: `${pct}%` }}
+   251→   251→                  transition={{ duration: 0.8 }}
+   252→   252→                />
+   253→   253→              </div>
+   254→   254→            </div>
+   255→   255→          );
+   256→   256→        })}
+   257→   257→      </Card>
+   258→   258→
+   259→   259→      {/* ═══ Meal Slots with gradient headers & search buttons ═══ */}
+   260→   260→      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   261→   261→        {SLOTS.map((slot) => {
+   262→   262→          const recs = recommendations[slot] || [];
+   263→   263→          const grad = SLOT_GRADIENT_COLORS[slot];
+   264→   264→          return (
+   265→   265→            <Card key={slot} className={`p-0 rounded-xl shadow-sm border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden`}>
+   266→   266→              {/* Gradient header strip */}
+   267→   267→              <div className={`bg-gradient-to-r ${grad.from} ${grad.to} px-4 py-3`}>
+   268→   268→                <div className="flex items-center justify-between">
+   269→   269→                  <div className="flex items-center gap-2">
+   270→   270→                    <span className="text-base">{SLOT_ICONS[slot]}</span>
+   271→   271→                    <h3 className="font-semibold text-sm text-gray-900">{SLOT_LABELS[slot]}</h3>
+   272→   272→                  </div>
+   273→   273→                  <Button
+   274→   274→                    variant="ghost" size="icon"
+   275→   275→                    className="h-8 w-8 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50"
+   276→   276→                    onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot }); }}
+   277→   277→                  >
+   278→   278→                    <Search className="h-4 w-4" />
+   279→   279→                  </Button>
+   280→   280→                </div>
+   281→   281→              </div>
+   282→   282→              <div className="px-4 pb-3 pt-2 space-y-2 max-h-64 overflow-y-auto">
+   283→   283→                {recs.length === 0 && (
+   284→   284→                  <div className="text-center py-3">
+   285→   285→                    <p className="text-xs text-gray-400">No recommendations</p>
+   286→   286→                    <Button variant="ghost" size="sm" className="text-emerald-600 text-xs mt-1 hover:bg-emerald-50" onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot }); }}>
+   287→   287→                      <Search className="h-3 w-3 mr-1" />Search for meals
+   288→   288→                    </Button>
+   289→   289→                  </div>
+   290→   290→                )}
+   291→   291→                {recs.map((rec) => (
+   292→   292→                  <div
+   293→   293→                    key={rec.meal.id}
+   294→   294→                    className="p-2.5 rounded-xl border border-gray-100 bg-white space-y-1.5 hover:shadow-sm hover:border-emerald-100 transition-all cursor-pointer"
+   295→   295→                    onClick={() => setDetailSheet({ open: true, rec })}
+   296→   296→                  >
+   297→   297→                    <div className="flex items-start justify-between gap-2">
+   298→   298→                      <p className="text-sm font-medium text-gray-800 leading-tight line-clamp-1">{rec.meal.name}</p>
+   299→   299→                      <div className="flex items-center gap-1 shrink-0">
+   300→   300→                        {rec.meal.isVeg && <span className="text-green-600 text-xs font-bold border border-green-300 rounded px-1">V</span>}
+   301→   301→                        {rec.meal.isVegan && <span className="text-green-700 text-xs font-bold border border-green-400 rounded px-1">VG</span>}
+   302→   302→                      </div>
+   303→   303→                    </div>
+   304→   304→                    <div className="flex items-center gap-2 flex-wrap">
+   305→   305→                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium border-gray-200 text-gray-500">{rec.meal.cuisine}</Badge>
+   306→   306→                      {rec.meal.prepTimeMin && (
+   307→   307→                        <span className="text-[10px] text-gray-400 flex items-center gap-0.5"><Clock className="h-3 w-3" />{rec.meal.prepTimeMin}m</span>
+   308→   308→                      )}
+   309→   309→                    </div>
+   310→   310→                    <div className="flex items-center gap-2 text-[11px] text-gray-500">
+   311→   311→                      <span className="font-medium text-gray-700">{rec.baseNutritionPer100g?.calories || 0} kcal/100g</span>
+   312→   312→                      <span>&middot;</span>
+   313→   313→                      <span>P: {rec.baseNutritionPer100g?.proteinG || 0}g</span>
+   314→   314→                      {rec.estimatedNutrition && (
+   315→   315→                        <span>&middot; <span className="text-emerald-600">~{rec.estimatedNutrition.calories} kcal ({rec.recommendedServingGms}g)</span></span>
+   316→   316→                      )}
+   317→   317→                    </div>
+   318→   318→                    <Button
+   319→   319→                      size="sm"
+   320→   320→                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs min-h-[32px] rounded-lg mt-1 font-medium"
+   321→   321→                      onClick={(e) => {
+   322→   322→                        e.stopPropagation();
+   323→   323→                        setServingGms(rec.recommendedServingGms);
+   324→   324→                        setLogDialog({
+   325→   325→                          open: true, meal: rec, slot,
+   326→   326→                          baseNutritionPer100g: rec.baseNutritionPer100g,
+   327→   327→                          mealName: rec.meal.name, cuisine: rec.meal.cuisine,
+   328→   328→                          mealType: rec.meal.mealType, description: rec.meal.description,
+   329→   329→                          isVeg: rec.meal.isVeg, isVegan: rec.meal.isVegan,
+   330→   330→                        });
+   331→   331→                      }}
+   332→   332→                    >
+   333→   333→                      I Ate This
+   334→   334→                    </Button>
+   335→   335→                  </div>
+   336→   336→                ))}
+   337→   337→              </div>
+   338→   338→            </Card>
+   339→   339→          );
+   340→   340→        })}
+   341→   341→      </div>
+   342→   342→
+   343→   343→      {/* ═══ FAB buttons ═══ */}
+   344→   344→      <div className="fixed bottom-20 right-4 z-40 flex flex-col gap-2">
+   345→   345→        <Button size="icon" className="w-12 h-12 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg" onClick={handleWaterAdd}>
+   346→   346→          <Droplets className="h-5 w-5" />
+   347→   347→        </Button>
+   348→   348→        <Button size="icon" className="w-12 h-12 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg" onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot: 'lunch' }); }}>
+   349→   349→          <Search className="h-5 w-5" />
+   350→   350→        </Button>
+   351→   351→        <Button size="icon" className="w-12 h-12 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg" onClick={() => onNavigate('upload')}>
+   352→   352→          <Camera className="h-5 w-5" />
+   353→   353→        </Button>
+   354→   354→      </div>
+   355→   355→
+   356→   356→      {/* ═══ Log Meal Dialog with Nutrition Facts Label ═══ */}
+   357→   357→      <Dialog open={logDialog.open} onOpenChange={(open) => setLogDialog(open ? logDialog : { open: false })}>
+   358→   358→        <DialogContent className="max-w-md">
+   359→   359→          <DialogHeader>
+   360→   360→            <DialogTitle>Log Meal</DialogTitle>
+   361→   361→            <DialogDescription className="flex items-center gap-2">
+   362→   362→              {logDialog.open && <span className="font-medium text-gray-700">{logDialog.mealName}</span>}
+   363→   363→              {logDialog.open && logDialog.cuisine && <Badge variant="outline" className="text-xs">{logDialog.cuisine}</Badge>}
+   364→   364→            </DialogDescription>
+   365→   365→          </DialogHeader>
+   366→   366→          <div className="space-y-4">
+   367→   367→            <div className="space-y-2">
+   368→   368→              <Label className="text-sm font-medium">Serving Size (grams)</Label>
+   369→   369→              <Input type="number" value={servingGms} onChange={(e) => setServingGms(Number(e.target.value))} min={10} max={1000} className="h-11 rounded-xl" />
+   370→   370→            </div>
+   371→   371→
+   372→   372→            {/* Per-100g vs Estimated nutrition display */}
+   373→   373→            {logDialog.open && logDialog.baseNutritionPer100g && (
+   374→   374→              <div className="space-y-3">
+   375→   375→                {/* Per 100g info */}
+   376→   376→                <div className="bg-gray-50 rounded-xl p-3 text-sm space-y-1">
+   377→   377→                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Per 100g</p>
+   378→   378→                  <div className="grid grid-cols-2 gap-1 text-xs">
+   379→   379→                    <span className="text-gray-600">Calories:</span><span className="font-bold text-gray-900">{logDialog.baseNutritionPer100g.calories} kcal</span>
+   380→   380→                    <span className="text-gray-600">Protein:</span><span className="font-bold text-blue-600">{logDialog.baseNutritionPer100g.proteinG}g</span>
+   381→   381→                    <span className="text-gray-600">Carbs:</span><span className="font-bold text-amber-600">{logDialog.baseNutritionPer100g.carbsG}g</span>
+   382→   382→                    <span className="text-gray-600">Fat:</span><span className="font-bold text-rose-600">{logDialog.baseNutritionPer100g.fatG}g</span>
+   383→   383→                  </div>
+   384→   384→                </div>
+   385→   385→                {/* Estimated for serving */}
+   386→   386→                <div className="bg-emerald-50 rounded-xl p-3 text-sm space-y-1 border border-emerald-100">
+   387→   387→                  <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1.5">Estimated for {servingGms}g serving</p>
+   388→   388→                  <div className="grid grid-cols-2 gap-1 text-xs">
+   389→   389→                    <span className="text-gray-600">Calories:</span><span className="font-bold text-gray-900">{Math.round((logDialog.baseNutritionPer100g.calories / 100) * servingGms)} kcal</span>
+   390→   390→                    <span className="text-gray-600">Protein:</span><span className="font-bold text-blue-600">{Math.round((logDialog.baseNutritionPer100g.proteinG / 100) * servingGms * 10) / 10}g</span>
+   391→   391→                    <span className="text-gray-600">Carbs:</span><span className="font-bold text-amber-600">{Math.round((logDialog.baseNutritionPer100g.carbsG / 100) * servingGms * 10) / 10}g</span>
+   392→   392→                    <span className="text-gray-600">Fat:</span><span className="font-bold text-rose-600">{Math.round((logDialog.baseNutritionPer100g.fatG / 100) * servingGms * 10) / 10}g</span>
+   393→   393→                  </div>
+   394→   394→                </div>
+   395→   395→              </div>
+   396→   396→            )}
+   397→   397→
+   398→   398→            {/* Nutrition Facts Label */}
+   399→   399→            {logDialog.open && logDialog.baseNutritionPer100g && (
+   400→   400→              <NutritionFactsLabel
+   401→   401→                nutrition={logDialog.baseNutritionPer100g}
+   402→   402→                servingGms={servingGms}
+   403→   403→                label="Per Serving"
+   404→   404→              />
+   405→   405→            )}
+   406→   406→
+   407→   407→            <div className="space-y-2">
+   408→   408→              <Label className="text-sm font-medium">Meal Slot</Label>
+   409→   409→              <Select value={logDialog.open ? logDialog.slot : 'lunch'} onValueChange={(v) => logDialog.open && setLogDialog({ ...logDialog, slot: v })}>
+   410→   410→                <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+   411→   411→                <SelectContent>{SLOTS.map((s) => <SelectItem key={s} value={s}>{SLOT_LABELS[s]}</SelectItem>)}</SelectContent>
+   412→   412→              </Select>
+   413→   413→            </div>
+   414→   414→          </div>
+   415→   415→          <DialogFooter>
+   416→   416→            <Button variant="outline" onClick={() => setLogDialog({ open: false })} className="rounded-xl">Cancel</Button>
+   417→   417→            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold" onClick={handleLogMeal}>Log It</Button>
+   418→   418→          </DialogFooter>
+   419→   419→        </DialogContent>
+   420→   420→      </Dialog>
+   421→   421→
+   422→   422→      {/* ═══ Per-Slot Meal Search Dialog ═══ */}
+   423→   423→      <Dialog open={slotSearchDialog.open} onOpenChange={(open) => { if (!open) { setSlotSearchDialog({ open: false }); setSearchQuery(''); setSearchResults([]); } }}>
+   424→   424→        <DialogContent className="max-w-md">
+   425→   425→          <DialogHeader>
+   426→   426→            <DialogTitle>Search Meals</DialogTitle>
+   427→   427→            <DialogDescription>Find and log a meal for {slotSearchDialog.open ? SLOT_LABELS[slotSearchDialog.slot] : ''}</DialogDescription>
+   428→   428→          </DialogHeader>
+   429→   429→          <div className="space-y-3">
+   430→   430→            <div className="relative">
+   431→   431→              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+   432→   432→              <Input
+   433→   433→                placeholder="Search meals..."
+   434→   434→                value={searchQuery}
+   435→   435→                onChange={(e) => handleSlotSearch(e.target.value)}
+   436→   436→                className="h-11 rounded-xl pl-9"
+   437→   437→                autoFocus
+   438→   438→              />
+   439→   439→            </div>
+   440→   440→            <ScrollArea className="max-h-72">
+   441→   441→              <div className="space-y-2">
+   442→   442→                {searchLoading && <div className="flex justify-center py-6"><LoaderIcon className="h-5 w-5 animate-spin text-emerald-600" /></div>}
+   443→   443→                {!searchLoading && searchQuery && searchResults.length === 0 && (
+   444→   444→                  <p className="text-sm text-gray-400 text-center py-6">No results found</p>
+   445→   445→                )}
+   446→   446→                {!searchLoading && searchResults.map((meal) => (
+   447→   447→                  <div
+   448→   448→                    key={meal.id}
+   449→   449→                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:bg-emerald-50/50 hover:border-emerald-100 transition-colors cursor-pointer"
+   450→   450→                    onClick={() => handleLogFromSearch(meal)}
+   451→   451→                  >
+   452→   452→                    <div className="flex-1 min-w-0">
+   453→   453→                      <div className="flex items-center gap-2">
+   454→   454→                        <p className="text-sm font-medium text-gray-800 truncate">{meal.name}</p>
+   455→   455→                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium border-gray-200 text-gray-500 shrink-0">{meal.cuisine}</Badge>
+   456→   456→                      </div>
+   457→   457→                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+   458→   458→                        <span>{meal.nutrition?.calories || 0} kcal/100g</span>
+   459→   459→                        <span>&middot;</span>
+   460→   460→                        <span className="text-blue-600 font-medium">P: {meal.nutrition?.proteinG || 0}g</span>
+   461→   461→                      </div>
+   462→   462→                    </div>
+   463→   463→                    <ChevronRight className="h-4 w-4 text-gray-300 shrink-0" />
+   464→   464→                  </div>
+   465→   465→                ))}
+   466→   466→              </div>
+   467→   467→            </ScrollArea>
+   468→   468→          </div>
+   469→   469→        </DialogContent>
+   470→   470→      </Dialog>
+   471→   471→
+   472→   472→      {/* ═══ Meal Detail Sheet ═══ */}
+   473→   473→      <Sheet open={detailSheet.open} onOpenChange={(open) => { if (!open) setDetailSheet({ open: false }); }}>
+   474→   474→        <SheetContent side="bottom" className="max-w-lg mx-auto rounded-t-2xl max-h-[85vh]">
+   475→   475→          {detailSheet.open && (
+   476→   476→            <>
+   477→   477→              <SheetHeader className="pt-2">
+   478→   478→                <div className="flex items-center gap-2 pr-8">
+   479→   479→                  {detailSheet.rec.meal.isVeg && <span className="text-green-600 text-xs font-bold border border-green-300 rounded px-1.5 py-0.5">Veg</span>}
+   480→   480→                  {detailSheet.rec.meal.isVegan && <span className="text-green-700 text-xs font-bold border border-green-400 rounded px-1.5 py-0.5">Vegan</span>}
+   481→   481→                </div>
+   482→   482→                <SheetTitle className="text-lg">{detailSheet.rec.meal.name}</SheetTitle>
+   483→   483→                <SheetDescription className="flex items-center gap-2 flex-wrap">
+   484→   484→                  <Badge variant="outline" className="text-xs">{detailSheet.rec.meal.cuisine}</Badge>
+   485→   485→                  <Badge variant="outline" className={`text-xs ${SLOT_BADGE_COLORS[detailSheet.rec.meal.mealType] || ''}`}>{detailSheet.rec.meal.mealType}</Badge>
+   486→   486→                  {detailSheet.rec.meal.prepTimeMin && (
+   487→   487→                    <span className="text-xs text-gray-500 flex items-center gap-1"><Clock className="h-3 w-3" />{detailSheet.rec.meal.prepTimeMin} min</span>
+   488→   488→                  )}
+   489→   489→                </SheetDescription>
+   490→   490→              </SheetHeader>
+   491→   491→              <ScrollArea className="flex-1 px-4 pb-4">
+   492→   492→                <div className="space-y-4">
+   493→   493→                  {detailSheet.rec.meal.description && (
+   494→   494→                    <p className="text-sm text-gray-600 leading-relaxed">{detailSheet.rec.meal.description}</p>
+   495→   495→                  )}
+   496→   496→
+   497→   497→                  {/* Per 100g nutrition */}
+   498→   498→                  {detailSheet.rec.baseNutritionPer100g && (
+   499→   499→                    <div>
+   500→   500→                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Nutrition per 100g</h4>
+   501→   501→                      <NutritionFactsLabel nutrition={detailSheet.rec.baseNutritionPer100g} servingGms={100} label="Per 100g" />
+   502→   502→                    </div>
+   503→   503→                  )}
+   504→   504→
+   505→   505→                  {/* Estimated for recommended serving */}
+   506→   506→                  {detailSheet.rec.estimatedNutrition && (
+   507→   507→                    <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
+   508→   508→                      <h4 className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2">Recommended: {detailSheet.rec.recommendedServingGms}g serving</h4>
+   509→   509→                      <div className="grid grid-cols-2 gap-1.5 text-xs">
+   510→   510→                        <span className="text-gray-600">Calories:</span><span className="font-bold">{detailSheet.rec.estimatedNutrition.calories} kcal</span>
+   511→   511→                        <span className="text-gray-600">Protein:</span><span className="font-bold text-blue-600">{detailSheet.rec.estimatedNutrition.proteinG}g</span>
+   512→   512→                        <span className="text-gray-600">Carbs:</span><span className="font-bold text-amber-600">{detailSheet.rec.estimatedNutrition.carbsG}g</span>
+   513→   513→                        <span className="text-gray-600">Fat:</span><span className="font-bold text-rose-600">{detailSheet.rec.estimatedNutrition.fatG}g</span>
+   514→   514→                      </div>
+   515→   515→                    </div>
+   516→   516→                  )}
+   517→   517→                </div>
+   518→   518→              </ScrollArea>
+   519→   519→              <SheetFooter className="border-t pt-3">
+   520→   520→                <Button
+   521→   521→                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold min-h-[44px]"
+   522→   522→                  onClick={() => {
+   523→   523→                    const r = detailSheet.rec;
+   524→   524→                    setServingGms(r.recommendedServingGms);
+   525→   525→                    setLogDialog({
+   526→   526→                      open: true, meal: r, slot: r.meal.mealType,
+   527→   527→                      baseNutritionPer100g: r.baseNutritionPer100g,
+   528→   528→                      mealName: r.meal.name, cuisine: r.meal.cuisine,
+   529→   529→                      mealType: r.meal.mealType, description: r.meal.description,
+   530→   530→                      isVeg: r.meal.isVeg, isVegan: r.meal.isVegan,
+   531→   531→                    });
+   532→   532→                    setDetailSheet({ open: false });
+   533→   533→                  }}
+   534→   534→                >
+   535→   535→                  Log This Meal
+   536→   536→                </Button>
+   537→   537→              </SheetFooter>
+   538→   538→            </>
+   539→   539→          )}
+   540→   540→        </SheetContent>
+   541→   541→      </Sheet>
+   542→   542→    </motion.div>
+   543→   543→  );
+   544→   544→}
+   545→   545→
+   546→   546→// Simple inline icons to avoid extra imports
+   547→   547→function CalendarIcon({ className }: { className?: string }) {
+   548→   548→  return (
+   549→   549→    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+   550→   550→      <rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" />
+   551→   551→    </svg>
+   552→   552→  );
+   553→   553→}
+   554→   554→
+   555→   555→function LoaderIcon({ className }: { className?: string }) {
+   556→   556→  return (
+   557→   557→    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+   558→   558→      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+   559→   559→    </svg>
+   560→   560→  );
+   561→   561→}
+   562→   562→

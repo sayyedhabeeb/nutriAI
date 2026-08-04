@@ -3,7 +3,7 @@ import { success, unauthorized } from '@/lib/response';
 
 export async function POST(request: Request) {
   try {
-    const session = getSessionFromRequest(request);
+    const session = await getSessionFromRequest(request);
     if (!session) {
       return unauthorized();
     }
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     }
 
     if (sessionId) {
-      destroySession(sessionId);
+      await destroySession(sessionId);
     }
 
     return success({ message: 'Logged out successfully' });

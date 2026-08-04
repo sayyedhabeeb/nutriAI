@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     });
 
     // Create session
-    const sessionId = createSession(user.id);
+    const sessionId = await createSession(user.id);
 
     return created({
       user: {

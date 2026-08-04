@@ -9,7 +9,7 @@ function getTodayStr(): string {
 
 export async function GET(request: Request) {
   try {
-    const session = getSessionFromRequest(request);
+    const session = await getSessionFromRequest(request);
     if (!session) return unauthorized();
 
     const { searchParams } = new URL(request.url);
@@ -71,7 +71,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = getSessionFromRequest(request);
+    const session = await getSessionFromRequest(request);
     if (!session) return unauthorized();
 
     const body = await request.json();
@@ -204,7 +204,7 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const session = getSessionFromRequest(request);
+    const session = await getSessionFromRequest(request);
     if (!session) return unauthorized();
 
     const { searchParams } = new URL(request.url);

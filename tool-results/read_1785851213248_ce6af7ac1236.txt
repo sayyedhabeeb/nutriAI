@@ -1,0 +1,1899 @@
+     1→'use client';
+     2→
+     3→import React, { useState, useEffect, useCallback, useRef } from 'react';
+     4→import { motion, AnimatePresence } from 'framer-motion';
+     5→import { format, subDays, parseISO } from 'date-fns';
+     6→import {
+     7→  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+     8→  XAxis, YAxis, Tooltip, ResponsiveContainer,
+     9→} from 'recharts';
+    10→import { toast } from 'sonner';
+    11→
+    12→// shadcn/ui
+    13→import { Button } from '@/components/ui/button';
+    14→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+    15→import { Input } from '@/components/ui/input';
+    16→import { Label } from '@/components/ui/label';
+    17→import {
+    18→  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+    19→} from '@/components/ui/select';
+    20→import {
+    21→  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+    22→} from '@/components/ui/dialog';
+    23→import {
+    24→  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter,
+    25→} from '@/components/ui/sheet';
+    26→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+    27→import { Badge } from '@/components/ui/badge';
+    28→import { Progress } from '@/components/ui/progress';
+    29→import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+    30→import { Checkbox } from '@/components/ui/checkbox';
+    31→import { Skeleton } from '@/components/ui/skeleton';
+    32→import { Separator } from '@/components/ui/separator';
+    33→import { ScrollArea } from '@/components/ui/scroll-area';
+    34→
+    35→// Lucide icons
+    36→import {
+    37→  Leaf, Camera, Search, Plus, Minus, Droplets, Utensils, Flame,
+    38→  Dumbbell, Target, TrendingUp, User, Settings, LogOut, X, Check,
+    39→  AlertCircle, Home, List, BarChart3, Loader2, Trash2, GlassWater, Scale,
+    40→  CalendarDays, Clock, RotateCcw, Zap, ChevronRight, Sparkles, Salad,
+    41→} from 'lucide-react';
+    42→
+    43→// ═══ Types ═══
+    44→type ViewType = 'auth' | 'onboarding' | 'dashboard' | 'foodlog' | 'upload' | 'progress' | 'settings';
+    45→type TabType = 'dashboard' | 'foodlog' | 'upload' | 'progress' | 'settings';
+    46→
+    47→interface NutritionData {
+    48→  targets: { calories: number; proteinG: number; carbsG: number; fatG: number };
+    49→  consumed: { calories: number; proteinG: number; carbsG: number; fatG: number };
+    50→  remaining: { calories: number; proteinG: number; carbsG: number; fatG: number };
+    51→  percentages: { calories: number; proteinG: number; carbsG: number; fatG: number };
+    52→}
+    53→
+    54→interface MealRecommendation {
+    55→  meal: {
+    56→    id: string; name: string; mealType: string; cuisine: string;
+    57→    imageUrl: string | null; prepTimeMin: number | null;
+    58→    isVeg?: boolean; isVegan?: boolean; description?: string | null;
+    59→  };
+    60→  score: number;
+    61→  recommendedServingGms: number;
+    62→  estimatedNutrition: { calories: number; proteinG: number; carbsG: number; fatG: number } | null;
+    63→  baseNutritionPer100g: { calories: number; proteinG: number; carbsG: number; fatG: number } | null;
+    64→}
+    65→
+    66→interface FoodLogItem {
+    67→  id: string;
+    68→  mealId: string | null;
+    69→  servingGms: number;
+    70→  calories: number;
+    71→  proteinG: number;
+    72→  carbsG: number;
+    73→  fatG: number;
+    74→  mealSlot: string;
+    75→  meal: { name: string; nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number } | null } | null;
+    76→}
+    77→
+    78→interface RecognizedFood {
+    79→  name: string;
+    80→  servingDescription: string;
+    81→  servingWeightGrams: number;
+    82→  confidence: number;
+    83→  matched: boolean;
+    84→  unknown_food?: boolean;
+    85→  meal: Record<string, unknown> | null;
+    86→}
+    87→
+    88→interface SearchMeal {
+    89→  id: string;
+    90→  name: string;
+    91→  mealType: string;
+    92→  cuisine: string;
+    93→  baseServingGms: number;
+    94→  nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; sugarG: number; sodiumMg: number } | null;
+    95→  isVeg: boolean;
+    96→  isVegan: boolean;
+    97→  prepTimeMin: number | null;
+    98→  servings: { servingSizeGms: number; servingDescription: string }[];
+    99→}
+   100→
+   101→// ═══ API Helper ═══
+   102→function getToken(): string | null {
+   103→  if (typeof window === 'undefined') return null;
+   104→  return localStorage.getItem('nutriai_session');
+   105→}
+   106→function setToken(token: string) {
+   107→  localStorage.setItem('nutriai_session', token);
+   108→}
+   109→function clearToken() {
+   110→  localStorage.removeItem('nutriai_session');
+   111→}
+   112→async function apiFetch(url: string, options: RequestInit = {}) {
+   113→  const token = getToken();
+   114→  const headers: Record<string, string> = {
+   115→    ...(options.headers as Record<string, string> || {}),
+   116→  };
+   117→  if (token) headers['Authorization'] = `Bearer ${token}`;
+   118→  if (!(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
+   119→  const res = await fetch(url, { ...options, headers });
+   120→  const json = await res.json();
+   121→  if (!json.success) throw new Error(json.error || 'Request failed');
+   122→  return json.data;
+   123→}
+   124→
+   125→// ═══ Constants ═══
+   126→const SLOTS = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
+   127→const SLOT_LABELS: Record<string, string> = {
+   128→  breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack',
+   129→};
+   130→const SLOT_ICONS: Record<string, string> = {
+   131→  breakfast: '🌅', lunch: '☀️', dinner: '🌙', snack: '🍿',
+   132→};
+   133→const SLOT_BORDER_COLORS: Record<string, string> = {
+   134→  breakfast: 'border-l-amber-400',
+   135→  lunch: 'border-l-orange-400',
+   136→  dinner: 'border-l-indigo-400',
+   137→  snack: 'border-l-purple-400',
+   138→};
+   139→const SLOT_BADGE_COLORS: Record<string, string> = {
+   140→  breakfast: 'bg-amber-50 text-amber-700 border-amber-200',
+   141→  lunch: 'bg-orange-50 text-orange-700 border-orange-200',
+   142→  dinner: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+   143→  snack: 'bg-purple-50 text-purple-700 border-purple-200',
+   144→};
+   145→const ALLERGENS = ['Peanuts', 'Tree Nuts', 'Dairy', 'Eggs', 'Gluten', 'Shellfish', 'Soy', 'Fish'];
+   146→const PIE_COLORS = ['#3b82f6', '#f59e0b', '#f43f5e'];
+   147→
+   148→// ═══ Animation Variants ═══
+   149→const fadeIn = {
+   150→  initial: { opacity: 0, y: 12 },
+   151→  animate: { opacity: 1, y: 0 },
+   152→  exit: { opacity: 0, y: -12 },
+   153→  transition: { duration: 0.25 },
+   154→};
+   155→
+   156→// ═══ Nutrition Facts Label Component ═══
+   157→function NutritionFactsLabel({
+   158→  nutrition, servingGms, label,
+   159→}: {
+   160→  nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG?: number; sugarG?: number; sodiumMg?: number } | null;
+   161→  servingGms: number;
+   162→  label?: string;
+   163→}) {
+   164→  if (!nutrition) return null;
+   165→  const scaled = {
+   166→    calories: Math.round(nutrition.calories * servingGms / 100),
+   167→    proteinG: Math.round(nutrition.proteinG * servingGms / 100 * 10) / 10,
+   168→    carbsG: Math.round(nutrition.carbsG * servingGms / 100 * 10) / 10,
+   169→    fatG: Math.round(nutrition.fatG * servingGms / 100 * 10) / 10,
+   170→    fiberG: nutrition.fiberG ? Math.round(nutrition.fiberG * servingGms / 100 * 10) / 10 : null,
+   171→    sugarG: nutrition.sugarG ? Math.round(nutrition.sugarG * servingGms / 100 * 10) / 10 : null,
+   172→    sodiumMg: nutrition.sodiumMg ? Math.round(nutrition.sodiumMg * servingGms / 100) : null,
+   173→  };
+   174→
+   175→  return (
+   176→    <div className="border-2 border-gray-800 rounded-lg p-0 bg-white">
+   177→      <div className="px-3 py-2 border-b-2 border-gray-800">
+   178→        <h4 className="text-lg font-extrabold text-gray-900 tracking-tight">Nutrition Facts</h4>
+   179→      </div>
+   180→      <div className="px-3 py-1.5 border-b border-gray-300 flex justify-between">
+   181→        <span className="text-sm font-medium text-gray-700">Serving Size</span>
+   182→        <span className="text-sm font-bold text-gray-900">{servingGms}g</span>
+   183→      </div>
+   184→      <div className="px-3 py-1.5 border-b-2 border-gray-800 flex justify-between">
+   185→        <span className="text-sm font-medium text-gray-700">{label || 'Per Serving'}</span>
+   186→        <span className="text-sm font-bold text-gray-900">{scaled.calories} kcal</span>
+   187→      </div>
+   188→      <div className="px-3 py-1.5 border-b border-gray-200 flex justify-between">
+   189→        <span className="text-xs font-bold text-gray-900">Total Fat</span>
+   190→        <span className="text-xs font-bold text-gray-900">{scaled.fatG}g</span>
+   191→      </div>
+   192→      <div className="px-3 py-1.5 border-b border-gray-200 pl-6 flex justify-between">
+   193→        <span className="text-xs text-gray-600">Protein</span>
+   194→        <span className="text-xs text-gray-900 font-medium">{scaled.proteinG}g</span>
+   195→      </div>
+   196→      <div className="px-3 py-1.5 border-b border-gray-200 flex justify-between">
+   197→        <span className="text-xs font-bold text-gray-900">Total Carbohydrate</span>
+   198→        <span className="text-xs font-bold text-gray-900">{scaled.carbsG}g</span>
+   199→      </div>
+   200→      {scaled.sugarG !== null && (
+   201→        <div className="px-3 py-1 border-b border-gray-200 pl-6 flex justify-between">
+   202→          <span className="text-xs text-gray-600">Total Sugars</span>
+   203→          <span className="text-xs text-gray-900 font-medium">{scaled.sugarG}g</span>
+   204→        </div>
+   205→      )}
+   206→      {scaled.fiberG !== null && (
+   207→        <div className="px-3 py-1 border-b border-gray-200 pl-6 flex justify-between">
+   208→          <span className="text-xs text-gray-600">Dietary Fiber</span>
+   209→          <span className="text-xs text-gray-900 font-medium">{scaled.fiberG}g</span>
+   210→        </div>
+   211→      )}
+   212→      {scaled.sodiumMg !== null && (
+   213→        <div className="px-3 py-1.5 border-b border-gray-200 flex justify-between">
+   214→          <span className="text-xs font-bold text-gray-900">Sodium</span>
+   215→          <span className="text-xs font-bold text-gray-900">{scaled.sodiumMg}mg</span>
+   216→        </div>
+   217→      )}
+   218→      <div className="px-3 py-2 flex justify-between">
+   219→        <span className="text-xs font-bold text-gray-900">Calories</span>
+   220→        <span className="text-xs font-bold text-gray-900">{scaled.calories}</span>
+   221→      </div>
+   222→    </div>
+   223→  );
+   224→}
+   225→
+   226→// ═══ Main Component ═══
+   227→export default function NutriAIPage() {
+   228→  const [view, setView] = useState<ViewType>('auth');
+   229→  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+   230→
+   231→  useEffect(() => {
+   232→    let cancelled = false;
+   233→    const token = getToken();
+   234→    if (!token) return;
+   235→    (async () => {
+   236→      try {
+   237→        const user = await apiFetch('/api/auth/me');
+   238→        if (!cancelled) {
+   239→          if (user.profile && user.goal && user.preference) {
+   240→            setView('dashboard');
+   241→          } else {
+   242→            setView('onboarding');
+   243→          }
+   244→        }
+   245→      } catch {
+   246→        if (!cancelled) clearToken();
+   247→      }
+   248→    })();
+   249→    return () => { cancelled = true; };
+   250→  }, []);
+   251→
+   252→  const handleTabChange = (tab: string) => {
+   253→    setActiveTab(tab as TabType);
+   254→    setView(tab as ViewType);
+   255→  };
+   256→
+   257→  const handleLogout = () => {
+   258→    clearToken();
+   259→    setView('auth');
+   260→    setActiveTab('dashboard');
+   261→    toast.success('Logged out successfully');
+   262→  };
+   263→
+   264→  return (
+   265→    <div className="min-h-screen flex flex-col bg-gray-50/50">
+   266→      <main className="flex-1 pb-20">
+   267→        <AnimatePresence mode="wait">
+   268→          {view === 'auth' && <AuthView key="auth" onAuth={(v: ViewType) => { setView(v); if (v === 'dashboard') setActiveTab('dashboard'); }} />}
+   269→          {view === 'onboarding' && <OnboardingView key="onboarding" onComplete={() => { setView('dashboard'); setActiveTab('dashboard'); }} />}
+   270→          {view === 'dashboard' && <DashboardView key="dashboard" onNavigate={setView} />}
+   271→          {view === 'foodlog' && <FoodLogView key="foodlog" />}
+   272→          {view === 'upload' && <UploadView key="upload" />}
+   273→          {view === 'progress' && <ProgressView key="progress" />}
+   274→          {view === 'settings' && <SettingsView key="settings" onLogout={handleLogout} />}
+   275→        </AnimatePresence>
+   276→      </main>
+   277→
+   278→      {view !== 'auth' && view !== 'onboarding' && (
+   279→        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-gray-200/60 safe-area-bottom">
+   280→          <div className="max-w-lg mx-auto flex justify-around items-center h-16">
+   281→            {([
+   282→              { tab: 'dashboard' as TabType, icon: Home, label: 'Home' },
+   283→              { tab: 'foodlog' as TabType, icon: List, label: 'Log' },
+   284→              { tab: 'upload' as TabType, icon: Camera, label: 'Scan' },
+   285→              { tab: 'progress' as TabType, icon: BarChart3, label: 'Progress' },
+   286→              { tab: 'settings' as TabType, icon: Settings, label: 'Settings' },
+   287→            ]).map(({ tab, icon: Icon, label }) => (
+   288→              <button
+   289→                key={tab}
+   290→                onClick={() => handleTabChange(tab)}
+   291→                className={`relative flex flex-col items-center justify-center gap-0.5 w-full h-full min-h-[44px] transition-colors ${
+   292→                  activeTab === tab ? 'text-emerald-600' : 'text-gray-400 hover:text-gray-600'
+   293→                }`}
+   294→              >
+   295→                <div className="relative">
+   296→                  <Icon className="h-5 w-5" strokeWidth={activeTab === tab ? 2.5 : 2} />
+   297→                  {activeTab === tab && (
+   298→                    <motion.div
+   299→                      layoutId="nav-dot"
+   300→                      className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-600"
+   301→                      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+   302→                    />
+   303→                  )}
+   304→                </div>
+   305→                <span className={`text-[10px] ${activeTab === tab ? 'font-semibold' : 'font-medium'}`}>{label}</span>
+   306→              </button>
+   307→            ))}
+   308→          </div>
+   309→        </nav>
+   310→      )}
+   311→    </div>
+   312→  );
+   313→}
+   314→
+   315→// ═══════════════════════════════════════════════════════════
+   316→// AUTH VIEW
+   317→// ═══════════════════════════════════════════════════════════
+   318→function AuthView({ onAuth }: { onAuth: (v: ViewType) => void }) {
+   319→  const [isLogin, setIsLogin] = useState(true);
+   320→  const [email, setEmail] = useState('');
+   321→  const [password, setPassword] = useState('');
+   322→  const [name, setName] = useState('');
+   323→  const [loading, setLoading] = useState(false);
+   324→
+   325→  const handleSubmit = async (e: React.FormEvent) => {
+   326→    e.preventDefault();
+   327→    setLoading(true);
+   328→    try {
+   329→      const url = isLogin ? '/api/auth/login' : '/api/auth/register';
+   330→      const body: Record<string, string> = { email, password };
+   331→      if (!isLogin && name) body.name = name;
+   332→      const res = await fetch(url, {
+   333→        method: 'POST',
+   334→        headers: { 'Content-Type': 'application/json' },
+   335→        body: JSON.stringify(body),
+   336→      });
+   337→      const json = await res.json();
+   338→      if (!json.success) {
+   339→        toast.error(json.error || 'Authentication failed');
+   340→        return;
+   341→      }
+   342→      setToken(json.data.token);
+   343→      toast.success(isLogin ? 'Welcome back!' : 'Account created!');
+   344→      const me = await apiFetch('/api/auth/me');
+   345→      if (me.profile && me.goal && me.preference) {
+   346→        onAuth('dashboard');
+   347→      } else {
+   348→        onAuth('onboarding');
+   349→      }
+   350→    } catch {
+   351→      toast.error('Something went wrong. Please try again.');
+   352→    } finally {
+   353→      setLoading(false);
+   354→    }
+   355→  };
+   356→
+   357→  return (
+   358→    <motion.div {...fadeIn} className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-emerald-50 via-green-50/30 to-white">
+   359→      <Card className="w-full max-w-md shadow-xl border-0 rounded-2xl overflow-hidden">
+   360→        <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 px-6 pt-8 pb-6 text-center">
+   361→          <div className="mx-auto w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-3">
+   362→            <Leaf className="h-8 w-8 text-white" />
+   363→          </div>
+   364→          <h2 className="text-2xl font-bold text-white">NutriAI</h2>
+   365→          <p className="text-emerald-100 text-sm mt-1">AI-Powered Nutrition Tracker</p>
+   366→        </div>
+   367→        <CardContent className="pt-6 px-6 pb-6">
+   368→          <form onSubmit={handleSubmit} className="space-y-4">
+   369→            {!isLogin && (
+   370→              <div className="space-y-2">
+   371→                <Label htmlFor="name" className="text-sm font-medium">Full Name</Label>
+   372→                <Input id="name" placeholder="John Doe" value={name} onChange={(e) => setName(e.target.value)} className="h-11 rounded-xl" />
+   373→              </div>
+   374→            )}
+   375→            <div className="space-y-2">
+   376→              <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+   377→              <Input id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-11 rounded-xl" />
+   378→            </div>
+   379→            <div className="space-y-2">
+   380→              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+   381→              <Input id="password" type="password" placeholder="Min 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} className="h-11 rounded-xl" />
+   382→            </div>
+   383→            <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white min-h-[44px] rounded-xl font-semibold" disabled={loading}>
+   384→              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+   385→              {isLogin ? 'Sign In' : 'Create Account'}
+   386→            </Button>
+   387→          </form>
+   388→          <div className="mt-5 text-center text-sm text-gray-500">
+   389→            {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
+   390→            <button onClick={() => setIsLogin(!isLogin)} className="text-emerald-600 font-semibold hover:underline">
+   391→              {isLogin ? 'Sign Up' : 'Sign In'}
+   392→            </button>
+   393→          </div>
+   394→        </CardContent>
+   395→      </Card>
+   396→    </motion.div>
+   397→  );
+   398→}
+   399→
+   400→// ═══════════════════════════════════════════════════════════
+   401→// ONBOARDING VIEW
+   402→// ═══════════════════════════════════════════════════════════
+   403→function OnboardingView({ onComplete }: { onComplete: () => void }) {
+   404→  const [step, setStep] = useState(1);
+   405→  const [loading, setLoading] = useState(false);
+   406→  const [profile, setProfile] = useState({ firstName: '', lastName: '', age: '', gender: 'male', heightCm: '', weightKg: '' });
+   407→  const [goals, setGoals] = useState({ goalType: 'maintain', activityLevel: 'moderately_active', targetWeightKg: '' });
+   408→  const [prefs, setPrefs] = useState<{ cuisinePreference: string; dietType: string; allergies: string[] }>({ cuisinePreference: 'Mixed', dietType: 'non-veg', allergies: [] });
+   409→
+   410→  const toggleAllergy = (a: string) => {
+   411→    setPrefs((p) => ({
+   412→      ...p,
+   413→      allergies: p.allergies.includes(a) ? p.allergies.filter((x) => x !== a) : [...p.allergies, a],
+   414→    }));
+   415→  };
+   416→
+   417→  const saveProfile = async () => {
+   418→    await apiFetch('/api/users/profile', {
+   419→      method: 'PUT',
+   420→      body: JSON.stringify({
+   421→        firstName: profile.firstName || null, lastName: profile.lastName || null,
+   422→        age: profile.age ? Number(profile.age) : null, gender: profile.gender,
+   423→        heightCm: profile.heightCm ? Number(profile.heightCm) : null,
+   424→        weightKg: profile.weightKg ? Number(profile.weightKg) : null,
+   425→      }),
+   426→    });
+   427→  };
+   428→
+   429→  const handleNext = async () => {
+   430→    if (step === 1) {
+   431→      setLoading(true);
+   432→      try { await saveProfile(); setStep(2); }
+   433→      catch (err) { toast.error((err as Error).message); }
+   434→      finally { setLoading(false); }
+   435→    } else if (step === 2) {
+   436→      setLoading(true);
+   437→      try {
+   438→        await apiFetch('/api/users/goals', {
+   439→          method: 'PUT',
+   440→          body: JSON.stringify({ goalType: goals.goalType, activityLevel: goals.activityLevel, targetWeightKg: goals.targetWeightKg ? Number(goals.targetWeightKg) : null }),
+   441→        });
+   442→        setStep(3);
+   443→      } catch (err) { toast.error((err as Error).message); }
+   444→      finally { setLoading(false); }
+   445→    }
+   446→  };
+   447→
+   448→  const handleComplete = async () => {
+   449→    setLoading(true);
+   450→    try {
+   451→      await apiFetch('/api/onboarding/complete', {
+   452→        method: 'POST',
+   453→        body: JSON.stringify({ goalType: goals.goalType, activityLevel: goals.activityLevel, cuisinePreference: prefs.cuisinePreference, dietType: prefs.dietType, allergies: prefs.allergies }),
+   454→      });
+   455→      toast.success('Setup complete! Welcome to NutriAI!');
+   456→      onComplete();
+   457→    } catch (err) { toast.error((err as Error).message); }
+   458→    finally { setLoading(false); }
+   459→  };
+   460→
+   461→  const steps = [{ num: 1, label: 'Profile' }, { num: 2, label: 'Goals' }, { num: 3, label: 'Preferences' }];
+   462→
+   463→  return (
+   464→    <motion.div {...fadeIn} className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-emerald-50 via-green-50/30 to-white">
+   465→      <Card className="w-full max-w-md shadow-xl border-0 rounded-2xl overflow-hidden">
+   466→        <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 px-6 pt-6 pb-5 text-center">
+   467→          <div className="mx-auto w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mb-2">
+   468→            <Leaf className="h-6 w-6 text-white" />
+   469→          </div>
+   470→          <CardTitle className="text-white text-lg">Let's Get Started</CardTitle>
+   471→          <CardDescription className="text-emerald-100">Step {step} of 3</CardDescription>
+   472→          <div className="flex gap-2 justify-center mt-4">
+   473→            {steps.map((s) => (
+   474→              <div key={s.num} className="flex items-center gap-2">
+   475→                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+   476→                  step >= s.num ? 'bg-white text-emerald-600' : 'bg-white/20 text-white/60'
+   477→                }`}>
+   478→                  {step > s.num ? <Check className="h-4 w-4" /> : s.num}
+   479→                </div>
+   480→                {s.num < 3 && <div className={`w-8 h-0.5 ${step > s.num ? 'bg-white' : 'bg-white/30'}`} />}
+   481→              </div>
+   482→            ))}
+   483→          </div>
+   484→        </div>
+   485→        <CardContent className="pt-5 px-6 pb-6 space-y-4">
+   486→          {step === 1 && (
+   487→            <div className="space-y-4">
+   488→              <div className="grid grid-cols-2 gap-3">
+   489→                <div className="space-y-1.5"><Label className="text-sm font-medium">First Name</Label><Input placeholder="John" value={profile.firstName} onChange={(e) => setProfile((p) => ({ ...p, firstName: e.target.value }))} className="h-11 rounded-xl" /></div>
+   490→                <div className="space-y-1.5"><Label className="text-sm font-medium">Last Name</Label><Input placeholder="Doe" value={profile.lastName} onChange={(e) => setProfile((p) => ({ ...p, lastName: e.target.value }))} className="h-11 rounded-xl" /></div>
+   491→              </div>
+   492→              <div className="space-y-1.5"><Label className="text-sm font-medium">Age</Label><Input type="number" placeholder="25" value={profile.age} onChange={(e) => setProfile((p) => ({ ...p, age: e.target.value }))} className="h-11 rounded-xl" /></div>
+   493→              <div className="space-y-1.5">
+   494→                <Label className="text-sm font-medium">Gender</Label>
+   495→                <RadioGroup value={profile.gender} onValueChange={(v) => setProfile((p) => ({ ...p, gender: v }))} className="flex gap-4">
+   496→                  {['male', 'female', 'other'].map((g) => (
+   497→                    <div key={g} className="flex items-center gap-2">
+   498→                      <RadioGroupItem value={g} id={`o-${g}`} />
+   499→                      <Label htmlFor={`o-${g}`} className="font-normal text-sm capitalize">{g}</Label>
+   500→                    </div>
+   501→                  ))}
+   502→                </RadioGroup>
+   503→              </div>
+   504→              <div className="grid grid-cols-2 gap-3">
+   505→                <div className="space-y-1.5"><Label className="text-sm font-medium">Height (cm)</Label><Input type="number" placeholder="170" value={profile.heightCm} onChange={(e) => setProfile((p) => ({ ...p, heightCm: e.target.value }))} className="h-11 rounded-xl" /></div>
+   506→                <div className="space-y-1.5"><Label className="text-sm font-medium">Weight (kg)</Label><Input type="number" placeholder="70" value={profile.weightKg} onChange={(e) => setProfile((p) => ({ ...p, weightKg: e.target.value }))} className="h-11 rounded-xl" /></div>
+   507→              </div>
+   508→            </div>
+   509→          )}
+   510→          {step === 2 && (
+   511→            <div className="space-y-4">
+   512→              <div className="space-y-1.5">
+   513→                <Label className="text-sm font-medium">Goal</Label>
+   514→                <Select value={goals.goalType} onValueChange={(v) => setGoals((g) => ({ ...g, goalType: v }))}>
+   515→                  <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+   516→                  <SelectContent>{['muscle_gain', 'lose_fat', 'maintain', 'recomp', 'weight_gain', 'athlete'].map((g) => <SelectItem key={g} value={g}>{g.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}</SelectItem>)}</SelectContent>
+   517→                </Select>
+   518→              </div>
+   519→              <div className="space-y-1.5">
+   520→                <Label className="text-sm font-medium">Activity Level</Label>
+   521→                <Select value={goals.activityLevel} onValueChange={(v) => setGoals((g) => ({ ...g, activityLevel: v }))}>
+   522→                  <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+   523→                  <SelectContent>{['sedentary', 'lightly_active', 'moderately_active', 'very_active', 'extra_active'].map((a) => <SelectItem key={a} value={a}>{a.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}</SelectItem>)}</SelectContent>
+   524→                </Select>
+   525→              </div>
+   526→              <div className="space-y-1.5"><Label className="text-sm font-medium">Target Weight (kg)</Label><Input type="number" placeholder="70" value={goals.targetWeightKg} onChange={(e) => setGoals((g) => ({ ...g, targetWeightKg: e.target.value }))} className="h-11 rounded-xl" /></div>
+   527→            </div>
+   528→          )}
+   529→          {step === 3 && (
+   530→            <div className="space-y-4">
+   531→              <div className="space-y-1.5">
+   532→                <Label className="text-sm font-medium">Cuisine Preference</Label>
+   533→                <Select value={prefs.cuisinePreference} onValueChange={(v) => setPrefs((p) => ({ ...p, cuisinePreference: v }))}>
+   534→                  <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+   535→                  <SelectContent>{['Indian', 'Chinese', 'Italian', 'American', 'Mexican', 'Mediterranean', 'Japanese', 'Thai', 'Mixed'].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+   536→                </Select>
+   537→              </div>
+   538→              <div className="space-y-1.5">
+   539→                <Label className="text-sm font-medium">Diet Type</Label>
+   540→                <Select value={prefs.dietType} onValueChange={(v) => setPrefs((p) => ({ ...p, dietType: v }))}>
+   541→                  <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+   542→                  <SelectContent>{['non-veg', 'vegetarian', 'vegan', 'eggetarian'].map((d) => <SelectItem key={d} value={d}>{d === 'non-veg' ? 'Non-Vegetarian' : d === 'vegan' ? 'Vegan' : d === 'vegetarian' ? 'Vegetarian' : 'Eggetarian'}</SelectItem>)}</SelectContent>
+   543→                </Select>
+   544→              </div>
+   545→              <div className="space-y-1.5">
+   546→                <Label className="text-sm font-medium">Allergies</Label>
+   547→                <div className="grid grid-cols-2 gap-2">
+   548→                  {ALLERGENS.map((a) => (
+   549→                    <label key={a} className="flex items-center gap-2 p-2.5 rounded-xl border border-gray-200 cursor-pointer hover:bg-emerald-50/50 hover:border-emerald-200 transition-colors min-h-[44px]">
+   550→                      <Checkbox checked={prefs.allergies.includes(a)} onCheckedChange={() => toggleAllergy(a)} />
+   551→                      <span className="text-sm">{a}</span>
+   552→                    </label>
+   553→                  ))}
+   554→                </div>
+   555→              </div>
+   556→            </div>
+   557→          )}
+   558→          <div className="flex gap-3 pt-2">
+   559→            {step > 1 && <Button variant="outline" onClick={() => setStep(step - 1)} className="min-h-[44px] rounded-xl">Back</Button>}
+   560→            <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white min-h-[44px] rounded-xl font-semibold" disabled={loading} onClick={step === 3 ? handleComplete : handleNext}>
+   561→              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+   562→              {step === 3 ? 'Complete Setup' : 'Next'}
+   563→            </Button>
+   564→          </div>
+   565→        </CardContent>
+   566→      </Card>
+   567→    </motion.div>
+   568→  );
+   569→}
+   570→
+   571→// ═══════════════════════════════════════════════════════════
+   572→// CALORIE RING SVG (with gradient stroke)
+   573→// ═══════════════════════════════════════════════════════════
+   574→function CalorieRing({ consumed, target }: { consumed: number; target: number }) {
+   575→  const pct = target > 0 ? Math.min(consumed / target, 1) : 0;
+   576→  const radius = 70;
+   577→  const circumference = 2 * Math.PI * radius;
+   578→  const strokeDashoffset = circumference * (1 - pct);
+   579→  const remaining = Math.max(0, target - consumed);
+   580→  const gradId = 'calRingGrad';
+   581→
+   582→  return (
+   583→    <div className="relative inline-flex items-center justify-center">
+   584→      <svg width="180" height="180" viewBox="0 0 180 180" className="-rotate-90">
+   585→        <defs>
+   586→          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
+   587→            <stop offset="0%" stopColor="#10b981" />
+   588→            <stop offset="100%" stopColor="#34d399" />
+   589→          </linearGradient>
+   590→        </defs>
+   591→        <circle cx="90" cy="90" r={radius} fill="none" stroke="#e5e7eb" strokeWidth="12" />
+   592→        <motion.circle
+   593→          cx="90" cy="90" r={radius} fill="none"
+   594→          stroke={pct > 1 ? '#f43f5e' : `url(#${gradId})`}
+   595→          strokeWidth="12" strokeLinecap="round"
+   596→          strokeDasharray={circumference}
+   597→          initial={{ strokeDashoffset: circumference }}
+   598→          animate={{ strokeDashoffset }}
+   599→          transition={{ duration: 1, ease: 'easeOut' }}
+   600→        />
+   601→      </svg>
+   602→      <div className="absolute inset-0 flex flex-col items-center justify-center">
+   603→        <Flame className="h-5 w-5 text-orange-500 mb-1" />
+   604→        <span className="text-2xl font-bold text-gray-900">{consumed}</span>
+   605→        <span className="text-xs text-gray-500">of {target} kcal</span>
+   606→        <span className="text-xs text-emerald-600 font-semibold mt-1">{remaining} left</span>
+   607→      </div>
+   608→    </div>
+   609→  );
+   610→}
+   611→
+   612→// ═══════════════════════════════════════════════════════════
+   613→// DASHBOARD VIEW
+   614→// ═══════════════════════════════════════════════════════════
+   615→function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => void }) {
+   616→  const [user, setUser] = useState<Record<string, unknown> | null>(null);
+   617→  const [nutrition, setNutrition] = useState<NutritionData | null>(null);
+   618→  const [recommendations, setRecommendations] = useState<Record<string, MealRecommendation[]>>({});
+   619→  const [loading, setLoading] = useState(true);
+   620→  const [streak, setStreak] = useState(0);
+   621→
+   622→  // Log meal dialog state
+   623→  const [logDialog, setLogDialog] = useState<{
+   624→    open: boolean;
+   625→    meal: MealRecommendation;
+   626→    slot: string;
+   627→    baseNutritionPer100g: { calories: number; proteinG: number; carbsG: number; fatG: number } | null;
+   628→    mealName: string;
+   629→    cuisine: string;
+   630→    mealType: string;
+   631→    description?: string | null;
+   632→    isVeg?: boolean;
+   633→    isVegan?: boolean;
+   634→  } | { open: false }>({ open: false });
+   635→  const [servingGms, setServingGms] = useState(100);
+   636→
+   637→  // Meal search dialog state (per-slot)
+   638→  const [slotSearchDialog, setSlotSearchDialog] = useState<{ open: boolean; slot: string } | { open: false }>({ open: false });
+   639→  const [searchQuery, setSearchQuery] = useState('');
+   640→  const [searchResults, setSearchResults] = useState<SearchMeal[]>([]);
+   641→  const [searchLoading, setSearchLoading] = useState(false);
+   642→  const [searchDebounce, setSearchDebounce] = useState<NodeJS.Timeout | null>(null);
+   643→
+   644→  // Meal detail sheet
+   645→  const [detailSheet, setDetailSheet] = useState<{
+   646→    open: boolean;
+   647→    rec: MealRecommendation;
+   648→  } | { open: false }>({ open: false });
+   649→
+   650→  const fetchData = useCallback(async () => {
+   651→    try {
+   652→      const [me, nut, summaryData] = await Promise.all([
+   653→        apiFetch('/api/auth/me'),
+   654→        apiFetch('/api/nutrition/daily'),
+   655→        apiFetch('/api/progress/summary?period=week').catch(() => ({ summary: { totalDays: 0 } })),
+   656→      ]);
+   657→      setUser(me);
+   658→      setNutrition(nut);
+   659→
+   660→      // Calculate streak from weekly data
+   661→      const weeklyData = await apiFetch('/api/progress/weekly').catch(() => [] as Record<string, unknown>[]);
+   662→      let streakCount = 0;
+   663→      for (let i = (weeklyData as Record<string, unknown>[]).length - 1; i >= 0; i--) {
+   664→        const day = weeklyData[i];
+   665→        const consumed = (day.consumed as Record<string, number>)?.calories || 0;
+   666→        if (consumed > 0) streakCount++;
+   667→        else break;
+   668→      }
+   669→      setStreak(streakCount);
+   670→
+   671→      const recs = await Promise.all(
+   672→        SLOTS.map(async (slot) => {
+   673→          try {
+   674→            const r = await apiFetch(`/api/recommendations?slot=${slot}`);
+   675→            return { slot, recs: r.recommendations || [] };
+   676→          } catch { return { slot, recs: [] }; }
+   677→        })
+   678→      );
+   679→      const recMap: Record<string, MealRecommendation[]> = {};
+   680→      for (const r of recs) recMap[r.slot] = r.recs;
+   681→      setRecommendations(recMap);
+   682→    } catch {
+   683→      toast.error('Failed to load dashboard');
+   684→    } finally {
+   685→      setLoading(false);
+   686→    }
+   687→  }, []);
+   688→
+   689→  useEffect(() => { fetchData(); }, [fetchData]);
+   690→
+   691→  const handleLogMeal = async () => {
+   692→    if (!logDialog.open) return;
+   693→    try {
+   694→      await apiFetch('/api/food-logs', {
+   695→        method: 'POST',
+   696→        body: JSON.stringify({ mealId: logDialog.meal.meal.id, servingGms, mealSlot: logDialog.slot }),
+   697→      });
+   698→      toast.success(`Logged ${logDialog.mealName}!`);
+   699→      setLogDialog({ open: false });
+   700→      fetchData();
+   701→    } catch (err) { toast.error((err as Error).message); }
+   702→  };
+   703→
+   704→  // Per-slot search with debounce
+   705→  const handleSlotSearch = (query: string) => {
+   706→    setSearchQuery(query);
+   707→    if (searchDebounce) clearTimeout(searchDebounce);
+   708→    if (!query.trim()) { setSearchResults([]); return; }
+   709→    const timer = setTimeout(async () => {
+   710→ setSearchLoading(true);
+   711→      try {
+   712→        const res = await apiFetch(`/api/meals/search?q=${encodeURIComponent(query)}`);
+   713→        setSearchResults((res.meals || []) as SearchMeal[]);
+   714→      } catch { toast.error('Search failed'); }
+   715→      finally { setSearchLoading(false); }
+   716→    }, 350);
+   717→    setSearchDebounce(timer);
+   718→  };
+   719→
+   720→  const handleLogFromSearch = (meal: SearchMeal) => {
+   721→    const slot = slotSearchDialog.open ? slotSearchDialog.slot : 'lunch';
+   722→    setServingGms(meal.baseServingGms || 100);
+   723→    setLogDialog({
+   724→      open: true,
+   725→      meal: {
+   726→        meal: { id: meal.id, name: meal.name, mealType: meal.mealType, cuisine: meal.cuisine, imageUrl: null, prepTimeMin: meal.prepTimeMin, isVeg: meal.isVeg, isVegan: meal.isVegan },
+   727→        score: 0, recommendedServingGms: meal.baseServingGms || 100, estimatedNutrition: meal.nutrition ? { calories: meal.nutrition.calories, proteinG: meal.nutrition.proteinG, carbsG: meal.nutrition.carbsG, fatG: meal.nutrition.fatG } : null,
+   728→        baseNutritionPer100g: meal.nutrition ? { calories: meal.nutrition.calories, proteinG: meal.nutrition.proteinG, carbsG: meal.nutrition.carbsG, fatG: meal.nutrition.fatG } : null,
+   729→      },
+   730→      slot,
+   731→      baseNutritionPer100g: meal.nutrition || null,
+   732→      mealName: meal.name,
+   733→      cuisine: meal.cuisine,
+   734→      mealType: meal.mealType,
+   735→      isVeg: meal.isVeg,
+   736→      isVegan: meal.isVegan,
+   737→    });
+   738→    setSlotSearchDialog({ open: false });
+   739→    setSearchQuery('');
+   740→    setSearchResults([]);
+   741→  };
+   742→
+   743→  const handleWaterAdd = async () => {
+   744→    try {
+   745→      await apiFetch('/api/water-log', { method: 'POST', body: JSON.stringify({ glasses: 1 }) });
+   746→      toast.success('\uD83D\uDCA7 +1 glass of water');
+   747→    } catch { toast.error('Failed to log water'); }
+   748→  };
+   749→
+   750→  const firstName = (user?.profile as Record<string, unknown> | null)?.firstName || (user?.name as string) || 'there';
+   751→  const todayStr = format(new Date(), 'EEEE, MMMM d');
+   752→
+   753→  if (loading) {
+   754→    return (
+   755→      <div className="p-4 max-w-lg mx-auto space-y-4">
+   756→        <Skeleton className="h-8 w-56 rounded-xl" />
+   757→        <div className="flex justify-center"><Skeleton className="h-[180px] w-[180px] rounded-full" /></div>
+   758→        <div className="space-y-3"><Skeleton className="h-10 w-full rounded-xl" /><Skeleton className="h-10 w-full rounded-xl" /><Skeleton className="h-10 w-full rounded-xl" /></div>
+   759→        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><Skeleton className="h-56 w-full rounded-xl" /><Skeleton className="h-56 w-full rounded-xl" /></div>
+   760→      </div>
+   761→    );
+   762→  }
+   763→
+   764→  const targetCal = nutrition?.targets?.calories || 0;
+   765→  const consumedCal = nutrition?.consumed?.calories || 0;
+   766→
+   767→  return (
+   768→    <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-4">
+   769→      {/* Greeting Section with Date & Streak */}
+   770→      <div className="flex items-start justify-between">
+   771→        <div>
+   772→          <h1 className="text-xl font-bold text-gray-900">Hi, {firstName}! &#x1F44B;</h1>
+   773→          <p className="text-sm text-gray-500 mt-0.5">{todayStr}</p>
+   774→        </div>
+   775→        <div className="flex items-center gap-2">
+   776→          {streak > 0 && (
+   777→            <Badge className="bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 gap-1">
+   778→              <Zap className="h-3 w-3" />{streak} day{streak > 1 ? 's' : ''}
+   779→            </Badge>
+   780→          )}
+   781→          <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+   782→            <User className="h-5 w-5 text-emerald-600" />
+   783→          </div>
+   784→        </div>
+   785→      </div>
+   786→
+   787→      {/* Calorie Ring */}
+   788→      <Card className="p-6 rounded-xl shadow-sm">
+   789→        <div className="flex justify-center">
+   790→          <CalorieRing consumed={consumedCal} target={targetCal} />
+   791→        </div>
+   792→      </Card>
+   793→
+   794→      {/* Macro Progress Bars with gradient & percentage */}
+   795→      <Card className="p-4 rounded-xl shadow-sm space-y-3">
+   796→        <h3 className="text-sm font-semibold text-gray-700">Today&apos;s Macros</h3>
+   797→        {[
+   798→          { label: 'Protein', val: nutrition?.consumed?.proteinG || 0, target: nutrition?.targets?.proteinG || 0, from: '#3b82f6', to: '#60a5fa', unit: 'g' },
+   799→          { label: 'Carbs', val: nutrition?.consumed?.carbsG || 0, target: nutrition?.targets?.carbsG || 0, from: '#f59e0b', to: '#fbbf24', unit: 'g' },
+   800→          { label: 'Fat', val: nutrition?.consumed?.fatG || 0, target: nutrition?.targets?.fatG || 0, from: '#f43f5e', to: '#fb7185', unit: 'g' },
+   801→        ].map((m) => {
+   802→          const pct = Math.min(Math.round((m.val / (m.target || 1)) * 100), 100);
+   803→          return (
+   804→            <div key={m.label}>
+   805→              <div className="flex justify-between text-xs mb-1.5">
+   806→                <span className="text-gray-600 font-medium">{m.label}</span>
+   807→                <span className="text-gray-500">{m.val}{m.unit} / {m.target}{m.unit} &middot; {pct}%</span>
+   808→              </div>
+   809→              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+   810→                <motion.div
+   811→                  className="h-full rounded-full"
+   812→                  style={{ background: `linear-gradient(90deg, ${m.from}, ${m.to})` }}
+   813→                  initial={{ width: 0 }}
+   814→                  animate={{ width: `${pct}%` }}
+   815→                  transition={{ duration: 0.8 }}
+   816→                />
+   817→              </div>
+   818→            </div>
+   819→          );
+   820→        })}
+   821→      </Card>
+   822→
+   823→      {/* Meal Slots with colored left borders & search buttons */}
+   824→      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   825→        {SLOTS.map((slot) => {
+   826→          const recs = recommendations[slot] || [];
+   827→          return (
+   828→            <Card key={slot} className={`p-0 rounded-xl shadow-sm border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden`}>
+   829→              <div className="p-4 pb-2">
+   830→                <div className="flex items-center justify-between mb-2">
+   831→                  <div className="flex items-center gap-2">
+   832→                    <span className="text-base">{SLOT_ICONS[slot]}</span>
+   833→                    <h3 className="font-semibold text-sm text-gray-900">{SLOT_LABELS[slot]}</h3>
+   834→                  </div>
+   835→                  <Button
+   836→                    variant="ghost" size="icon"
+   837→                    className="h-8 w-8 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50"
+   838→                    onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot }); }}
+   839→                  >
+   840→                    <Search className="h-4 w-4" />
+   841→                  </Button>
+   842→                </div>
+   843→              </div>
+   844→              <div className="px-4 pb-3 space-y-2 max-h-64 overflow-y-auto">
+   845→                {recs.length === 0 && (
+   846→                  <div className="text-center py-3">
+   847→                    <p className="text-xs text-gray-400">No recommendations</p>
+   848→                    <Button variant="ghost" size="sm" className="text-emerald-600 text-xs mt-1 hover:bg-emerald-50" onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot }); }}>
+   849→                      <Search className="h-3 w-3 mr-1" />Search for meals
+   850→                    </Button>
+   851→                  </div>
+   852→                )}
+   853→                {recs.map((rec) => (
+   854→                  <div
+   855→                    key={rec.meal.id}
+   856→                    className="p-2.5 rounded-xl border border-gray-100 bg-white space-y-1.5 hover:shadow-sm hover:border-emerald-100 transition-all cursor-pointer"
+   857→                    onClick={() => setDetailSheet({ open: true, rec })}
+   858→                  >
+   859→                    <div className="flex items-start justify-between gap-2">
+   860→                      <p className="text-sm font-medium text-gray-800 leading-tight line-clamp-1">{rec.meal.name}</p>
+   861→                      <div className="flex items-center gap-1 shrink-0">
+   862→                        {rec.meal.isVeg && <span className="text-green-600 text-xs font-bold border border-green-300 rounded px-1">V</span>}
+   863→                        {rec.meal.isVegan && <span className="text-green-700 text-xs font-bold border border-green-400 rounded px-1">VG</span>}
+   864→                      </div>
+   865→                    </div>
+   866→                    <div className="flex items-center gap-2 flex-wrap">
+   867→                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium border-gray-200 text-gray-500">{rec.meal.cuisine}</Badge>
+   868→                      {rec.meal.prepTimeMin && (
+   869→                        <span className="text-[10px] text-gray-400 flex items-center gap-0.5"><Clock className="h-3 w-3" />{rec.meal.prepTimeMin}m</span>
+   870→                      )}
+   871→                    </div>
+   872→                    <div className="flex items-center gap-2 text-[11px] text-gray-500">
+   873→                      <span className="font-medium text-gray-700">{rec.baseNutritionPer100g?.calories || 0} kcal/100g</span>
+   874→                      <span>&middot;</span>
+   875→                      <span>P: {rec.baseNutritionPer100g?.proteinG || 0}g</span>
+   876→                      {rec.estimatedNutrition && (
+   877→                        <span>&middot; <span className="text-emerald-600">~{rec.estimatedNutrition.calories} kcal ({rec.recommendedServingGms}g)</span></span>
+   878→                      )}
+   879→                    </div>
+   880→                    <Button
+   881→                      size="sm"
+   882→                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs min-h-[32px] rounded-lg mt-1 font-medium"
+   883→                      onClick={(e) => {
+   884→                        e.stopPropagation();
+   885→                        setServingGms(rec.recommendedServingGms);
+   886→                        setLogDialog({
+   887→                          open: true, meal: rec, slot,
+   888→                          baseNutritionPer100g: rec.baseNutritionPer100g,
+   889→                          mealName: rec.meal.name,
+   890→                          cuisine: rec.meal.cuisine,
+   891→                          mealType: rec.meal.mealType,
+   892→                          description: rec.meal.description,
+   893→                          isVeg: rec.meal.isVeg,
+   894→                          isVegan: rec.meal.isVegan,
+   895→                        });
+   896→                      }}
+   897→                    >
+   898→                      I Ate This
+   899→                    </Button>
+   900→                  </div>
+   901→                ))}
+   902→              </div>
+   903→            </Card>
+   904→          );
+   905→        })}
+   906→      </div>
+   907→
+   908→      {/* FAB buttons */}
+   909→      <div className="fixed bottom-20 right-4 z-40 flex flex-col gap-2">
+   910→        <Button size="icon" className="w-12 h-12 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg" onClick={handleWaterAdd}>
+   911→          <Droplets className="h-5 w-5" />
+   912→        </Button>
+   913→        <Button size="icon" className="w-12 h-12 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg" onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot: 'lunch' }); }}>
+   914→          <Search className="h-5 w-5" />
+   915→        </Button>
+   916→        <Button size="icon" className="w-12 h-12 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg" onClick={() => onNavigate('upload')}>
+   917→          <Camera className="h-5 w-5" />
+   918→        </Button>
+   919→      </div>
+   920→
+   921→      {/* ═══ Log Meal Dialog with Nutrition Facts Label ═══ */}
+   922→      <Dialog open={logDialog.open} onOpenChange={(open) => setLogDialog(open ? logDialog : { open: false })}>
+   923→        <DialogContent className="max-w-md">
+   924→          <DialogHeader>
+   925→            <DialogTitle>Log Meal</DialogTitle>
+   926→            <DialogDescription className="flex items-center gap-2">
+   927→              {logDialog.open && <span className="font-medium text-gray-700">{logDialog.mealName}</span>}
+   928→              {logDialog.open && logDialog.cuisine && <Badge variant="outline" className="text-xs">{logDialog.cuisine}</Badge>}
+   929→            </DialogDescription>
+   930→          </DialogHeader>
+   931→          <div className="space-y-4">
+   932→            <div className="space-y-2">
+   933→              <Label className="text-sm font-medium">Serving Size (grams)</Label>
+   934→              <Input type="number" value={servingGms} onChange={(e) => setServingGms(Number(e.target.value))} min={10} max={1000} className="h-11 rounded-xl" />
+   935→            </div>
+   936→
+   937→            {/* Per-100g vs Estimated nutrition display */}
+   938→            {logDialog.open && logDialog.baseNutritionPer100g && (
+   939→              <div className="space-y-3">
+   940→                {/* Per 100g info */}
+   941→                <div className="bg-gray-50 rounded-xl p-3 text-sm space-y-1">
+   942→                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Per 100g</p>
+   943→                  <div className="grid grid-cols-2 gap-1 text-xs">
+   944→                    <span className="text-gray-600">Calories:</span><span className="font-bold text-gray-900">{logDialog.baseNutritionPer100g.calories} kcal</span>
+   945→                    <span className="text-gray-600">Protein:</span><span className="font-bold text-blue-600">{logDialog.baseNutritionPer100g.proteinG}g</span>
+   946→                    <span className="text-gray-600">Carbs:</span><span className="font-bold text-amber-600">{logDialog.baseNutritionPer100g.carbsG}g</span>
+   947→                    <span className="text-gray-600">Fat:</span><span className="font-bold text-rose-600">{logDialog.baseNutritionPer100g.fatG}g</span>
+   948→                  </div>
+   949→                </div>
+   950→                {/* Estimated for serving */}
+   951→                <div className="bg-emerald-50 rounded-xl p-3 text-sm space-y-1 border border-emerald-100">
+   952→                  <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1.5">Estimated for {servingGms}g serving</p>
+   953→                  <div className="grid grid-cols-2 gap-1 text-xs">
+   954→                    <span className="text-gray-600">Calories:</span><span className="font-bold text-gray-900">{Math.round((logDialog.baseNutritionPer100g.calories / 100) * servingGms)} kcal</span>
+   955→                    <span className="text-gray-600">Protein:</span><span className="font-bold text-blue-600">{Math.round((logDialog.baseNutritionPer100g.proteinG / 100) * servingGms * 10) / 10}g</span>
+   956→                    <span className="text-gray-600">Carbs:</span><span className="font-bold text-amber-600">{Math.round((logDialog.baseNutritionPer100g.carbsG / 100) * servingGms * 10) / 10}g</span>
+   957→                    <span className="text-gray-600">Fat:</span><span className="font-bold text-rose-600">{Math.round((logDialog.baseNutritionPer100g.fatG / 100) * servingGms * 10) / 10}g</span>
+   958→                  </div>
+   959→                </div>
+   960→              </div>
+   961→            )}
+   962→
+   963→            {/* Nutrition Facts Label */}
+   964→            {logDialog.open && logDialog.baseNutritionPer100g && (
+   965→              <NutritionFactsLabel
+   966→                nutrition={logDialog.baseNutritionPer100g}
+   967→                servingGms={servingGms}
+   968→                label="Per Serving"
+   969→              />
+   970→            )}
+   971→
+   972→            <div className="space-y-2">
+   973→              <Label className="text-sm font-medium">Meal Slot</Label>
+   974→              <Select value={logDialog.open ? logDialog.slot : 'lunch'} onValueChange={(v) => logDialog.open && setLogDialog({ ...logDialog, slot: v })}>
+   975→                <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+   976→                <SelectContent>{SLOTS.map((s) => <SelectItem key={s} value={s}>{SLOT_LABELS[s]}</SelectItem>)}</SelectContent>
+   977→              </Select>
+   978→            </div>
+   979→          </div>
+   980→          <DialogFooter>
+   981→            <Button variant="outline" onClick={() => setLogDialog({ open: false })} className="rounded-xl">Cancel</Button>
+   982→            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold" onClick={handleLogMeal}>Log It</Button>
+   983→          </DialogFooter>
+   984→        </DialogContent>
+   985→      </Dialog>
+   986→
+   987→      {/* ═══ Per-Slot Meal Search Dialog ═══ */}
+   988→      <Dialog open={slotSearchDialog.open} onOpenChange={(open) => { if (!open) { setSlotSearchDialog({ open: false }); setSearchQuery(''); setSearchResults([]); } }}>
+   989→        <DialogContent className="max-w-md">
+   990→          <DialogHeader>
+   991→            <DialogTitle>Search Meals</DialogTitle>
+   992→            <DialogDescription>Find and log a meal for {slotSearchDialog.open ? SLOT_LABELS[slotSearchDialog.slot] : ''}</DialogDescription>
+   993→          </DialogHeader>
+   994→          <div className="space-y-3">
+   995→            <div className="relative">
+   996→              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+   997→              <Input
+   998→                placeholder="Search meals..."
+   999→                value={searchQuery}
+  1000→                onChange={(e) => handleSlotSearch(e.target.value)}
+  1001→                className="h-11 rounded-xl pl-9"
+  1002→                autoFocus
+  1003→              />
+  1004→            </div>
+  1005→            <ScrollArea className="max-h-72">
+  1006→              <div className="space-y-2">
+  1007→                {searchLoading && <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-emerald-600" /></div>}
+  1008→                {!searchLoading && searchQuery && searchResults.length === 0 && (
+  1009→                  <p className="text-sm text-gray-400 text-center py-6">No results found</p>
+  1010→                )}
+  1011→                {!searchLoading && searchResults.map((meal) => (
+  1012→                  <div
+  1013→                    key={meal.id}
+  1014→                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:bg-emerald-50/50 hover:border-emerald-100 transition-colors cursor-pointer"
+  1015→                    onClick={() => handleLogFromSearch(meal)}
+  1016→                  >
+  1017→                    <div className="flex-1 min-w-0">
+  1018→                      <div className="flex items-center gap-2">
+  1019→                        <p className="text-sm font-medium text-gray-800 truncate">{meal.name}</p>
+  1020→                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium border-gray-200 text-gray-500 shrink-0">{meal.cuisine}</Badge>
+  1021→                      </div>
+  1022→                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+  1023→                        <span>{meal.nutrition?.calories || 0} kcal/100g</span>
+  1024→                        <span>&middot;</span>
+  1025→                        <span className="text-blue-600 font-medium">P: {meal.nutrition?.proteinG || 0}g</span>
+  1026→                      </div>
+  1027→                    </div>
+  1028→                    <ChevronRight className="h-4 w-4 text-gray-300 shrink-0" />
+  1029→                  </div>
+  1030→                ))}
+  1031→              </div>
+  1032→            </ScrollArea>
+  1033→          </div>
+  1034→        </DialogContent>
+  1035→      </Dialog>
+  1036→
+  1037→      {/* ═══ Meal Detail Sheet ═══ */}
+  1038→      <Sheet open={detailSheet.open} onOpenChange={(open) => { if (!open) setDetailSheet({ open: false }); }}>
+  1039→        <SheetContent side="bottom" className="max-w-lg mx-auto rounded-t-2xl max-h-[85vh]">
+  1040→          {detailSheet.open && (
+  1041→            <>
+  1042→              <SheetHeader className="pt-2">
+  1043→                <div className="flex items-center gap-2 pr-8">
+  1044→                  {detailSheet.rec.meal.isVeg && <span className="text-green-600 text-xs font-bold border border-green-300 rounded px-1.5 py-0.5">Veg</span>}
+  1045→                  {detailSheet.rec.meal.isVegan && <span className="text-green-700 text-xs font-bold border border-green-400 rounded px-1.5 py-0.5">Vegan</span>}
+  1046→                </div>
+  1047→                <SheetTitle className="text-lg">{detailSheet.rec.meal.name}</SheetTitle>
+  1048→                <SheetDescription className="flex items-center gap-2 flex-wrap">
+  1049→                  <Badge variant="outline" className="text-xs">{detailSheet.rec.meal.cuisine}</Badge>
+  1050→                  <Badge variant="outline" className={`text-xs ${SLOT_BADGE_COLORS[detailSheet.rec.meal.mealType] || ''}`}>{detailSheet.rec.meal.mealType}</Badge>
+  1051→                  {detailSheet.rec.meal.prepTimeMin && (
+  1052→                    <span className="text-xs text-gray-500 flex items-center gap-1"><Clock className="h-3 w-3" />{detailSheet.rec.meal.prepTimeMin} min</span>
+  1053→                  )}
+  1054→                </SheetDescription>
+  1055→              </SheetHeader>
+  1056→              <ScrollArea className="flex-1 px-4 pb-4">
+  1057→                <div className="space-y-4">
+  1058→                  {detailSheet.rec.meal.description && (
+  1059→                    <p className="text-sm text-gray-600 leading-relaxed">{detailSheet.rec.meal.description}</p>
+  1060→                  )}
+  1061→
+  1062→                  {/* Per 100g nutrition */}
+  1063→                  {detailSheet.rec.baseNutritionPer100g && (
+  1064→                    <div>
+  1065→                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Nutrition per 100g</h4>
+  1066→                      <NutritionFactsLabel nutrition={detailSheet.rec.baseNutritionPer100g} servingGms={100} label="Per 100g" />
+  1067→                    </div>
+  1068→                  )}
+  1069→
+  1070→                  {/* Estimated for recommended serving */}
+  1071→                  {detailSheet.rec.estimatedNutrition && (
+  1072→                    <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
+  1073→                      <h4 className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2">Recommended: {detailSheet.rec.recommendedServingGms}g serving</h4>
+  1074→                      <div className="grid grid-cols-2 gap-1.5 text-xs">
+  1075→                        <span className="text-gray-600">Calories:</span><span className="font-bold">{detailSheet.rec.estimatedNutrition.calories} kcal</span>
+  1076→                        <span className="text-gray-600">Protein:</span><span className="font-bold text-blue-600">{detailSheet.rec.estimatedNutrition.proteinG}g</span>
+  1077→                        <span className="text-gray-600">Carbs:</span><span className="font-bold text-amber-600">{detailSheet.rec.estimatedNutrition.carbsG}g</span>
+  1078→                        <span className="text-gray-600">Fat:</span><span className="font-bold text-rose-600">{detailSheet.rec.estimatedNutrition.fatG}g</span>
+  1079→                      </div>
+  1080→                    </div>
+  1081→                  )}
+  1082→                </div>
+  1083→              </ScrollArea>
+  1084→              <SheetFooter className="border-t pt-3">
+  1085→                <Button
+  1086→                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold min-h-[44px]"
+  1087→                  onClick={() => {
+  1088→                    const r = detailSheet.rec;
+  1089→                    setServingGms(r.recommendedServingGms);
+  1090→                    setLogDialog({
+  1091→                      open: true, meal: r, slot: r.meal.mealType,
+  1092→                      baseNutritionPer100g: r.baseNutritionPer100g,
+  1093→                      mealName: r.meal.name, cuisine: r.meal.cuisine,
+  1094→                      mealType: r.meal.mealType, description: r.meal.description,
+  1095→                      isVeg: r.meal.isVeg, isVegan: r.meal.isVegan,
+  1096→                    });
+  1097→                    setDetailSheet({ open: false });
+  1098→                  }}
+  1099→                >
+  1100→                  Log This Meal
+  1101→                </Button>
+  1102→              </SheetFooter>
+  1103→            </>
+  1104→          )}
+  1105→        </SheetContent>
+  1106→      </Sheet>
+  1107→    </motion.div>
+  1108→  );
+  1109→}
+  1110→
+  1111→// ═══════════════════════════════════════════════════════════
+  1112→// FOOD LOG VIEW (with Quick Re-log)
+  1113→// ═══════════════════════════════════════════════════════════
+  1114→function FoodLogView() {
+  1115→  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  1116→  const [foodLog, setFoodLog] = useState<Record<string, unknown> | null>(null);
+  1117→  const [loading, setLoading] = useState(true);
+  1118→  const [relogDialog, setRelogDialog] = useState<{ open: boolean; item: FoodLogItem } | { open: false }>({ open: false });
+  1119→  const [relogSlot, setRelogSlot] = useState('lunch');
+  1120→
+  1121→  const dates = Array.from({ length: 7 }, (_, i) => format(subDays(new Date(), 6 - i), 'yyyy-MM-dd'));
+  1122→
+  1123→  const fetchLog = useCallback(async () => {
+  1124→    setLoading(true);
+  1125→    try {
+  1126→      const data = await apiFetch(`/api/food-logs?date=${selectedDate}`);
+  1127→      setFoodLog(data);
+  1128→    } catch { toast.error('Failed to load food log'); }
+  1129→    finally { setLoading(false); }
+  1130→  }, [selectedDate]);
+  1131→
+  1132→  useEffect(() => { fetchLog(); }, [fetchLog]);
+  1133→
+  1134→  const handleDelete = async (itemId: string) => {
+  1135→    try {
+  1136→      await apiFetch(`/api/food-logs?id=${itemId}`, { method: 'DELETE' });
+  1137→      toast.success('Item removed');
+  1138→      fetchLog();
+  1139→    } catch (err) { toast.error((err as Error).message); }
+  1140→  };
+  1141→
+  1142→  const handleRelog = async () => {
+  1143→    if (!relogDialog.open) return;
+  1144→    const item = relogDialog.item;
+  1145→    try {
+  1146→      if (item.mealId) {
+  1147→        await apiFetch('/api/food-logs', {
+  1148→          method: 'POST',
+  1149→          body: JSON.stringify({ mealId: item.mealId, servingGms: item.servingGms, mealSlot: relogSlot }),
+  1150→        });
+  1151→      } else {
+  1152→        await apiFetch('/api/food-logs', {
+  1153→          method: 'POST',
+  1154→          body: JSON.stringify({ customName: item.meal?.name || 'Food', servingGms: item.servingGms, mealSlot: relogSlot, caloriesPer100g: Math.round(item.calories / item.servingGms * 100), proteinPer100g: Math.round(item.proteinG / item.servingGms * 100) }),
+  1155→        });
+  1156→      }
+  1157→      toast.success(`Re-logged ${item.meal?.name || 'meal'}!`);
+  1158→      setRelogDialog({ open: false });
+  1159→      fetchLog();
+  1160→    } catch (err) { toast.error((err as Error).message); }
+  1161→  };
+  1162→
+  1163→  const itemsBySlot = (foodLog?.itemsBySlot || {}) as Record<string, FoodLogItem[]>;
+  1164→  const hasItems = Object.values(itemsBySlot).some((items: FoodLogItem[]) => items.length > 0);
+  1165→
+  1166→  return (
+  1167→    <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-4">
+  1168→      <h1 className="text-xl font-bold text-gray-900">Food Log</h1>
+  1169→
+  1170→      {/* Date strip */}
+  1171→      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+  1172→        {dates.map((date) => {
+  1173→          const isToday = date === format(new Date(), 'yyyy-MM-dd');
+  1174→          const isSelected = date === selectedDate;
+  1175→          return (
+  1176→            <button
+  1177→              key={date}
+  1178→              onClick={() => setSelectedDate(date)}
+  1179→              className={`flex flex-col items-center min-w-[52px] py-2 px-2 rounded-xl transition-all shrink-0 min-h-[44px] ${
+  1180→                isSelected
+  1181→                  ? 'bg-emerald-600 text-white shadow-sm'
+  1182→                  : isToday
+  1183→                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+  1184→                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-100'
+  1185→              }`}
+  1186→            >
+  1187→              <span className="text-[10px] font-medium uppercase">{format(parseISO(date), 'EEE')}</span>
+  1188→              <span className="text-sm font-bold">{format(parseISO(date), 'd')}</span>
+  1189→            </button>
+  1190→          );
+  1191→        })}
+  1192→      </div>
+  1193→
+  1194→      {/* Summary */}
+  1195→      <Card className="p-4 rounded-xl shadow-sm">
+  1196→        <div className="grid grid-cols-4 gap-2 text-center">
+  1197→          {[
+  1198→            { label: 'Calories', val: foodLog?.totalCalories || 0, unit: 'kcal', color: 'text-orange-600' },
+  1199→            { label: 'Protein', val: foodLog?.totalProtein || 0, unit: 'g', color: 'text-blue-600' },
+  1200→            { label: 'Carbs', val: foodLog?.totalCarbs || 0, unit: 'g', color: 'text-amber-600' },
+  1201→            { label: 'Fat', val: foodLog?.totalFat || 0, unit: 'g', color: 'text-rose-600' },
+  1202→          ].map((s) => (
+  1203→            <div key={s.label} className="bg-gray-50 rounded-lg py-2 px-1">
+  1204→              <p className={`text-lg font-bold ${s.color}`}>{Math.round(s.val)}</p>
+  1205→              <p className="text-[10px] text-gray-500">{s.label}</p>
+  1206→            </div>
+  1207→          ))}
+  1208→        </div>
+  1209→      </Card>
+  1210→
+  1211→      {/* Loading */}
+  1212→      {loading && (
+  1213→        <div className="space-y-3">
+  1214→          <Skeleton className="h-20 w-full rounded-xl" />
+  1215→          <Skeleton className="h-20 w-full rounded-xl" />
+  1216→        </div>
+  1217→      )}
+  1218→
+  1219→      {/* Empty state with camera icon */}
+  1220→      {!loading && !hasItems && (
+  1221→        <Card className="p-8 text-center rounded-xl shadow-sm">
+  1222→          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+  1223→            <Camera className="h-8 w-8 text-gray-300" />
+  1224→          </div>
+  1225→          <p className="text-gray-700 font-semibold text-base">Start logging your meals!</p>
+  1226→          <p className="text-sm text-gray-400 mt-1">Scan a photo or search for meals to get started</p>
+  1227→        </Card>
+  1228→      )}
+  1229→
+  1230→      {/* Food items by slot with better cards */}
+  1231→      {!loading && SLOTS.map((slot) => {
+  1232→        const items = itemsBySlot[slot] || [];
+  1233→        if (items.length === 0) return null;
+  1234→        return (
+  1235→          <Card key={slot} className={`p-0 rounded-xl shadow-sm border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden`}>
+  1236→            <div className="p-4 pb-2">
+  1237→              <div className="flex items-center gap-2">
+  1238→                <span className="text-base">{SLOT_ICONS[slot]}</span>
+  1239→                <h3 className="font-semibold text-sm text-gray-900">{SLOT_LABELS[slot]}</h3>
+  1240→                <Badge variant="secondary" className="text-xs ml-auto bg-gray-100 text-gray-600">{items.length} item{items.length > 1 ? 's' : ''}</Badge>
+  1241→              </div>
+  1242→            </div>
+  1243→            <div className="px-4 pb-3 space-y-2">
+  1244→              {items.map((item) => (
+  1245→                <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 border border-gray-100 group hover:bg-gray-50 transition-colors">
+  1246→                  <div className="flex-1 min-w-0">
+  1247→                    <p className="text-sm font-medium text-gray-800 truncate">{item.meal?.name || 'Unknown'}</p>
+  1248→                    <p className="text-xs text-gray-500 mt-0.5">{item.servingGms}g &middot; {Math.round(item.calories)} kcal &middot; P: {Math.round(item.proteinG * 10) / 10}g</p>
+  1249→                  </div>
+  1250→                  <div className="flex items-center gap-1 shrink-0 ml-2">
+  1251→                    <Button
+  1252→                      variant="ghost" size="icon"
+  1253→                      className="h-8 w-8 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 opacity-0 group-hover:opacity-100 transition-opacity"
+  1254→                      onClick={() => { setRelogDialog({ open: true, item }); setRelogSlot(item.mealSlot); }}
+  1255→                      title="Log Again"
+  1256→                    >
+  1257→                      <RotateCcw className="h-3.5 w-3.5" />
+  1258→                    </Button>
+  1259→                    <Button
+  1260→                      variant="ghost" size="icon"
+  1261→                      className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50"
+  1262→                      onClick={() => handleDelete(item.id)}
+  1263→                    >
+  1264→                      <Trash2 className="h-3.5 w-3.5" />
+  1265→                    </Button>
+  1266→                  </div>
+  1267→                </div>
+  1268→              ))}
+  1269→            </div>
+  1270→          </Card>
+  1271→        );
+  1272→      })}
+  1273→
+  1274→      {/* Quick Re-log Dialog */}
+  1275→      <Dialog open={relogDialog.open} onOpenChange={(open) => setRelogDialog(open ? relogDialog : { open: false })}>
+  1276→        <DialogContent className="max-w-sm">
+  1277→          <DialogHeader>
+  1278→            <DialogTitle>Log Again</DialogTitle>
+  1279→            <DialogDescription>{relogDialog.open ? relogDialog.item.meal?.name || 'This meal' : ''} ({relogDialog.open ? relogDialog.item.servingGms : 0}g)</DialogDescription>
+  1280→          </DialogHeader>
+  1281→          <div className="space-y-3">
+  1282→            <div className="space-y-2">
+  1283→              <Label className="text-sm font-medium">Log as</Label>
+  1284→              <Select value={relogSlot} onValueChange={setRelogSlot}>
+  1285→                <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+  1286→                <SelectContent>{SLOTS.map((s) => <SelectItem key={s} value={s}>{SLOT_LABELS[s]}</SelectItem>)}</SelectContent>
+  1287→              </Select>
+  1288→            </div>
+  1289→          </div>
+  1290→          <DialogFooter>
+  1291→            <Button variant="outline" onClick={() => setRelogDialog({ open: false })} className="rounded-xl">Cancel</Button>
+  1292→            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold" onClick={handleRelog}>Log Again</Button>
+  1293→          </DialogFooter>
+  1294→        </DialogContent>
+  1295→      </Dialog>
+  1296→    </motion.div>
+  1297→  );
+  1298→}
+  1299→
+  1300→// ═══════════════════════════════════════════════════════════
+  1301→// UPLOAD VIEW
+  1302→// ═══════════════════════════════════════════════════════════
+  1303→function UploadView() {
+  1304→  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  1305→  const [imageFile, setImageFile] = useState<File | null>(null);
+  1306→  const [recognizing, setRecognizing] = useState(false);
+  1307→  const [results, setResults] = useState<RecognizedFood[]>([]);
+  1308→  const [unknownForms, setUnknownForms] = useState<Record<number, {
+  1309→    confirmedName: string; confirmedPortion: number; caloriesPer100g: number;
+  1310→    proteinPer100g: number; carbsPer100g: number; fatPer100g: number;
+  1311→    mealType: string; cuisine: string;
+  1312→  }>>({});
+  1313→  const fileInputRef = useRef<HTMLInputElement>(null);
+  1314→
+  1315→  const handleFileSelect = (file: File) => {
+  1316→    setImageFile(file);
+  1317→    const reader = new FileReader();
+  1318→    reader.onload = (e) => setImagePreview(e.target?.result as string);
+  1319→    reader.readAsDataURL(file);
+  1320→  };
+  1321→
+  1322→  const handleDrop = (e: React.DragEvent) => {
+  1323→    e.preventDefault();
+  1324→    const file = e.dataTransfer.files[0];
+  1325→    if (file && file.type.startsWith('image/')) handleFileSelect(file);
+  1326→  };
+  1327→
+  1328→  const handleRecognize = async () => {
+  1329→    if (!imageFile) return;
+  1330→    setRecognizing(true);
+  1331→    try {
+  1332→      const formData = new FormData();
+  1333→      formData.append('image', imageFile);
+  1334→      const data = await apiFetch('/api/food-recognize', { method: 'POST', body: formData });
+  1335→      setResults(data.foods || []);
+  1336→      const forms: typeof unknownForms = {};
+  1337→      (data.foods || []).forEach((f: RecognizedFood, idx: number) => {
+  1338→        if (f.unknown_food) {
+  1339→          forms[idx] = { confirmedName: f.name, confirmedPortion: f.servingWeightGrams || 200, caloriesPer100g: 0, proteinPer100g: 0, carbsPer100g: 0, fatPer100g: 0, mealType: 'lunch', cuisine: 'Mixed' };
+  1340→        }
+  1341→      });
+  1342→      setUnknownForms(forms);
+  1343→    } catch (err) { toast.error((err as Error).message || 'Recognition failed'); }
+  1344→    finally { setRecognizing(false); }
+  1345→  };
+  1346→
+  1347→  const confidenceBadge = (conf: number) => {
+  1348→    const pct = Math.round(conf * 100);
+  1349→    const color = conf >= 0.9 ? 'bg-green-100 text-green-700 border-green-200' : conf >= 0.7 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : conf >= 0.5 ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-red-100 text-red-700 border-red-200';
+  1350→    return <Badge className={`${color} text-xs`}>{pct}%</Badge>;
+  1351→  };
+  1352→
+  1353→  const handleLogRecognized = async (mealId: string, servingWeightGrams: number) => {
+  1354→    try {
+  1355→      await apiFetch('/api/food-logs', { method: 'POST', body: JSON.stringify({ mealId, servingGms: servingWeightGrams, mealSlot: 'lunch' }) });
+  1356→      toast.success('Food logged!');
+  1357→    } catch (err) { toast.error((err as Error).message); }
+  1358→  };
+  1359→
+  1360→  const handleSubmitUnknown = async (idx: number, aiName: string) => {
+  1361→    const form = unknownForms[idx];
+  1362→    if (!form || !form.confirmedName || !form.caloriesPer100g) { toast.error('Please fill in all required fields'); return; }
+  1363→    try {
+  1364→      const data = await apiFetch('/api/unknown-food/submit', { method: 'POST', body: JSON.stringify({ aiDetectedName: aiName, ...form }) });
+  1365→      toast.success('Food submitted and logged!');
+  1366→      if (data?.meal?.id) await handleLogRecognized(data.meal.id, form.confirmedPortion);
+  1367→    } catch (err) { toast.error((err as Error).message); }
+  1368→  };
+  1369→
+  1370→  return (
+  1371→    <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-4">
+  1372→      <div className="flex items-center gap-2">
+  1373→        <Camera className="h-5 w-5 text-emerald-600" />
+  1374→        <h1 className="text-xl font-bold text-gray-900">Scan Food</h1>
+  1375→      </div>
+  1376→
+  1377→      {/* Dropzone */}
+  1378→      <div
+  1379→        onDragOver={(e) => e.preventDefault()}
+  1380→        onDrop={handleDrop}
+  1381→        onClick={() => fileInputRef.current?.click()}
+  1382→        className="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/30 transition-colors"
+  1383→      >
+  1384→        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])} />
+  1385→        {imagePreview ? (
+  1386→          <div className="space-y-3">
+  1387→            <img src={imagePreview} alt="Preview" className="max-h-64 mx-auto rounded-xl object-contain" />
+  1388→            <p className="text-sm text-gray-500">Tap to change image</p>
+  1389→          </div>
+  1390→        ) : (
+  1391→          <div className="space-y-3">
+  1392→            <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto">
+  1393→              <Camera className="h-8 w-8 text-emerald-400" />
+  1394→            </div>
+  1395→            <p className="text-gray-600 font-medium">Drag & drop or tap to upload</p>
+  1396→            <p className="text-sm text-gray-400">Supports JPG, PNG, WebP</p>
+  1397→          </div>
+  1398→        )}
+  1399→      </div>
+  1400→
+  1401→      {imageFile && !results.length && (
+  1402→        <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white min-h-[44px] rounded-xl font-semibold" onClick={handleRecognize} disabled={recognizing}>
+  1403→          {recognizing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing...</> : 'Recognize Food'}
+  1404→        </Button>
+  1405→      )}
+  1406→
+  1407→      {results.length > 0 && (
+  1408→        <div className="space-y-4">
+  1409→          <h2 className="font-semibold text-gray-900">Recognized Foods</h2>
+  1410→          {results.map((food, idx) => (
+  1411→            <Card key={idx} className="p-4 rounded-xl shadow-sm">
+  1412→              <div className="flex items-start justify-between gap-2 mb-2">
+  1413→                <div>
+  1414→                  <p className="font-medium text-gray-900">{food.name}</p>
+  1415→                  <p className="text-xs text-gray-500">{food.servingDescription}</p>
+  1416→                </div>
+  1417→                {confidenceBadge(food.confidence)}
+  1418→              </div>
+  1419→              <p className="text-xs text-gray-500 mb-2">Est. serving: {food.servingWeightGrams}g</p>
+  1420→              {food.matched && food.meal && (
+  1421→                <div className="bg-green-50 rounded-xl p-3 space-y-1 border border-green-100">
+  1422→                  <p className="text-sm text-green-800 font-medium">&#10003; Found in database</p>
+  1423→                  <p className="text-xs text-green-700">
+  1424→                    {(food.meal as Record<string, unknown>).nutrition
+  1425→                      ? `${(food.meal as Record<string, Record<string, unknown>>).nutrition?.calories} kcal, ${(food.meal as Record<string, Record<string, unknown>>).nutrition?.proteinG}g protein per 100g`
+  1426→                      : 'Nutrition data available'}
+  1427→                  </p>
+  1428→                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white mt-2 rounded-lg" onClick={() => handleLogRecognized((food.meal as Record<string, unknown>).id as string, food.servingWeightGrams)}>Log This</Button>
+  1429→                </div>
+  1430→              )}
+  1431→              {food.unknown_food && unknownForms[idx] && (
+  1432→                <div className="bg-orange-50 rounded-xl p-3 space-y-3 border border-orange-100">
+  1433→                  <p className="text-sm text-orange-800 font-medium">&#9888;&#65039; New Food — Please provide nutrition info</p>
+  1434→                  <div className="grid grid-cols-2 gap-2">
+  1435→                    <div className="space-y-1"><Label className="text-xs">Name</Label><Input className="h-9 rounded-lg" value={unknownForms[idx].confirmedName} onChange={(e) => setUnknownForms({ ...unknownForms, [idx]: { ...unknownForms[idx], confirmedName: e.target.value } })} /></div>
+  1436→                    <div className="space-y-1"><Label className="text-xs">Portion (g)</Label><Input type="number" className="h-9 rounded-lg" value={unknownForms[idx].confirmedPortion} onChange={(e) => setUnknownForms({ ...unknownForms, [idx]: { ...unknownForms[idx], confirmedPortion: Number(e.target.value) } })} /></div>
+  1437→                    <div className="space-y-1"><Label className="text-xs">Cal/100g</Label><Input type="number" className="h-9 rounded-lg" placeholder="e.g. 250" value={unknownForms[idx].caloriesPer100g || ''} onChange={(e) => setUnknownForms({ ...unknownForms, [idx]: { ...unknownForms[idx], caloriesPer100g: Number(e.target.value) } })} /></div>
+  1438→                    <div className="space-y-1"><Label className="text-xs">Protein/100g</Label><Input type="number" className="h-9 rounded-lg" placeholder="e.g. 15" value={unknownForms[idx].proteinPer100g || ''} onChange={(e) => setUnknownForms({ ...unknownForms, [idx]: { ...unknownForms[idx], proteinPer100g: Number(e.target.value) } })} /></div>
+  1439→                    <div className="space-y-1"><Label className="text-xs">Carbs/100g</Label><Input type="number" className="h-9 rounded-lg" placeholder="e.g. 30" value={unknownForms[idx].carbsPer100g || ''} onChange={(e) => setUnknownForms({ ...unknownForms, [idx]: { ...unknownForms[idx], carbsPer100g: Number(e.target.value) } })} /></div>
+  1440→                    <div className="space-y-1"><Label className="text-xs">Fat/100g</Label><Input type="number" className="h-9 rounded-lg" placeholder="e.g. 10" value={unknownForms[idx].fatPer100g || ''} onChange={(e) => setUnknownForms({ ...unknownForms, [idx]: { ...unknownForms[idx], fatPer100g: Number(e.target.value) } })} /></div>
+  1441→                  </div>
+  1442→                  <div className="grid grid-cols-2 gap-2">
+  1443→                    <div className="space-y-1">
+  1444→                      <Label className="text-xs">Meal Type</Label>
+  1445→                      <Select value={unknownForms[idx].mealType} onValueChange={(v) => setUnknownForms({ ...unknownForms, [idx]: { ...unknownForms[idx], mealType: v } })}>
+  1446→                        <SelectTrigger className="h-9 rounded-lg"><SelectValue /></SelectTrigger>
+  1447→                        <SelectContent>{SLOTS.map((s) => <SelectItem key={s} value={s}>{SLOT_LABELS[s]}</SelectItem>)}</SelectContent>
+  1448→                      </Select>
+  1449→                    </div>
+  1450→                    <div className="space-y-1">
+  1451→                      <Label className="text-xs">Cuisine</Label>
+  1452→                      <Select value={unknownForms[idx].cuisine} onValueChange={(v) => setUnknownForms({ ...unknownForms, [idx]: { ...unknownForms[idx], cuisine: v } })}>
+  1453→                        <SelectTrigger className="h-9 rounded-lg"><SelectValue /></SelectTrigger>
+  1454→                        <SelectContent>{['Indian', 'Chinese', 'Italian', 'American', 'Mexican', 'Mediterranean', 'Japanese', 'Thai', 'Mixed'].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+  1455→                      </Select>
+  1456→                    </div>
+  1457→                  </div>
+  1458→                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white w-full rounded-lg" onClick={() => handleSubmitUnknown(idx, food.name)}>Submit & Log</Button>
+  1459→                </div>
+  1460→              )}
+  1461→            </Card>
+  1462→          ))}
+  1463→          <Button variant="outline" className="w-full rounded-xl" onClick={() => { setResults([]); setImagePreview(null); setImageFile(null); }}>Scan Another Photo</Button>
+  1464→        </div>
+  1465→      )}
+  1466→    </motion.div>
+  1467→  );
+  1468→}
+  1469→
+  1470→// ═══════════════════════════════════════════════════════════
+  1471→// PROGRESS VIEW (improved chart styling)
+  1472→// ═══════════════════════════════════════════════════════════
+  1473→function ProgressView() {
+  1474→  const [tab, setTab] = useState('weekly');
+  1475→  const [weeklyData, setWeeklyData] = useState<Record<string, unknown>[]>([]);
+  1476→  const [summary, setSummary] = useState<Record<string, unknown> | null>(null);
+  1477→  const [weightLogs, setWeightLogs] = useState<Record<string, unknown>[]>([]);
+  1478→  const [waterGlasses, setWaterGlasses] = useState(0);
+  1479→  const [loading, setLoading] = useState(true);
+  1480→  const [weightInput, setWeightInput] = useState('');
+  1481→  const [weightNotes, setWeightNotes] = useState('');
+  1482→
+  1483→  const fetchProgress = useCallback(async () => {
+  1484→    setLoading(true);
+  1485→    try {
+  1486→      const [weekData, sumData, wLogs, waterData] = await Promise.all([
+  1487→        apiFetch('/api/progress/weekly'),
+  1488→        apiFetch(`/api/progress/summary?period=${tab === 'monthly' ? 'month' : 'week'}`),
+  1489→        apiFetch('/api/weight-log?limit=30'),
+  1490→        apiFetch('/api/water-log'),
+  1491→      ]);
+  1492→      setWeeklyData(weekData || []);
+  1493→      setSummary(sumData?.summary || null);
+  1494→      setWeightLogs(wLogs || []);
+  1495→      setWaterGlasses(waterData?.glassesConsumed || 0);
+  1496→    } catch { toast.error('Failed to load progress'); }
+  1497→    finally { setLoading(false); }
+  1498→  }, [tab]);
+  1499→
+  1500→  useEffect(() => { fetchProgress(); }, [fetchProgress]);
+  1501→
+  1502→  const handleAddWater = async (delta: number) => {
+  1503→    const newCount = waterGlasses + delta;
+  1504→    if (newCount < 0) return;
+  1505→    if (delta > 0) {
+  1506→      try {
+  1507→        await apiFetch('/api/water-log', { method: 'POST', body: JSON.stringify({ glasses: delta }) });
+  1508→        setWaterGlasses(newCount);
+  1509→        toast.success(`\uD83D\uDCA7 +${delta} glass${delta > 1 ? 'es' : ''} of water`);
+  1510→      } catch { toast.error('Failed to log water'); }
+  1511→    } else {
+  1512→      setWaterGlasses(Math.max(0, newCount));
+  1513→    }
+  1514→  };
+  1515→
+  1516→  const handleLogWeight = async () => {
+  1517→    if (!weightInput || Number(weightInput) <= 0) return;
+  1518→    try {
+  1519→      await apiFetch('/api/weight-log', { method: 'POST', body: JSON.stringify({ weightKg: Number(weightInput), notes: weightNotes || null }) });
+  1520→      toast.success('Weight logged!');
+  1521→      setWeightInput('');
+  1522→      setWeightNotes('');
+  1523→      fetchProgress();
+  1524→    } catch (err) { toast.error((err as Error).message); }
+  1525→  };
+  1526→
+  1527→  const chartData = weeklyData.map((d) => {
+  1528→    const consumed = d.consumed as Record<string, number>;
+  1529→    const targets = d.targets as Record<string, number> | null;
+  1530→    return {
+  1531→      date: format(parseISO(d.date as string), 'EEE'),
+  1532→      calories: consumed?.calories || 0,
+  1533→      target: targets?.calories || 0,
+  1534→    };
+  1535→  });
+  1536→
+  1537→  const macroData = [
+  1538→    { name: 'Protein', value: summary?.avgProtein || 0, color: PIE_COLORS[0] },
+  1539→    { name: 'Carbs', value: summary?.avgCarbs || 0, color: PIE_COLORS[1] },
+  1540→    { name: 'Fat', value: summary?.avgFat || 0, color: PIE_COLORS[2] },
+  1541→  ];
+  1542→
+  1543→  const weightChartData = weightLogs.slice().reverse().slice(-7).map((w) => ({
+  1544→    date: format(parseISO(w.logDate as string), 'MMM d'),
+  1545→    weight: w.weightKg as number,
+  1546→  }));
+  1547→
+  1548→  if (loading) {
+  1549→    return (
+  1550→      <div className="p-4 max-w-lg mx-auto space-y-4">
+  1551→        <Skeleton className="h-8 w-32 rounded-xl" />
+  1552→        <Skeleton className="h-64 w-full rounded-xl" />
+  1553→        <div className="grid grid-cols-2 gap-4"><Skeleton className="h-28 w-full rounded-xl" /><Skeleton className="h-28 w-full rounded-xl" /></div>
+  1554→      </div>
+  1555→    );
+  1556→  }
+  1557→
+  1558→  return (
+  1559→    <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-4">
+  1560→      <div className="flex items-center gap-2">
+  1561→        <TrendingUp className="h-5 w-5 text-emerald-600" />
+  1562→        <h1 className="text-xl font-bold text-gray-900">Progress</h1>
+  1563→      </div>
+  1564→
+  1565→      <Tabs value={tab} onValueChange={setTab}>
+  1566→        <TabsList className="w-full rounded-xl">
+  1567→          <TabsTrigger value="weekly" className="flex-1 rounded-lg">Weekly</TabsTrigger>
+  1568→          <TabsTrigger value="monthly" className="flex-1 rounded-lg">Monthly</TabsTrigger>
+  1569→        </TabsList>
+  1570→      </Tabs>
+  1571→
+  1572→      {/* Calorie Chart - improved with gradient */}
+  1573→      <Card className="p-4 rounded-xl shadow-sm">
+  1574→        <h3 className="text-sm font-semibold text-gray-700 mb-3">Calorie Intake</h3>
+  1575→        <div className="h-48">
+  1576→          <ResponsiveContainer width="100%" height="100%">
+  1577→            <BarChart data={chartData} barCategoryGap="20%">
+  1578→              <XAxis dataKey="date" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+  1579→              <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+  1580→              <Tooltip
+  1581→                contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+  1582→              />
+  1583→              <defs>
+  1584→                <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+  1585→                  <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
+  1586→                  <stop offset="100%" stopColor="#34d399" stopOpacity={0.8} />
+  1587→                </linearGradient>
+  1588→              </defs>
+  1589→              <Bar dataKey="calories" fill="url(#barGrad)" radius={[6, 6, 0, 0]} name="Consumed" />
+  1590→              <Bar dataKey="target" fill="#e5e7eb" radius={[6, 6, 0, 0]} name="Target" />
+  1591→            </BarChart>
+  1592→          </ResponsiveContainer>
+  1593→        </div>
+  1594→      </Card>
+  1595→
+  1596→      {/* Macro Pie + Weight Trend */}
+  1597→      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  1598→        <Card className="p-4 rounded-xl shadow-sm">
+  1599→          <h3 className="text-sm font-semibold text-gray-700 mb-2">Macro Breakdown</h3>
+  1600→          <div className="h-40">
+  1601→            <ResponsiveContainer width="100%" height="100%">
+  1602→              <PieChart>
+  1603→                <Pie data={macroData} cx="50%" cy="50%" innerRadius={35} outerRadius={55} dataKey="value" label={({ name, value }) => `${name}: ${value}g`} strokeWidth={2}>
+  1604→                  {macroData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+  1605→                </Pie>
+  1606→                <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb' }} />
+  1607→              </PieChart>
+  1608→            </ResponsiveContainer>
+  1609→          </div>
+  1610→        </Card>
+  1611→        <Card className="p-4 rounded-xl shadow-sm">
+  1612→          <h3 className="text-sm font-semibold text-gray-700 mb-2">Weight Trend</h3>
+  1613→          {weightChartData.length > 1 ? (
+  1614→            <div className="h-40">
+  1615→              <ResponsiveContainer width="100%" height="100%">
+  1616→                <LineChart data={weightChartData}>
+  1617→                  <XAxis dataKey="date" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+  1618→                  <YAxis domain={['dataMin - 1', 'dataMax + 1']} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+  1619→                  <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb' }} />
+  1620→                  <Line type="monotone" dataKey="weight" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 5 }} />
+  1621→                </LineChart>
+  1622→              </ResponsiveContainer>
+  1623→            </div>
+  1624→          ) : (
+  1625→            <div className="h-40 flex items-center justify-center text-gray-400 text-sm">Log at least 2 weights to see trend</div>
+  1626→          )}
+  1627→        </Card>
+  1628→      </div>
+  1629→
+  1630→      {/* Stats Cards with icons */}
+  1631→      <div className="grid grid-cols-2 gap-3">
+  1632→        {[
+  1633→          { label: 'Avg Daily Calories', value: `${summary?.avgCalories || 0}`, icon: Flame, color: 'text-orange-500', bg: 'bg-orange-50' },
+  1634→          { label: 'Avg Protein', value: `${summary?.avgProtein || 0}g`, icon: Dumbbell, color: 'text-blue-500', bg: 'bg-blue-50' },
+  1635→          { label: 'Weight Change', value: `${(summary?.weightChange as number) >= 0 ? '+' : ''}${summary?.weightChange ?? 'N/A'}kg`, icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+  1636→          { label: 'Current Weight', value: `${summary?.currentWeight ?? 'N/A'}kg`, icon: Scale, color: 'text-purple-500', bg: 'bg-purple-50' },
+  1637→        ].map((s) => (
+  1638→          <Card key={s.label} className="p-4 rounded-xl shadow-sm">
+  1639→            <div className="flex items-center gap-2.5 mb-2">
+  1640→              <div className={`w-8 h-8 ${s.bg} rounded-lg flex items-center justify-center`}>
+  1641→                <s.icon className={`h-4 w-4 ${s.color}`} />
+  1642→              </div>
+  1643→              <span className="text-xs text-gray-500 font-medium">{s.label}</span>
+  1644→            </div>
+  1645→            <p className="text-lg font-bold text-gray-900">{s.value}</p>
+  1646→          </Card>
+  1647→        ))}
+  1648→      </div>
+  1649→
+  1650→      {/* Water Tracking */}
+  1651→      <Card className="p-4 rounded-xl shadow-sm">
+  1652→        <div className="flex items-center justify-between mb-3">
+  1653→          <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+  1654→            <Droplets className="h-4 w-4 text-blue-500" /> Water Intake
+  1655→          </h3>
+  1656→          <span className="text-sm font-bold text-blue-600">{waterGlasses}/8 glasses</span>
+  1657→        </div>
+  1658→        <div className="flex items-center justify-center gap-4">
+  1659→          <Button size="icon" variant="outline" className="h-11 w-11 rounded-xl" onClick={() => handleAddWater(-1)} disabled={waterGlasses <= 0}>
+  1660→            <Minus className="h-4 w-4" />
+  1661→          </Button>
+  1662→          <div className="flex gap-1.5 flex-wrap justify-center">
+  1663→            {Array.from({ length: 8 }, (_, i) => (
+  1664→              <motion.div
+  1665→                key={i}
+  1666→                className={`w-6 h-8 rounded-md border-2 transition-colors ${i < waterGlasses ? 'bg-blue-400 border-blue-500' : 'bg-gray-100 border-gray-200'}`}
+  1667→                animate={i < waterGlasses ? { scale: [1, 1.1, 1] } : {}}
+  1668→                transition={{ duration: 0.3, delay: i * 0.05 }}
+  1669→              />
+  1670→            ))}
+  1671→          </div>
+  1672→          <Button size="icon" className="h-11 w-11 bg-blue-500 hover:bg-blue-600 rounded-xl" onClick={() => handleAddWater(1)} disabled={waterGlasses >= 16}>
+  1673→            <Plus className="h-4 w-4" />
+  1674→          </Button>
+  1675→        </div>
+  1676→      </Card>
+  1677→
+  1678→      {/* Weight Logging */}
+  1679→      <Card className="p-4 rounded-xl shadow-sm">
+  1680→        <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+  1681→          <Scale className="h-4 w-4 text-purple-500" /> Log Weight
+  1682→        </h3>
+  1683→        <div className="flex gap-2">
+  1684→          <Input type="number" placeholder="Weight (kg)" value={weightInput} onChange={(e) => setWeightInput(e.target.value)} className="flex-1 h-11 rounded-xl" />
+  1685→          <Input placeholder="Notes" value={weightNotes} onChange={(e) => setWeightNotes(e.target.value)} className="flex-1 h-11 rounded-xl" />
+  1686→          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl" onClick={handleLogWeight} disabled={!weightInput}>Log</Button>
+  1687→        </div>
+  1688→        {weightLogs.length > 0 && (
+  1689→          <div className="mt-3 space-y-1">
+  1690→            <p className="text-xs text-gray-500 font-medium">Recent Entries</p>
+  1691→            {weightLogs.slice(0, 5).map((w) => (
+  1692→              <div key={w.id as string} className="flex justify-between text-xs text-gray-600 py-1.5 border-b border-gray-50 last:border-0">
+  1693→                <span>{format(parseISO(w.logDate as string), 'MMM d, yyyy')}</span>
+  1694→                <span className="font-semibold">{w.weightKg as number} kg</span>
+  1695→              </div>
+  1696→            ))}
+  1697→          </div>
+  1698→        )}
+  1699→      </Card>
+  1700→    </motion.div>
+  1701→  );
+  1702→}
+  1703→
+  1704→// ═══════════════════════════════════════════════════════════
+  1705→// SETTINGS VIEW (with section separators)
+  1706→// ═══════════════════════════════════════════════════════════
+  1707→function SettingsView({ onLogout }: { onLogout: () => void }) {
+  1708→  const [user, setUser] = useState<Record<string, unknown> | null>(null);
+  1709→  const [loading, setLoading] = useState(true);
+  1710→  const [saving, setSaving] = useState(false);
+  1711→  const [profile, setProfile] = useState({ firstName: '', lastName: '', age: '', gender: 'male', heightCm: '', weightKg: '' });
+  1712→  const [goals, setGoals] = useState({ goalType: 'maintain', activityLevel: 'moderately_active', targetWeightKg: '' });
+  1713→  const [prefs, setPrefs] = useState<{ cuisinePreference: string; dietType: string; allergies: string[] }>({ cuisinePreference: 'Mixed', dietType: 'non-veg', allergies: [] });
+  1714→
+  1715→  const fetchUser = useCallback(async () => {
+  1716→    try {
+  1717→      const me = await apiFetch('/api/auth/me');
+  1718→      setUser(me);
+  1719→      const p = me.profile as Record<string, unknown> | null;
+  1720→      if (p) setProfile({ firstName: (p.firstName as string) || '', lastName: (p.lastName as string) || '', age: p.age ? String(p.age) : '', gender: (p.gender as string) || 'male', heightCm: p.heightCm ? String(p.heightCm) : '', weightKg: p.weightKg ? String(p.weightKg) : '' });
+  1721→      const g = me.goal as Record<string, unknown> | null;
+  1722→      if (g) setGoals({ goalType: (g.goalType as string) || 'maintain', activityLevel: (g.activityLevel as string) || 'moderately_active', targetWeightKg: g.targetWeightKg ? String(g.targetWeightKg) : '' });
+  1723→      const pr = me.preference as Record<string, unknown> | null;
+  1724→      if (pr) setPrefs({ cuisinePreference: (pr.cuisinePreference as string) || 'Mixed', dietType: (pr.dietType as string) || 'non-veg', allergies: (me.allergies as string[]) || [] });
+  1725→    } catch { toast.error('Failed to load settings'); }
+  1726→    finally { setLoading(false); }
+  1727→  }, []);
+  1728→
+  1729→  useEffect(() => { fetchUser(); }, [fetchUser]);
+  1730→
+  1731→  const toggleAllergy = (a: string) => {
+  1732→    setPrefs((p) => ({ ...p, allergies: p.allergies.includes(a) ? p.allergies.filter((x) => x !== a) : [...p.allergies, a] }));
+  1733→  };
+  1734→
+  1735→  const saveProfile = async () => {
+  1736→    setSaving(true);
+  1737→    try {
+  1738→      await apiFetch('/api/users/profile', { method: 'PUT', body: JSON.stringify({ firstName: profile.firstName || null, lastName: profile.lastName || null, age: profile.age ? Number(profile.age) : null, gender: profile.gender, heightCm: profile.heightCm ? Number(profile.heightCm) : null, weightKg: profile.weightKg ? Number(profile.weightKg) : null }) });
+  1739→      toast.success('Profile saved');
+  1740→    } catch (err) { toast.error((err as Error).message); }
+  1741→    finally { setSaving(false); }
+  1742→  };
+  1743→
+  1744→  const saveGoals = async () => {
+  1745→    setSaving(true);
+  1746→    try {
+  1747→      await apiFetch('/api/users/goals', { method: 'PUT', body: JSON.stringify({ goalType: goals.goalType, activityLevel: goals.activityLevel, targetWeightKg: goals.targetWeightKg ? Number(goals.targetWeightKg) : null }) });
+  1748→      toast.success('Goals updated');
+  1749→    } catch (err) { toast.error((err as Error).message); }
+  1750→    finally { setSaving(false); }
+  1751→  };
+  1752→
+  1753→  const savePrefs = async () => {
+  1754→    setSaving(true);
+  1755→    try {
+  1756→      await apiFetch('/api/onboarding/complete', { method: 'POST', body: JSON.stringify({ goalType: goals.goalType, activityLevel: goals.activityLevel, cuisinePreference: prefs.cuisinePreference, dietType: prefs.dietType, allergies: prefs.allergies }) });
+  1757→      toast.success('Preferences saved');
+  1758→    } catch (err) { toast.error((err as Error).message); }
+  1759→    finally { setSaving(false); }
+  1760→  };
+  1761→
+  1762→  const bmi = profile.heightCm && profile.weightKg ? (Number(profile.weightKg) / ((Number(profile.heightCm) / 100) ** 2)).toFixed(1) : null;
+  1763→  const bmiCategory = bmi
+  1764→    ? Number(bmi) < 18.5 ? { label: 'Underweight', color: 'bg-yellow-100 text-yellow-700' }
+  1765→      : Number(bmi) < 25 ? { label: 'Normal', color: 'bg-green-100 text-green-700' }
+  1766→      : Number(bmi) < 30 ? { label: 'Overweight', color: 'bg-orange-100 text-orange-700' }
+  1767→      : { label: 'Obese', color: 'bg-red-100 text-red-700' }
+  1768→    : null;
+  1769→
+  1770→  if (loading) {
+  1771→    return (
+  1772→      <div className="p-4 max-w-lg mx-auto space-y-4">
+  1773→        <Skeleton className="h-8 w-32 rounded-xl" />
+  1774→        <Skeleton className="h-64 w-full rounded-xl" />
+  1775→        <Skeleton className="h-48 w-full rounded-xl" />
+  1776→      </div>
+  1777→    );
+  1778→  }
+  1779→
+  1780→  return (
+  1781→    <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-4">
+  1782→      <div className="flex items-center gap-2">
+  1783→        <Settings className="h-5 w-5 text-emerald-600" />
+  1784→        <h1 className="text-xl font-bold text-gray-900">Settings</h1>
+  1785→      </div>
+  1786→
+  1787→      {/* Profile Section */}
+  1788→      <Card className="p-4 rounded-xl shadow-sm">
+  1789→        <CardHeader className="p-0 pb-3">
+  1790→          <CardTitle className="text-base flex items-center gap-2"><User className="h-4 w-4 text-emerald-600" />Profile</CardTitle>
+  1791→        </CardHeader>
+  1792→        <Separator className="mb-3" />
+  1793→        <div className="space-y-3">
+  1794→          <div className="grid grid-cols-2 gap-3">
+  1795→            <div className="space-y-1.5"><Label className="text-xs font-medium">First Name</Label><Input className="h-10 rounded-xl" value={profile.firstName} onChange={(e) => setProfile((p) => ({ ...p, firstName: e.target.value }))} /></div>
+  1796→            <div className="space-y-1.5"><Label className="text-xs font-medium">Last Name</Label><Input className="h-10 rounded-xl" value={profile.lastName} onChange={(e) => setProfile((p) => ({ ...p, lastName: e.target.value }))} /></div>
+  1797→          </div>
+  1798→          <div className="grid grid-cols-3 gap-3">
+  1799→            <div className="space-y-1.5"><Label className="text-xs font-medium">Age</Label><Input type="number" className="h-10 rounded-xl" value={profile.age} onChange={(e) => setProfile((p) => ({ ...p, age: e.target.value }))} /></div>
+  1800→            <div className="space-y-1.5"><Label className="text-xs font-medium">Height (cm)</Label><Input type="number" className="h-10 rounded-xl" value={profile.heightCm} onChange={(e) => setProfile((p) => ({ ...p, heightCm: e.target.value }))} /></div>
+  1801→            <div className="space-y-1.5"><Label className="text-xs font-medium">Weight (kg)</Label><Input type="number" className="h-10 rounded-xl" value={profile.weightKg} onChange={(e) => setProfile((p) => ({ ...p, weightKg: e.target.value }))} /></div>
+  1802→          </div>
+  1803→          <div className="space-y-1.5">
+  1804→            <Label className="text-xs font-medium">Gender</Label>
+  1805→            <RadioGroup value={profile.gender} onValueChange={(v) => setProfile((p) => ({ ...p, gender: v }))} className="flex gap-4">
+  1806→              {['male', 'female', 'other'].map((g) => (
+  1807→                <div key={g} className="flex items-center gap-2">
+  1808→                  <RadioGroupItem value={g} id={`s-${g}`} />
+  1809→                  <Label htmlFor={`s-${g}`} className="font-normal text-sm capitalize">{g}</Label>
+  1810→                </div>
+  1811→              ))}
+  1812→            </RadioGroup>
+  1813→          </div>
+  1814→          {bmi && bmiCategory && (
+  1815→            <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2.5">
+  1816→              <span className="text-sm text-gray-600">BMI: <b>{bmi}</b></span>
+  1817→              <Badge className={bmiCategory.color}>{bmiCategory.label}</Badge>
+  1818→            </div>
+  1819→          )}
+  1820→          <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold" onClick={saveProfile} disabled={saving}>
+  1821→            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Profile
+  1822→          </Button>
+  1823→        </div>
+  1824→      </Card>
+  1825→
+  1826→      {/* Goal Section */}
+  1827→      <Card className="p-4 rounded-xl shadow-sm">
+  1828→        <CardHeader className="p-0 pb-3">
+  1829→          <CardTitle className="text-base flex items-center gap-2"><Target className="h-4 w-4 text-emerald-600" />Goals</CardTitle>
+  1830→        </CardHeader>
+  1831→        <Separator className="mb-3" />
+  1832→        <div className="space-y-3">
+  1833→          <div className="space-y-1.5">
+  1834→            <Label className="text-xs font-medium">Goal Type</Label>
+  1835→            <Select value={goals.goalType} onValueChange={(v) => setGoals((g) => ({ ...g, goalType: v }))}>
+  1836→              <SelectTrigger className="h-10 rounded-xl"><SelectValue /></SelectTrigger>
+  1837→              <SelectContent>{['muscle_gain', 'lose_fat', 'maintain', 'recomp', 'weight_gain', 'athlete'].map((g) => <SelectItem key={g} value={g}>{g.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}</SelectItem>)}</SelectContent>
+  1838→            </Select>
+  1839→          </div>
+  1840→          <div className="space-y-1.5">
+  1841→            <Label className="text-xs font-medium">Activity Level</Label>
+  1842→            <Select value={goals.activityLevel} onValueChange={(v) => setGoals((g) => ({ ...g, activityLevel: v }))}>
+  1843→              <SelectTrigger className="h-10 rounded-xl"><SelectValue /></SelectTrigger>
+  1844→              <SelectContent>{['sedentary', 'lightly_active', 'moderately_active', 'very_active', 'extra_active'].map((a) => <SelectItem key={a} value={a}>{a.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}</SelectItem>)}</SelectContent>
+  1845→            </Select>
+  1846→          </div>
+  1847→          <div className="space-y-1.5"><Label className="text-xs font-medium">Target Weight (kg)</Label><Input type="number" className="h-10 rounded-xl" value={goals.targetWeightKg} onChange={(e) => setGoals((g) => ({ ...g, targetWeightKg: e.target.value }))} /></div>
+  1848→          <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold" onClick={saveGoals} disabled={saving}>
+  1849→            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Goals
+  1850→          </Button>
+  1851→        </div>
+  1852→      </Card>
+  1853→
+  1854→      {/* Preferences Section */}
+  1855→      <Card className="p-4 rounded-xl shadow-sm">
+  1856→        <CardHeader className="p-0 pb-3">
+  1857→          <CardTitle className="text-base flex items-center gap-2"><Sparkles className="h-4 w-4 text-emerald-600" />Preferences</CardTitle>
+  1858→        </CardHeader>
+  1859→        <Separator className="mb-3" />
+  1860→        <div className="space-y-3">
+  1861→          <div className="space-y-1.5">
+  1862→            <Label className="text-xs font-medium">Cuisine Preference</Label>
+  1863→            <Select value={prefs.cuisinePreference} onValueChange={(v) => setPrefs((p) => ({ ...p, cuisinePreference: v }))}>
+  1864→              <SelectTrigger className="h-10 rounded-xl"><SelectValue /></SelectTrigger>
+  1865→              <SelectContent>{['Indian', 'Chinese', 'Italian', 'American', 'Mexican', 'Mediterranean', 'Japanese', 'Thai', 'Mixed'].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+  1866→            </Select>
+  1867→          </div>
+  1868→          <div className="space-y-1.5">
+  1869→            <Label className="text-xs font-medium">Diet Type</Label>
+  1870→            <Select value={prefs.dietType} onValueChange={(v) => setPrefs((p) => ({ ...p, dietType: v }))}>
+  1871→              <SelectTrigger className="h-10 rounded-xl"><SelectValue /></SelectTrigger>
+  1872→              <SelectContent>{['non-veg', 'vegetarian', 'vegan', 'eggetarian'].map((d) => <SelectItem key={d} value={d}>{d === 'non-veg' ? 'Non-Vegetarian' : d === 'vegan' ? 'Vegan' : d === 'vegetarian' ? 'Vegetarian' : 'Eggetarian'}</SelectItem>)}</SelectContent>
+  1873→            </Select>
+  1874→          </div>
+  1875→          <div className="space-y-1.5">
+  1876→            <Label className="text-xs font-medium">Allergies</Label>
+  1877→            <div className="grid grid-cols-2 gap-2">
+  1878→              {ALLERGENS.map((a) => (
+  1879→                <label key={a} className="flex items-center gap-2 p-2.5 rounded-xl border border-gray-200 cursor-pointer hover:bg-emerald-50/50 hover:border-emerald-200 transition-colors min-h-[44px]">
+  1880→                  <Checkbox checked={prefs.allergies.includes(a)} onCheckedChange={() => toggleAllergy(a)} />
+  1881→                  <span className="text-sm">{a}</span>
+  1882→                </label>
+  1883→              ))}
+  1884→            </div>
+  1885→          </div>
+  1886→          <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold" onClick={savePrefs} disabled={saving}>
+  1887→            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Preferences
+  1888→          </Button>
+  1889→        </div>
+  1890→      </Card>
+  1891→
+  1892→      {/* Logout */}
+  1893→      <Button variant="outline" className="w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600 min-h-[44px] rounded-xl font-medium" onClick={onLogout}>
+  1894→        <LogOut className="mr-2 h-4 w-4" />Log Out
+  1895→      </Button>
+  1896→    </motion.div>
+  1897→  );
+  1898→}
+  1899→
