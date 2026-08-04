@@ -25,14 +25,14 @@ export function NutritionFactsLabel({
 
   return (
     <div className="border-2 border-gray-800 rounded-lg p-0 bg-white">
-      <div className="px-3 py-2 border-b-2 border-gray-800">
+      <div className="px-3 py-2.5 border-b-[3px] border-gray-800">
         <h4 className="text-lg font-extrabold text-gray-900 tracking-tight">Nutrition Facts</h4>
       </div>
       <div className="px-3 py-1.5 border-b border-gray-300 flex justify-between">
         <span className="text-sm font-medium text-gray-700">Serving Size</span>
         <span className="text-sm font-bold text-gray-900">{servingGms}g</span>
       </div>
-      <div className="px-3 py-1.5 border-b-2 border-gray-800 flex justify-between">
+      <div className="px-3 py-2 border-b-2 border-gray-800 flex justify-between">
         <span className="text-sm font-medium text-gray-700">{label || 'Per Serving'}</span>
         <span className="text-sm font-bold text-gray-900">{scaled.calories} kcal</span>
       </div>
@@ -90,11 +90,11 @@ export function CalorieRing({ consumed, target }: { consumed: number; target: nu
       {/* Pulsing glow ring when under 50% */}
       {isLow && (
         <motion.div
-          className="absolute w-[180px] h-[180px] rounded-full"
+          className="absolute w-[180px] h-[180px] rounded-full ring-2 ring-emerald-300/20"
           style={{
             background: 'radial-gradient(circle, rgba(16,185,129,0.15) 0%, transparent 70%)',
           }}
-          animate={{ scale: [1, 1.15, 1], opacity: [0.5, 1, 0.5] }}
+          animate={{ scale: [1, 1.15, 1], opacity: [0.4, 1, 0.4] }}
           transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
         />
       )}
@@ -128,7 +128,7 @@ export function CalorieRing({ consumed, target }: { consumed: number; target: nu
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <Flame className={`h-5 w-5 mb-1 ${pct > 1 ? 'text-rose-500' : 'text-orange-500'}`} />
-        <span className="text-2xl font-bold text-gray-900">{consumed}</span>
+        <span className="text-3xl font-bold text-gray-900">{consumed}</span>
         <span className="text-xs text-gray-500">of {target} kcal</span>
         <span className={`text-xs font-semibold mt-1 ${pct >= 1 ? 'text-rose-600' : 'text-emerald-600'}`}>{pct >= 1 ? 'Goal reached!' : `${remaining} left`}</span>
       </div>

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { Home, List, Camera, BarChart3, Settings } from 'lucide-react';
+import { Home, List, Camera, MessageSquare, BarChart3, Settings } from 'lucide-react';
 import { getToken, clearToken, apiFetch } from '@/components/nutriai/api';
 import type { ViewType, TabType } from '@/components/nutriai/types';
 import { AuthView } from '@/components/nutriai/AuthView';
@@ -13,6 +13,7 @@ import { FoodLogView } from '@/components/nutriai/FoodLogView';
 import { UploadView } from '@/components/nutriai/UploadView';
 import { ProgressView } from '@/components/nutriai/ProgressView';
 import { SettingsView } from '@/components/nutriai/SettingsView';
+import { ChatView } from '@/components/nutriai/ChatView';
 
 export default function NutriAIPage() {
   const [view, setView] = useState<ViewType>('auth');
@@ -60,6 +61,7 @@ export default function NutriAIPage() {
           {view === 'dashboard' && <DashboardView key="dashboard" onNavigate={setView} />}
           {view === 'foodlog' && <FoodLogView key="foodlog" />}
           {view === 'upload' && <UploadView key="upload" />}
+          {view === 'chat' && <ChatView key="chat" onNavigate={setView} />}
           {view === 'progress' && <ProgressView key="progress" />}
           {view === 'settings' && <SettingsView key="settings" onLogout={handleLogout} />}
         </AnimatePresence>
@@ -72,6 +74,7 @@ export default function NutriAIPage() {
               { tab: 'dashboard' as TabType, icon: Home, label: 'Home' },
               { tab: 'foodlog' as TabType, icon: List, label: 'Log' },
               { tab: 'upload' as TabType, icon: Camera, label: 'Scan' },
+              { tab: 'chat' as TabType, icon: MessageSquare, label: 'Chat' },
               { tab: 'progress' as TabType, icon: BarChart3, label: 'Progress' },
               { tab: 'settings' as TabType, icon: Settings, label: 'Settings' },
             ]).map(({ tab, icon: Icon, label }) => (

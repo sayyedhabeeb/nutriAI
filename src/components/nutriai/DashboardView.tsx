@@ -229,13 +229,13 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
   return (
     <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-4">
       {/* ═══ Hero Section with gradient bg & decorative blobs ═══ */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500/5 to-teal-500/5 p-5 border border-emerald-100/50">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500/5 to-teal-500/5 p-5 border border-emerald-100/50 backdrop-blur-sm">
         <div className="absolute -top-8 -right-8 w-24 h-24 bg-emerald-200/20 rounded-full blur-2xl" />
         <div className="absolute -bottom-6 -left-6 w-20 h-20 bg-teal-200/20 rounded-full blur-2xl" />
         <div className="absolute top-1/2 right-1/4 w-12 h-12 bg-green-200/10 rounded-full blur-xl" />
         <div className="relative flex items-start justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Hi, {firstName}! {'\uD83D\uDC4B'}</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Hi, {firstName}! {'\uD83D\uDC4B'}</h1>
             <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-500">
               <CalendarIcon className="h-3.5 w-3.5" />
               <span>{todayStr}</span>
@@ -255,7 +255,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
       </div>
 
       {/* ═══ Calorie Ring Card ═══ */}
-      <Card className="p-6 rounded-xl shadow-sm">
+      <Card className="p-6 rounded-2xl shadow-sm border border-gray-100/80">
         <div className="flex justify-center">
           <CalorieRing consumed={consumedCal} target={targetCal} />
         </div>
@@ -267,7 +267,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
       </Card>
 
       {/* ═══ Macro Progress Bars ═══ */}
-      <Card className="p-4 rounded-xl shadow-sm space-y-3">
+      <Card className="p-4 rounded-2xl shadow-sm border border-gray-100/80 space-y-3">
         <h3 className="text-sm font-semibold text-gray-700">Today&apos;s Macros</h3>
         {[
           { label: 'Protein', val: consumedProtein, target: targetProtein, from: '#3b82f6', to: '#60a5fa', unit: 'g' },
@@ -277,11 +277,11 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
           const pct = Math.min(Math.round((m.val / (m.target || 1)) * 100), 100);
           return (
             <div key={m.label}>
-              <div className="flex justify-between text-xs mb-1.5">
-                <span className="text-gray-600 font-medium">{m.label}</span>
-                <span className="text-gray-500">{m.val}{m.unit} / {m.target}{m.unit} &middot; {pct}%</span>
+              <div className="flex justify-between mb-1.5">
+                <span className="text-sm text-gray-600 font-medium">{m.label}</span>
+                <span className="text-xs text-gray-600 font-medium">{m.val}{m.unit} / {m.target}{m.unit} &middot; {pct}%</span>
               </div>
-              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                 <motion.div
                   className="h-full rounded-full"
                   style={{ background: `linear-gradient(90deg, ${m.from}, ${m.to})` }}
@@ -301,9 +301,9 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
       >
-        <Card className={`p-4 rounded-xl shadow-sm border-l-4 ${pctConsumed > 1 ? 'border-l-amber-500' : pctConsumed >= 0.75 ? 'border-l-emerald-500' : 'border-l-blue-500'}`}>
+        <Card className={`p-4 rounded-2xl shadow-sm border border-gray-100/80 ${pctConsumed > 1 ? 'bg-amber-50/50' : pctConsumed >= 0.75 ? 'bg-emerald-50/50' : 'bg-blue-50/50'}`}>
           <div className="flex items-start gap-3">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${pctConsumed > 1 ? 'bg-amber-50' : pctConsumed >= 0.75 ? 'bg-emerald-50' : 'bg-blue-50'}`}>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${pctConsumed > 1 ? 'bg-amber-100/80' : pctConsumed >= 0.75 ? 'bg-emerald-100/80' : 'bg-blue-100/80'}`}>
               <Lightbulb className={`h-4.5 w-4.5 ${pctConsumed > 1 ? 'text-amber-500' : pctConsumed >= 0.75 ? 'text-emerald-500' : 'text-blue-500'}`} />
             </div>
             <div className="flex-1 min-w-0 space-y-2">
@@ -351,7 +351,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
       >
-        <Card className="p-4 rounded-xl shadow-sm bg-gradient-to-r from-emerald-500/5 to-teal-500/5 border border-emerald-100/50">
+        <Card className="p-4 rounded-2xl shadow-sm border border-gray-100/80 bg-gradient-to-r from-emerald-500/5 to-teal-500/5">
           {!mealPlan?.exists ? (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -423,11 +423,11 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                                   <div className="flex-1 min-w-0">
                                     <p className="text-xs font-medium text-gray-800 truncate">{item.meal.name}</p>
                                     <div className="flex items-center gap-1.5 mt-0.5">
-                                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium border-gray-200 text-gray-500">{item.meal.cuisine}</Badge>
-                                      <span className="text-[10px] text-gray-400">{item.servingGms}g</span>
+                                      <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 font-medium border-gray-200 text-gray-500">{item.meal.cuisine}</Badge>
+                                      <span className="text-xs text-gray-400">{item.servingGms}g</span>
                                     </div>
                                     {item.nutrition && (
-                                      <div className="flex gap-2 mt-0.5 text-[10px] text-gray-500">
+                                      <div className="flex gap-2 mt-0.5 text-xs text-gray-500">
                                         <span className="text-orange-600 font-medium">{item.nutrition.calories} kcal</span>
                                         <span>P: {item.nutrition.proteinG}g</span>
                                         <span>C: {item.nutrition.carbsG}g</span>
@@ -437,7 +437,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                                   </div>
                                   <Button
                                     size="sm"
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] min-h-[30px] rounded-lg px-2.5 shrink-0"
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold min-h-[30px] rounded-lg px-2.5 shrink-0"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setServingGms(item.servingGms);
@@ -522,12 +522,12 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium border-gray-200 text-gray-500">{rec.meal.cuisine}</Badge>
+                      <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 font-medium border-gray-200 text-gray-500">{rec.meal.cuisine}</Badge>
                       {rec.meal.prepTimeMin && (
-                        <span className="text-[10px] text-gray-400 flex items-center gap-0.5"><Clock className="h-3 w-3" />{rec.meal.prepTimeMin}m</span>
+                        <span className="text-xs text-gray-400 flex items-center gap-0.5"><Clock className="h-3 w-3" />{rec.meal.prepTimeMin}m</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] text-gray-500">
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
                       <span className="font-medium text-gray-700">{rec.baseNutritionPer100g?.calories || 0} kcal/100g</span>
                       <span>&middot;</span>
                       <span>P: {rec.baseNutritionPer100g?.proteinG || 0}g</span>
@@ -537,7 +537,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                     </div>
                     <Button
                       size="sm"
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs min-h-[32px] rounded-lg mt-1 font-medium"
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold min-h-[32px] rounded-lg mt-1"
                       onClick={(e) => {
                         e.stopPropagation();
                         setServingGms(rec.recommendedServingGms);
@@ -561,21 +561,32 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
       </div>
 
       {/* ═══ FAB buttons ═══ */}
-      <div className="fixed bottom-20 right-4 z-40 flex flex-col gap-2">
-        <Button size="icon" className="w-12 h-12 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg" onClick={handleWaterAdd}>
-          <Droplets className="h-5 w-5" />
-        </Button>
-        <Button size="icon" className="w-12 h-12 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg" onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot: 'lunch' }); }}>
-          <Search className="h-5 w-5" />
-        </Button>
-        <Button size="icon" className="w-12 h-12 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg" onClick={() => onNavigate('upload')}>
-          <Camera className="h-5 w-5" />
-        </Button>
+      <div className="fixed bottom-20 right-4 z-40 flex flex-col items-end gap-2">
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-2 group">
+            <span className="text-xs text-gray-600 font-medium bg-white/90 backdrop-blur-sm border border-gray-200/50 px-2.5 py-1 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Add Water</span>
+            <Button size="icon" className="w-11 h-11 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg" onClick={handleWaterAdd}>
+              <Droplets className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex items-center gap-2 group">
+            <span className="text-xs text-gray-600 font-medium bg-white/90 backdrop-blur-sm border border-gray-200/50 px-2.5 py-1 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Search Meals</span>
+            <Button size="icon" className="w-11 h-11 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg" onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot: 'lunch' }); }}>
+              <Search className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex items-center gap-2 group">
+            <span className="text-xs text-gray-600 font-medium bg-white/90 backdrop-blur-sm border border-gray-200/50 px-2.5 py-1 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Scan Food</span>
+            <Button size="icon" className="w-11 h-11 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg" onClick={() => onNavigate('upload')}>
+              <Camera className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* ═══ Log Meal Dialog ═══ */}
       <Dialog open={logDialog.open} onOpenChange={(open) => setLogDialog(open ? logDialog : { open: false })}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md p-6">
           <DialogHeader>
             <DialogTitle>Log Meal</DialogTitle>
             <DialogDescription className="flex items-center gap-2">
@@ -592,7 +603,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
               <div className="space-y-3">
                 <div className="bg-gray-50 rounded-xl p-3 text-sm space-y-1">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Per 100g</p>
-                  <div className="grid grid-cols-2 gap-1 text-xs">
+                  <div className="grid grid-cols-2 gap-2.5 text-xs">
                     <span className="text-gray-600">Calories:</span><span className="font-bold text-gray-900">{logDialog.baseNutritionPer100g.calories} kcal</span>
                     <span className="text-gray-600">Protein:</span><span className="font-bold text-blue-600">{logDialog.baseNutritionPer100g.proteinG}g</span>
                     <span className="text-gray-600">Carbs:</span><span className="font-bold text-amber-600">{logDialog.baseNutritionPer100g.carbsG}g</span>
@@ -601,7 +612,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                 </div>
                 <div className="bg-emerald-50 rounded-xl p-3 text-sm space-y-1 border border-emerald-100">
                   <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1.5">Estimated for {servingGms}g serving</p>
-                  <div className="grid grid-cols-2 gap-1 text-xs">
+                  <div className="grid grid-cols-2 gap-2.5 text-xs">
                     <span className="text-gray-600">Calories:</span><span className="font-bold text-gray-900">{Math.round((logDialog.baseNutritionPer100g.calories / 100) * servingGms)} kcal</span>
                     <span className="text-gray-600">Protein:</span><span className="font-bold text-blue-600">{Math.round((logDialog.baseNutritionPer100g.proteinG / 100) * servingGms * 10) / 10}g</span>
                     <span className="text-gray-600">Carbs:</span><span className="font-bold text-amber-600">{Math.round((logDialog.baseNutritionPer100g.carbsG / 100) * servingGms * 10) / 10}g</span>
@@ -661,7 +672,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium text-gray-800 truncate">{meal.name}</p>
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium border-gray-200 text-gray-500 shrink-0">{meal.cuisine}</Badge>
+                        <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 font-medium border-gray-200 text-gray-500 shrink-0">{meal.cuisine}</Badge>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
                         <span>{meal.nutrition?.calories || 0} kcal/100g</span>

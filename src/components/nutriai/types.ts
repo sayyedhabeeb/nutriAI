@@ -1,5 +1,5 @@
-export type ViewType = 'auth' | 'onboarding' | 'dashboard' | 'foodlog' | 'upload' | 'progress' | 'settings';
-export type TabType = 'dashboard' | 'foodlog' | 'upload' | 'progress' | 'settings';
+export type ViewType = 'auth' | 'onboarding' | 'dashboard' | 'foodlog' | 'upload' | 'progress' | 'settings' | 'chat';
+export type TabType = 'dashboard' | 'foodlog' | 'upload' | 'chat' | 'progress' | 'settings';
 
 export interface NutritionData {
   targets: { calories: number; proteinG: number; carbsG: number; fatG: number };

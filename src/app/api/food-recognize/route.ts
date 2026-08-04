@@ -1,7 +1,7 @@
 import { db } from '@/lib/db';
 import { getSessionFromRequest } from '@/lib/auth';
 import { created, unauthorized, serverError, error } from '@/lib/response';
-import AI from 'z-ai-web-dev-sdk';
+import ZAI from 'z-ai-web-dev-sdk';
 
 const VISION_PROMPT = `You are a food recognition assistant. Identify cooked food items in this image. Return ONLY JSON: { "foods": [{ "name": "...", "serving_description": "...", "serving_weight_grams": N, "confidence": N.N }] }`;
 
@@ -23,7 +23,8 @@ export async function POST(request: Request) {
     const base64 = buffer.toString('base64');
 
     // Call VLM
-    const result = await AI.chat({
+    const zai = await ZAI.create();
+    const result = await zai.chat.completions.createVision({
       model: 'gpt-4o',
       messages: [
         {

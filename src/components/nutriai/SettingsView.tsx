@@ -4,23 +4,26 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Checkbox } from '@/components/ui/checkbox';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Settings, User, Target, Sparkles, Loader2, LogOut } from 'lucide-react';
+import { Settings, User, Target, Heart, Loader2, LogOut } from 'lucide-react';
 import { apiFetch } from './api';
 import {
   ALLERGENS, CUISINES, GOAL_TYPES, ACTIVITY_LEVELS, DIET_TYPES, DIET_LABELS,
   formatLabel, fadeIn,
 } from './constants';
+
+const GENDER_OPTIONS = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'other', label: 'Other' },
+];
 
 export function SettingsView({ onLogout }: { onLogout: () => void }) {
   const [user, setUser] = useState<Record<string, unknown> | null>(null);
@@ -89,126 +92,180 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
     return (
       <div className="p-4 max-w-lg mx-auto space-y-4">
         <Skeleton className="h-8 w-32 rounded-xl" />
-        <Skeleton className="h-64 w-full rounded-xl" />
-        <Skeleton className="h-48 w-full rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
+        <Skeleton className="h-48 w-full rounded-2xl" />
       </div>
     );
   }
 
   return (
-    <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-4">
-      <div className="flex items-center gap-2">
-        <Settings className="h-5 w-5 text-emerald-600" />
-        <h1 className="text-xl font-bold text-gray-900">Settings</h1>
+    <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-5">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
+          <Settings className="h-5 w-5 text-gray-600" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Settings</h1>
+          <p className="text-xs text-gray-400">Manage your profile and preferences</p>
+        </div>
       </div>
 
-      {/* Profile Section */}
-      <Card className="p-4 rounded-xl shadow-sm">
-        <CardHeader className="p-0 pb-3">
-          <CardTitle className="text-base flex items-center gap-2"><User className="h-4 w-4 text-emerald-600" />Profile</CardTitle>
-        </CardHeader>
-        <Separator className="mb-3" />
-        <div className="space-y-3">
+      {/* ═══ Profile Section ═══ */}
+      <Card className="rounded-2xl shadow-sm border border-gray-100/80 bg-white p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <User className="h-4 w-4 text-emerald-600" />
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Personal Profile</span>
+        </div>
+        <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5"><Label className="text-xs font-medium">First Name</Label><Input className="h-10 rounded-xl" value={profile.firstName} onChange={(e) => setProfile((p) => ({ ...p, firstName: e.target.value }))} /></div>
-            <div className="space-y-1.5"><Label className="text-xs font-medium">Last Name</Label><Input className="h-10 rounded-xl" value={profile.lastName} onChange={(e) => setProfile((p) => ({ ...p, lastName: e.target.value }))} /></div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-gray-500">First Name</Label>
+              <Input className="h-11 rounded-xl" placeholder="e.g., John" value={profile.firstName} onChange={(e) => setProfile((p) => ({ ...p, firstName: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-gray-500">Last Name</Label>
+              <Input className="h-11 rounded-xl" placeholder="e.g., Doe" value={profile.lastName} onChange={(e) => setProfile((p) => ({ ...p, lastName: e.target.value }))} />
+            </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1.5"><Label className="text-xs font-medium">Age</Label><Input type="number" className="h-10 rounded-xl" value={profile.age} onChange={(e) => setProfile((p) => ({ ...p, age: e.target.value }))} /></div>
-            <div className="space-y-1.5"><Label className="text-xs font-medium">Height (cm)</Label><Input type="number" className="h-10 rounded-xl" value={profile.heightCm} onChange={(e) => setProfile((p) => ({ ...p, heightCm: e.target.value }))} /></div>
-            <div className="space-y-1.5"><Label className="text-xs font-medium">Weight (kg)</Label><Input type="number" className="h-10 rounded-xl" value={profile.weightKg} onChange={(e) => setProfile((p) => ({ ...p, weightKg: e.target.value }))} /></div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-gray-500">Age</Label>
+              <Input type="number" className="h-11 rounded-xl" value={profile.age} onChange={(e) => setProfile((p) => ({ ...p, age: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-gray-500">Height</Label>
+              <Input type="number" className="h-11 rounded-xl" placeholder="cm" value={profile.heightCm} onChange={(e) => setProfile((p) => ({ ...p, heightCm: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-gray-500">Weight</Label>
+              <Input type="number" className="h-11 rounded-xl" placeholder="kg" value={profile.weightKg} onChange={(e) => setProfile((p) => ({ ...p, weightKg: e.target.value }))} />
+            </div>
           </div>
+
+          {/* Gender Segmented Control */}
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Gender</Label>
-            <RadioGroup value={profile.gender} onValueChange={(v) => setProfile((p) => ({ ...p, gender: v }))} className="flex gap-4">
-              {['male', 'female', 'other'].map((g) => (
-                <div key={g} className="flex items-center gap-2">
-                  <RadioGroupItem value={g} id={`s-${g}`} />
-                  <Label htmlFor={`s-${g}`} className="font-normal text-sm capitalize">{g}</Label>
-                </div>
+            <Label className="text-xs font-medium text-gray-500">Gender</Label>
+            <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+              {GENDER_OPTIONS.map((g) => (
+                <button
+                  key={g.value}
+                  type="button"
+                  onClick={() => setProfile((p) => ({ ...p, gender: g.value }))}
+                  className={`flex-1 rounded-xl text-sm font-medium py-2 transition-colors min-h-[36px] ${
+                    profile.gender === g.value
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {g.label}
+                </button>
               ))}
-            </RadioGroup>
+            </div>
           </div>
+
           {bmi && bmiCategory && (
-            <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-2.5">
+            <div className="flex items-center gap-2 bg-gray-50 rounded-xl p-3">
               <span className="text-sm text-gray-600">BMI: <b>{bmi}</b></span>
               <Badge className={bmiCategory.color}>{bmiCategory.label}</Badge>
             </div>
           )}
-          <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold" onClick={saveProfile} disabled={saving}>
+
+          <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl min-h-[44px] font-semibold" onClick={saveProfile} disabled={saving}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Profile
           </Button>
         </div>
       </Card>
 
-      {/* Goal Section */}
-      <Card className="p-4 rounded-xl shadow-sm">
-        <CardHeader className="p-0 pb-3">
-          <CardTitle className="text-base flex items-center gap-2"><Target className="h-4 w-4 text-emerald-600" />Goals</CardTitle>
-        </CardHeader>
-        <Separator className="mb-3" />
-        <div className="space-y-3">
+      {/* ═══ Goals Section ═══ */}
+      <Card className="rounded-2xl shadow-sm border border-gray-100/80 bg-white p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Target className="h-4 w-4 text-emerald-600" />
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Fitness Goals</span>
+        </div>
+        <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Goal Type</Label>
+            <Label className="text-xs font-medium text-gray-500">Goal Type</Label>
             <Select value={goals.goalType} onValueChange={(v) => setGoals((g) => ({ ...g, goalType: v }))}>
-              <SelectTrigger className="h-10 rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
               <SelectContent>{GOAL_TYPES.map((g) => <SelectItem key={g} value={g}>{formatLabel(g)}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Activity Level</Label>
+            <Label className="text-xs font-medium text-gray-500">Activity Level</Label>
             <Select value={goals.activityLevel} onValueChange={(v) => setGoals((g) => ({ ...g, activityLevel: v }))}>
-              <SelectTrigger className="h-10 rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
               <SelectContent>{ACTIVITY_LEVELS.map((a) => <SelectItem key={a} value={a}>{formatLabel(a)}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5"><Label className="text-xs font-medium">Target Weight (kg)</Label><Input type="number" className="h-10 rounded-xl" value={goals.targetWeightKg} onChange={(e) => setGoals((g) => ({ ...g, targetWeightKg: e.target.value }))} /></div>
-          <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold" onClick={saveGoals} disabled={saving}>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-gray-500">Target Weight</Label>
+            <Input type="number" className="h-11 rounded-xl" placeholder="kg" value={goals.targetWeightKg} onChange={(e) => setGoals((g) => ({ ...g, targetWeightKg: e.target.value }))} />
+          </div>
+          <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl min-h-[44px] font-semibold" onClick={saveGoals} disabled={saving}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Goals
           </Button>
         </div>
       </Card>
 
-      {/* Preferences Section */}
-      <Card className="p-4 rounded-xl shadow-sm">
-        <CardHeader className="p-0 pb-3">
-          <CardTitle className="text-base flex items-center gap-2"><Sparkles className="h-4 w-4 text-emerald-600" />Preferences</CardTitle>
-        </CardHeader>
-        <Separator className="mb-3" />
-        <div className="space-y-3">
+      {/* ═══ Preferences Section ═══ */}
+      <Card className="rounded-2xl shadow-sm border border-gray-100/80 bg-white p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Heart className="h-4 w-4 text-emerald-600" />
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Dietary Preferences</span>
+        </div>
+        <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Cuisine Preference</Label>
+            <Label className="text-xs font-medium text-gray-500">Cuisine Preference</Label>
             <Select value={prefs.cuisinePreference} onValueChange={(v) => setPrefs((p) => ({ ...p, cuisinePreference: v }))}>
-              <SelectTrigger className="h-10 rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
               <SelectContent>{CUISINES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Diet Type</Label>
+            <Label className="text-xs font-medium text-gray-500">Diet Type</Label>
             <Select value={prefs.dietType} onValueChange={(v) => setPrefs((p) => ({ ...p, dietType: v }))}>
-              <SelectTrigger className="h-10 rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
               <SelectContent>{DIET_TYPES.map((d) => <SelectItem key={d} value={d}>{DIET_LABELS[d]}</SelectItem>)}</SelectContent>
             </Select>
           </div>
+
+          {/* Allergy Pill Toggles */}
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Allergies</Label>
+            <Label className="text-xs font-medium text-gray-500">Allergies</Label>
             <div className="grid grid-cols-2 gap-2">
-              {ALLERGENS.map((a) => (
-                <label key={a} className="flex items-center gap-2 p-2.5 rounded-xl border border-gray-200 cursor-pointer hover:bg-emerald-50/50 hover:border-emerald-200 transition-colors min-h-[44px]">
-                  <Checkbox checked={prefs.allergies.includes(a)} onCheckedChange={() => toggleAllergy(a)} />
-                  <span className="text-sm">{a}</span>
-                </label>
-              ))}
+              {ALLERGENS.map((a) => {
+                const isSelected = prefs.allergies.includes(a);
+                return (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => toggleAllergy(a)}
+                    className={`rounded-lg text-sm border px-3 py-2.5 font-medium transition-colors min-h-[44px] ${
+                      isSelected
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                    }`}
+                  >
+                    {a}
+                  </button>
+                );
+              })}
             </div>
           </div>
-          <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold" onClick={savePrefs} disabled={saving}>
+
+          <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl min-h-[44px] font-semibold" onClick={savePrefs} disabled={saving}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Preferences
           </Button>
         </div>
       </Card>
 
       {/* Logout */}
-      <Button variant="outline" className="w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600 min-h-[44px] rounded-xl font-medium" onClick={onLogout}>
+      <Button
+        variant="outline"
+        className="w-full border-2 border-red-200 text-red-600 hover:bg-red-50 min-h-[44px] rounded-xl font-semibold"
+        onClick={onLogout}
+      >
         <LogOut className="mr-2 h-4 w-4" />Log Out
       </Button>
     </motion.div>

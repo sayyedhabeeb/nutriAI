@@ -20,7 +20,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
-import { Camera, RotateCcw, Trash2, Plus, Search, ChevronDown, ChevronRight } from 'lucide-react';
+import { Camera, RotateCcw, Trash2, Plus, Search, ChevronDown, ChevronRight, Flame, Dumbbell, Wheat, Droplets } from 'lucide-react';
 import { apiFetch } from './api';
 import { SLOTS, SLOT_LABELS, SLOT_ICONS, SLOT_BORDER_COLORS, fadeIn } from './constants';
 import type { FoodLogItem, SearchMeal } from './types';
@@ -174,25 +174,26 @@ export function FoodLogView() {
     <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-4">
       <h1 className="text-xl font-bold text-gray-900">Food Log</h1>
 
-      {/* Feature 4: Search bar (pill-shaped) */}
+      {/* Feature 4: Search bar */}
       <motion.div
         initial={{ opacity: 0, y: -4 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <button
-          onClick={() => { setSearchQuery(''); setSearchResults([]); setSearchDialog(true); }}
-          className="w-full flex items-center gap-2 px-4 h-11 rounded-full bg-gray-100 hover:bg-gray-200/80 transition-colors text-left"
-        >
-          <Search className="h-4 w-4 text-gray-400 shrink-0" />
-          <span className="text-sm text-gray-400">Search meals to log...</span>
-        </button>
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 shrink-0 pointer-events-none" />
+          <button
+            onClick={() => { setSearchQuery(''); setSearchResults([]); setSearchDialog(true); }}
+            className="w-full flex items-center gap-2 pl-10 pr-4 h-10 rounded-full bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors text-left"
+          >
+            <span className="text-sm text-gray-400">Search meals to log...</span>
+          </button>
+        </div>
       </motion.div>
 
       {/* Date strip */}
       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         {dates.map((date) => {
-          const isToday = date === format(new Date(), 'yyyy-MM-dd');
           const isSelected = date === selectedDate;
           return (
             <button
@@ -201,30 +202,34 @@ export function FoodLogView() {
               className={`flex flex-col items-center min-w-[52px] py-2 px-2 rounded-xl transition-all shrink-0 min-h-[44px] ${
                 isSelected
                   ? 'bg-emerald-600 text-white shadow-sm'
-                  : isToday
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-100'
+                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
               }`}
             >
               <span className="text-[10px] font-medium uppercase">{format(parseISO(date), 'EEE')}</span>
-              <span className="text-sm font-bold">{format(parseISO(date), 'd')}</span>
+              <span className={`text-sm font-bold ${isSelected ? '' : ''}`}>{format(parseISO(date), 'd')}</span>
             </button>
           );
         })}
       </div>
+      <div className="h-px bg-gray-200/60 -mt-1" />
 
       {/* Summary */}
-      <Card className="p-4 rounded-xl shadow-sm">
+      <Card className="p-4 rounded-2xl shadow-sm border border-gray-100/80 bg-white">
         <div className="grid grid-cols-4 gap-2 text-center">
           {[
-            { label: 'Calories', val: foodLog?.totalCalories || 0, unit: 'kcal', color: 'text-orange-600', bg: 'bg-orange-50' },
-            { label: 'Protein', val: foodLog?.totalProtein || 0, unit: 'g', color: 'text-blue-600', bg: 'bg-blue-50' },
-            { label: 'Carbs', val: foodLog?.totalCarbs || 0, unit: 'g', color: 'text-amber-600', bg: 'bg-amber-50' },
-            { label: 'Fat', val: foodLog?.totalFat || 0, unit: 'g', color: 'text-rose-600', bg: 'bg-rose-50' },
+            { label: 'Calories', val: foodLog?.totalCalories || 0, unit: 'kcal', color: 'text-orange-600', iconBg: 'bg-orange-100', Icon: Flame },
+            { label: 'Protein', val: foodLog?.totalProtein || 0, unit: 'g', color: 'text-blue-600', iconBg: 'bg-blue-100', Icon: Dumbbell },
+            { label: 'Carbs', val: foodLog?.totalCarbs || 0, unit: 'g', color: 'text-amber-600', iconBg: 'bg-amber-100', Icon: Wheat },
+            { label: 'Fat', val: foodLog?.totalFat || 0, unit: 'g', color: 'text-rose-600', iconBg: 'bg-rose-100', Icon: Droplets },
           ].map((s) => (
-            <div key={s.label} className={`${s.bg} rounded-xl py-2.5 px-1`}>
-              <p className={`text-lg font-bold ${s.color}`}>{Math.round(s.val)}</p>
-              <p className="text-[10px] text-gray-500">{s.label}</p>
+            <div key={s.label} className="flex flex-col items-center gap-1.5">
+              <div className={`w-8 h-8 rounded-full ${s.iconBg} flex items-center justify-center`}>
+                <s.Icon className={`h-4 w-4 ${s.color}`} />
+              </div>
+              <div>
+                <p className={`text-lg font-bold ${s.color}`}>{Math.round(s.val)}</p>
+                <p className="text-xs text-gray-500 font-medium">{s.label}</p>
+              </div>
             </div>
           ))}
         </div>
@@ -240,7 +245,7 @@ export function FoodLogView() {
 
       {/* Empty state */}
       {!loading && !hasItems && (
-        <Card className="p-8 text-center rounded-xl shadow-sm">
+        <Card className="p-8 text-center rounded-2xl shadow-sm border border-gray-100/80 bg-white">
           <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Camera className="h-8 w-8 text-gray-300" />
           </div>
@@ -254,7 +259,7 @@ export function FoodLogView() {
         const items = itemsBySlot[slot] || [];
         if (items.length === 0) return null;
         return (
-          <Card key={slot} className={`p-0 rounded-xl shadow-sm border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden`}>
+          <Card key={slot} className={`p-0 rounded-2xl shadow-sm border border-gray-100/80 border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden bg-white`}>
             <div className="p-4 pb-2">
               <div className="flex items-center gap-2">
                 <span className="text-base">{SLOT_ICONS[slot]}</span>
@@ -262,28 +267,28 @@ export function FoodLogView() {
                 <Badge variant="secondary" className="text-xs ml-auto bg-gray-100 text-gray-600">{items.length} item{items.length > 1 ? 's' : ''}</Badge>
               </div>
             </div>
-            <div className="px-4 pb-3 space-y-2">
+            <div className="px-4 pb-3 space-y-3">
               {items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 border border-gray-100 group hover:bg-gray-50 transition-colors">
+                <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 border border-gray-100 group hover:shadow-sm hover:bg-gray-50/100 hover:border-gray-200/80 transition-all">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-800 truncate">{item.meal?.name || 'Unknown'}</p>
                     <p className="text-xs text-gray-500 mt-0.5">{item.servingGms}g &middot; {Math.round(item.calories)} kcal &middot; P: {Math.round(item.proteinG * 10) / 10}g</p>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0 ml-2">
+                  <div className="flex items-center gap-0.5 shrink-0 ml-2">
                     <Button
                       variant="ghost" size="icon"
-                      className="h-8 w-8 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="h-7 w-7 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={() => { setRelogDialog({ open: true, item }); setRelogSlot(item.mealSlot); }}
                       title="Log Again"
                     >
-                      <RotateCcw className="h-3.5 w-3.5" />
+                      <RotateCcw className="h-3 w-3" />
                     </Button>
                     <Button
                       variant="ghost" size="icon"
-                      className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50"
+                      className="h-7 w-7 text-gray-300 hover:text-red-500 hover:bg-red-50"
                       onClick={() => handleDelete(item.id)}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
@@ -302,7 +307,7 @@ export function FoodLogView() {
       >
         <Button
           size="icon"
-          className="w-14 h-14 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-xl transition-shadow"
+          className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-xl hover:shadow-2xl transition-shadow"
           onClick={() => setQuickAddDialog(true)}
         >
           <Plus className="h-6 w-6" />
