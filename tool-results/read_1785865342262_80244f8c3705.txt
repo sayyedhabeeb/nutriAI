@@ -1,0 +1,589 @@
+     1→'use client';
+     2→
+     3→import React, { useState, useEffect, useCallback } from 'react';
+     4→import { format, subDays, parseISO } from 'date-fns';
+     5→import { motion, AnimatePresence } from 'framer-motion';
+     6→import { toast } from 'sonner';
+     7→import { Button } from '@/components/ui/button';
+     8→import { Card } from '@/components/ui/card';
+     9→import { Input } from '@/components/ui/input';
+    10→import { Label } from '@/components/ui/label';
+    11→import { Badge } from '@/components/ui/badge';
+    12→import { Skeleton } from '@/components/ui/skeleton';
+    13→import { ScrollArea } from '@/components/ui/scroll-area';
+    14→import {
+    15→  Collapsible, CollapsibleContent, CollapsibleTrigger,
+    16→} from '@/components/ui/collapsible';
+    17→import {
+    18→  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+    19→} from '@/components/ui/select';
+    20→import {
+    21→  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+    22→} from '@/components/ui/dialog';
+    23→import { Camera, RotateCcw, Trash2, Plus, Search, ChevronDown, ChevronRight, Flame, Dumbbell, Wheat, Droplets, UtensilsCrossed } from 'lucide-react';
+    24→import { apiFetch } from './api';
+    25→import { SLOTS, SLOT_LABELS, SLOT_ICONS, SLOT_BORDER_COLORS, fadeIn } from './constants';
+    26→import type { FoodLogItem, SearchMeal } from './types';
+    27→
+    28→export function FoodLogView() {
+    29→  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+    30→  const [foodLog, setFoodLog] = useState<Record<string, unknown> | null>(null);
+    31→  const [loading, setLoading] = useState(true);
+    32→  const [relogDialog, setRelogDialog] = useState<{ open: boolean; item: FoodLogItem } | { open: false }>({ open: false });
+    33→  const [relogSlot, setRelogSlot] = useState('lunch');
+    34→  const [nutritionTargets, setNutritionTargets] = useState<Record<string, number>>({});
+    35→
+    36→  // Feature 1: Quick Add Custom Food
+    37→  const [quickAddDialog, setQuickAddDialog] = useState(false);
+    38→  const [quickName, setQuickName] = useState('');
+    39→  const [quickSlot, setQuickSlot] = useState('lunch');
+    40→  const [quickServing, setQuickServing] = useState(100);
+    41→  const [quickCalories, setQuickCalories] = useState('');
+    42→  const [quickProtein, setQuickProtein] = useState('');
+    43→  const [quickCarbs, setQuickCarbs] = useState('');
+    44→  const [quickFat, setQuickFat] = useState('');
+    45→  const [showMacros, setShowMacros] = useState(false);
+    46→  const [quickAdding, setQuickAdding] = useState(false);
+    47→
+    48→  // Feature 4: Search Meals
+    49→  const [searchDialog, setSearchDialog] = useState(false);
+    50→  const [searchQuery, setSearchQuery] = useState('');
+    51→  const [searchResults, setSearchResults] = useState<SearchMeal[]>([]);
+    52→  const [searchLoading, setSearchLoading] = useState(false);
+    53→  const [searchDebounce, setSearchDebounce] = useState<ReturnType<typeof setTimeout> | null>(null);
+    54→
+    55→  // Log meal dialog from search (Feature 4)
+    56→  const [logFromSearchDialog, setLogFromSearchDialog] = useState<{
+    57→    open: boolean;
+    58→    meal: SearchMeal;
+    59→  } | { open: false }>({ open: false });
+    60→  const [searchLogServing, setSearchLogServing] = useState(100);
+    61→
+    62→  const dates = Array.from({ length: 7 }, (_, i) => format(subDays(new Date(), 6 - i), 'yyyy-MM-dd'));
+    63→  const todayStr = format(new Date(), 'yyyy-MM-dd');
+    64→
+    65→  useEffect(() => {
+    66→    apiFetch('/api/nutrition/daily').then((d: Record<string, unknown>) => {
+    67→      const targets = d.targets as Record<string, number> | undefined;
+    68→      setNutritionTargets({
+    69→        calories: targets?.calories || 0,
+    70→        proteinG: targets?.proteinG || 0,
+    71→        carbsG: targets?.carbsG || 0,
+    72→        fatG: targets?.fatG || 0,
+    73→      });
+    74→    }).catch(() => {});
+    75→  }, []);
+    76→
+    77→  const fetchLog = useCallback(async () => {
+    78→    setLoading(true);
+    79→    try {
+    80→      const data = await apiFetch(`/api/food-logs?date=${selectedDate}`);
+    81→      setFoodLog(data);
+    82→    } catch { toast.error('Failed to load food log'); }
+    83→    finally { setLoading(false); }
+    84→  }, [selectedDate]);
+    85→
+    86→  useEffect(() => { fetchLog(); }, [fetchLog]);
+    87→
+    88→  const handleDelete = async (itemId: string) => {
+    89→    try {
+    90→      await apiFetch(`/api/food-logs?id=${itemId}`, { method: 'DELETE' });
+    91→      toast.success('Item removed');
+    92→      fetchLog();
+    93→    } catch (err) { toast.error((err as Error).message); }
+    94→  };
+    95→
+    96→  const handleRelog = async () => {
+    97→    if (!relogDialog.open) return;
+    98→    const item = relogDialog.item;
+    99→    try {
+   100→      if (item.mealId) {
+   101→        await apiFetch('/api/food-logs', {
+   102→          method: 'POST',
+   103→          body: JSON.stringify({ mealId: item.mealId, servingGms: item.servingGms, mealSlot: relogSlot }),
+   104→        });
+   105→      } else {
+   106→        await apiFetch('/api/food-logs', {
+   107→          method: 'POST',
+   108→          body: JSON.stringify({ customName: item.meal?.name || 'Food', servingGms: item.servingGms, mealSlot: relogSlot, caloriesPer100g: Math.round(item.calories / item.servingGms * 100), proteinPer100g: Math.round(item.proteinG / item.servingGms * 100) }),
+   109→        });
+   110→      }
+   111→      toast.success(`Re-logged ${item.meal?.name || 'meal'}!`);
+   112→      setRelogDialog({ open: false });
+   113→      fetchLog();
+   114→    } catch (err) { toast.error((err as Error).message); }
+   115→  };
+   116→
+   117→  // Feature 1: Handle quick add
+   118→  const handleQuickAdd = async () => {
+   119→    if (!quickName.trim()) { toast.error('Please enter a food name'); return; }
+   120→    if (!quickCalories || Number(quickCalories) <= 0) { toast.error('Please enter calories'); return; }
+   121→    setQuickAdding(true);
+   122→    try {
+   123→      await apiFetch('/api/food-logs/quick', {
+   124→        method: 'POST',
+   125→        body: JSON.stringify({
+   126→          name: quickName.trim(),
+   127→          calories: Number(quickCalories),
+   128→          proteinG: Number(quickProtein) || 0,
+   129→          carbsG: Number(quickCarbs) || 0,
+   130→          fatG: Number(quickFat) || 0,
+   131→          mealSlot: quickSlot,
+   132→          servingGms: quickServing,
+   133→        }),
+   134→      });
+   135→      toast.success(`Logged ${quickName.trim()}!`);
+   136→      // Reset form
+   137→      setQuickAddDialog(false);
+   138→      setQuickName('');
+   139→      setQuickCalories('');
+   140→      setQuickProtein('');
+   141→      setQuickCarbs('');
+   142→      setQuickFat('');
+   143→      setQuickServing(100);
+   144→      setShowMacros(false);
+   145→      fetchLog();
+   146→    } catch (err) { toast.error((err as Error).message); }
+   147→    finally { setQuickAdding(false); }
+   148→  };
+   149→
+   150→  // Feature 4: Search handlers
+   151→  const handleSearch = (query: string) => {
+   152→    setSearchQuery(query);
+   153→    if (searchDebounce) clearTimeout(searchDebounce);
+   154→    if (!query.trim()) { setSearchResults([]); return; }
+   155→    const timer = setTimeout(async () => {
+   156→      setSearchLoading(true);
+   157→      try {
+   158→        const res = await apiFetch(`/api/meals/search?q=${encodeURIComponent(query)}`);
+   159→        setSearchResults((res.meals || []) as SearchMeal[]);
+   160→      } catch { toast.error('Search failed'); }
+   161→      finally { setSearchLoading(false); }
+   162→    }, 350);
+   163→    setSearchDebounce(timer);
+   164→  };
+   165→
+   166→  const handleLogFromSearch = async () => {
+   167→    if (!logFromSearchDialog.open) return;
+   168→    const meal = logFromSearchDialog.meal;
+   169→    try {
+   170→      await apiFetch('/api/food-logs', {
+   171→        method: 'POST',
+   172→        body: JSON.stringify({ mealId: meal.id, servingGms: searchLogServing, mealSlot: quickSlot }),
+   173→      });
+   174→      toast.success(`Logged ${meal.name}!`);
+   175→      setLogFromSearchDialog({ open: false });
+   176→      setSearchDialog(false);
+   177→      setSearchQuery('');
+   178→      setSearchResults([]);
+   179→      fetchLog();
+   180→    } catch (err) { toast.error((err as Error).message); }
+   181→  };
+   182→
+   183→  const itemsBySlot = (foodLog?.itemsBySlot || {}) as Record<string, FoodLogItem[]>;
+   184→  const hasItems = Object.values(itemsBySlot).some((items: FoodLogItem[]) => items.length > 0);
+   185→
+   186→  return (
+   187→    <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-4">
+   188→      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Food Log</h1>
+   189→
+   190→      {/* Feature 4: Search bar */}
+   191→      <motion.div
+   192→        initial={{ opacity: 0, y: -4 }}
+   193→        animate={{ opacity: 1, y: 0 }}
+   194→        transition={{ delay: 0.1 }}
+   195→      >
+   196→        <div className="relative">
+   197→          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 shrink-0 pointer-events-none" />
+   198→          <button
+   199→            onClick={() => { setSearchQuery(''); setSearchResults([]); setSearchDialog(true); }}
+   200→            className="w-full flex items-center gap-2 pl-10 pr-4 h-11 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-gray-700 hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-800 transition-all text-left"
+   201→          >
+   202→            <span className="text-sm text-gray-400 dark:text-gray-500">Search meals to log...</span>
+   203→          </button>
+   204→        </div>
+   205→      </motion.div>
+   206→
+   207→      {/* Date strip */}
+   208→      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+   209→        {dates.map((date) => {
+   210→          const isSelected = date === selectedDate;
+   211→          const isToday = date === todayStr;
+   212→          return (
+   213→            <button
+   214→              key={date}
+   215→              onClick={() => setSelectedDate(date)}
+   216→              className={`flex flex-col items-center min-w-[52px] py-2 px-2 rounded-xl transition-all shrink-0 min-h-[44px] ${
+   217→                isSelected
+   218→                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200/60 dark:shadow-emerald-900/40 -translate-y-0.5'
+   219→                  : `text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 ${isToday && !isSelected ? 'ring-1 ring-emerald-300 dark:ring-emerald-700' : ''}`
+   220→              }`}
+   221→            >
+   222→              <span className="text-[10px] font-medium uppercase">{format(parseISO(date), 'EEE')}</span>
+   223→              <span className={`text-sm font-bold ${isSelected ? '' : ''}`}>{format(parseISO(date), 'd')}</span>
+   224→              {isToday && !isSelected && (
+   225→                <span className="w-1 h-1 rounded-full bg-emerald-500 mt-0.5" />
+   226→              )}
+   227→            </button>
+   228→          );
+   229→        })}
+   230→      </div>
+   231→      <div className="h-px bg-gray-200/60 dark:bg-gray-800/60 -mt-1" />
+   232→      <div className="flex justify-between items-center mb-1">
+   233→        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+   234→          {format(parseISO(dates[0]), 'MMM d')} – {format(parseISO(dates[dates.length - 1]), 'MMM d')}
+   235→        </span>
+   236→        {selectedDate !== todayStr && (
+   237→          <button
+   238→            onClick={() => setSelectedDate(todayStr)}
+   239→            className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold hover:underline"
+   240→          >
+   241→            Today
+   242→          </button>
+   243→        )}
+   244→      </div>
+   245→
+   246→      {/* Summary */}
+   247→      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 backdrop-blur-sm">
+   248→        <div className="grid grid-cols-4 gap-2 text-center">
+   249→          {[
+   250→            { label: 'Calories', val: foodLog?.totalCalories || 0, unit: 'kcal', color: 'text-orange-600 dark:text-orange-400', iconBg: 'bg-orange-100 dark:bg-orange-900/30', Icon: Flame },
+   251→            { label: 'Protein', val: foodLog?.totalProtein || 0, unit: 'g', color: 'text-blue-600 dark:text-blue-400', iconBg: 'bg-blue-100 dark:bg-blue-900/30', Icon: Dumbbell },
+   252→            { label: 'Carbs', val: foodLog?.totalCarbs || 0, unit: 'g', color: 'text-amber-600 dark:text-amber-400', iconBg: 'bg-amber-100 dark:bg-amber-900/30', Icon: Wheat },
+   253→            { label: 'Fat', val: foodLog?.totalFat || 0, unit: 'g', color: 'text-rose-600 dark:text-rose-400', iconBg: 'bg-rose-100 dark:bg-rose-900/30', Icon: Droplets },
+   254→          ].map((s) => {
+   255→            const targetKey = s.unit === 'kcal' ? 'calories' : s.label === 'Protein' ? 'proteinG' : s.label === 'Carbs' ? 'carbsG' : 'fatG';
+   256→            const targetVal = nutritionTargets[targetKey] || 0;
+   257→            return (
+   258→              <div key={s.label} className="flex flex-col items-center gap-1.5 border border-gray-100 dark:border-gray-800 rounded-xl p-2.5 shadow-sm">
+   259→                <div className={`w-8 h-8 rounded-full ${s.iconBg} flex items-center justify-center`}>
+   260→                  <s.Icon className={`h-4 w-4 ${s.color}`} />
+   261→                </div>
+   262→                <p className={`text-lg font-bold ${s.color} tabular-nums`}>{Math.round(s.val)}</p>
+   263→                <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">{s.label}</p>
+   264→                {targetVal > 0 && (
+   265→                  <div className="w-full h-1 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+   266→                    <div
+   267→                      className={`h-full rounded-full ${
+   268→                        s.label === 'Calories' ? 'bg-orange-500' : s.label === 'Protein' ? 'bg-blue-500' : s.label === 'Carbs' ? 'bg-amber-500' : 'bg-rose-500'
+   269→                      }`}
+   270→                      style={{ width: `${Math.min(100, Math.round(s.val / targetVal * 100))}%` }}
+   271→                    />
+   272→                  </div>
+   273→                )}
+   274→              </div>
+   275→            );
+   276→          })}
+   277→        </div>
+   278→      </Card>
+   279→
+   280→      {/* Loading */}
+   281→      {loading && (
+   282→        <div className="space-y-3">
+   283→          <Skeleton className="h-20 w-full rounded-xl" />
+   284→          <Skeleton className="h-20 w-full rounded-xl" />
+   285→        </div>
+   286→      )}
+   287→
+   288→      {/* Empty state */}
+   289→      {!loading && !hasItems && (
+   290→        <Card className="p-8 text-center rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+   291→          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-bounce [animation-duration:3s]">
+   292→            <UtensilsCrossed className="h-8 w-8 text-gray-300 dark:text-gray-600" />
+   293→          </div>
+   294→          <p className="text-gray-700 dark:text-gray-300 font-semibold text-base">No meals logged</p>
+   295→          <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Search for meals or add a custom food</p>
+   296→        </Card>
+   297→      )}
+   298→
+   299→      {/* Food items by slot */}
+   300→      {!loading && SLOTS.map((slot) => {
+   301→        const items = itemsBySlot[slot] || [];
+   302→        if (items.length === 0) return null;
+   303→        return (
+   304→          <Card key={slot} className={`p-0 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden bg-white dark:bg-gray-900`}>
+   305→            <div className="p-4 pb-2">
+   306→              <div className="flex items-center gap-2">
+   307→                <span className="text-base">{SLOT_ICONS[slot]}</span>
+   308→                <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100">{SLOT_LABELS[slot]}</h3>
+   309→                <Badge variant="secondary" className="text-xs ml-auto bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">{items.length} item{items.length > 1 ? 's' : ''}</Badge>
+   310→              </div>
+   311→            </div>
+   312→            <div className="px-4 pb-3 space-y-3">
+   313→              {items.map((item) => (
+   314→                <div key={item.id} className={`flex items-center justify-between p-3 rounded-xl bg-gray-50/80 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 border-l-3 ${SLOT_BORDER_COLORS[slot]} group shadow-sm hover:shadow-md hover:bg-gray-50/100 dark:hover:bg-gray-800/80 hover:border-gray-200/80 dark:hover:border-gray-700 transition-all`}>
+   315→                  <div className="flex-1 min-w-0">
+   316→                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{item.meal?.name || 'Unknown'}</p>
+   317→                    <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{item.servingGms}g</p>
+   318→                  </div>
+   319→                  <div className="text-right shrink-0 mr-2">
+   320→                    <p className="text-sm font-bold text-gray-800 dark:text-gray-200 tabular-nums">{Math.round(item.calories)}</p>
+   321→                    <p className="text-[10px] text-gray-400 dark:text-gray-500">kcal</p>
+   322→                  </div>
+   323→                  <div className="flex items-center gap-0.5 shrink-0 ml-2">
+   324→                    <button
+   325→                      className="h-7 w-7 flex items-center justify-center rounded-lg text-emerald-600 dark:text-emerald-400 font-semibold text-xs hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+   326→                      onClick={() => { setRelogDialog({ open: true, item }); setRelogSlot(item.mealSlot); }}
+   327→                      title="Log Again"
+   328→                    >
+   329→                      <RotateCcw className="h-3 w-3" />
+   330→                    </button>
+   331→                    <Button
+   332→                      variant="ghost" size="icon"
+   333→                      className="h-7 w-7 text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-40 hover:opacity-100 transition-opacity"
+   334→                      onClick={() => handleDelete(item.id)}
+   335→                    >
+   336→                      <Trash2 className="h-3 w-3" />
+   337→                    </Button>
+   338→                  </div>
+   339→                </div>
+   340→              ))}
+   341→            </div>
+   342→          </Card>
+   343→        );
+   344→      })}
+   345→
+   346→      {/* Feature 1: Quick Add FAB (above nav) */}
+   347→      <motion.div
+   348→        className="fixed bottom-24 right-4 z-40"
+   349→        initial={{ scale: 0 }}
+   350→        animate={{ scale: 1 }}
+   351→        transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.2 }}
+   352→      >
+   353→        <Button
+   354→          size="icon"
+   355→          className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-xl hover:shadow-2xl transition-shadow"
+   356→          onClick={() => setQuickAddDialog(true)}
+   357→        >
+   358→          <Plus className="h-6 w-6" />
+   359→        </Button>
+   360→      </motion.div>
+   361→
+   362→      {/* ═══ Feature 1: Quick Add Custom Food Dialog ═══ */}
+   363→      <Dialog open={quickAddDialog} onOpenChange={setQuickAddDialog}>
+   364→        <DialogContent className="max-w-md">
+   365→          <DialogHeader>
+   366→            <DialogTitle>Quick Add Food</DialogTitle>
+   367→            <DialogDescription>Log a custom food with its nutrition info</DialogDescription>
+   368→          </DialogHeader>
+   369→          <div className="space-y-3">
+   370→            <div className="space-y-2">
+   371→              <Label className="text-sm font-medium">Food Name *</Label>
+   372→              <Input
+   373→                placeholder="e.g. Chicken Sandwich"
+   374→                value={quickName}
+   375→                onChange={(e) => setQuickName(e.target.value)}
+   376→                className="h-11 rounded-xl"
+   377→                autoFocus
+   378→              />
+   379→            </div>
+   380→            <div className="space-y-2">
+   381→              <Label className="text-sm font-medium">Meal Slot</Label>
+   382→              <Select value={quickSlot} onValueChange={setQuickSlot}>
+   383→                <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+   384→                <SelectContent>{SLOTS.map((s) => <SelectItem key={s} value={s}>{SLOT_LABELS[s]}</SelectItem>)}</SelectContent>
+   385→              </Select>
+   386→            </div>
+   387→            <div className="grid grid-cols-2 gap-3">
+   388→              <div className="space-y-2">
+   389→                <Label className="text-sm font-medium">Serving (g)</Label>
+   390→                <Input
+   391→                  type="number"
+   392→                  value={quickServing}
+   393→                  onChange={(e) => setQuickServing(Number(e.target.value) || 100)}
+   394→                  min={1} max={5000}
+   395→                  className="h-11 rounded-xl"
+   396→                />
+   397→              </div>
+   398→              <div className="space-y-2">
+   399→                <Label className="text-sm font-medium">Calories * (kcal)</Label>
+   400→                <Input
+   401→                  type="number"
+   402→                  placeholder="e.g. 350"
+   403→                  value={quickCalories}
+   404→                  onChange={(e) => setQuickCalories(e.target.value)}
+   405→                  min={1}
+   406→                  className="h-11 rounded-xl"
+   407→                />
+   408→              </div>
+   409→            </div>
+   410→
+   411→            {/* Collapsible macros */}
+   412→            <Collapsible open={showMacros} onOpenChange={setShowMacros}>
+   413→              <CollapsibleTrigger asChild>
+   414→                <button className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors">
+   415→                  <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showMacros ? 'rotate-180' : ''}`} />
+   416→                  {showMacros ? 'Hide' : 'Add'} protein, carbs & fat
+   417→                </button>
+   418→              </CollapsibleTrigger>
+   419→              <AnimatePresence>
+   420→                {showMacros && (
+   421→                  <CollapsibleContent forceMount>
+   422→                    <motion.div
+   423→                      initial={{ height: 0, opacity: 0 }}
+   424→                      animate={{ height: 'auto', opacity: 1 }}
+   425→                      exit={{ height: 0, opacity: 0 }}
+   426→                      transition={{ duration: 0.2 }}
+   427→                      className="overflow-hidden"
+   428→                    >
+   429→                      <div className="grid grid-cols-3 gap-2 pt-2">
+   430→                        <div className="space-y-1.5">
+   431→                          <Label className="text-xs text-gray-500 dark:text-gray-400">Protein (g)</Label>
+   432→                          <Input type="number" placeholder="0" value={quickProtein} onChange={(e) => setQuickProtein(e.target.value)} min={0} className="h-10 rounded-lg text-sm" />
+   433→                        </div>
+   434→                        <div className="space-y-1.5">
+   435→                          <Label className="text-xs text-gray-500 dark:text-gray-400">Carbs (g)</Label>
+   436→                          <Input type="number" placeholder="0" value={quickCarbs} onChange={(e) => setQuickCarbs(e.target.value)} min={0} className="h-10 rounded-lg text-sm" />
+   437→                        </div>
+   438→                        <div className="space-y-1.5">
+   439→                          <Label className="text-xs text-gray-500 dark:text-gray-400">Fat (g)</Label>
+   440→                          <Input type="number" placeholder="0" value={quickFat} onChange={(e) => setQuickFat(e.target.value)} min={0} className="h-10 rounded-lg text-sm" />
+   441→                        </div>
+   442→                      </div>
+   443→                    </motion.div>
+   444→                  </CollapsibleContent>
+   445→                )}
+   446→              </AnimatePresence>
+   447→            </Collapsible>
+   448→          </div>
+   449→          <DialogFooter>
+   450→            <Button variant="outline" onClick={() => setQuickAddDialog(false)} className="rounded-xl">Cancel</Button>
+   451→            <Button
+   452→              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold"
+   453→              onClick={handleQuickAdd}
+   454→              disabled={quickAdding || !quickName.trim() || !quickCalories}
+   455→            >
+   456→              {quickAdding ? 'Logging...' : 'Log It'}
+   457→            </Button>
+   458→          </DialogFooter>
+   459→        </DialogContent>
+   460→      </Dialog>
+   461→
+   462→      {/* ═══ Feature 4: Search Meals Dialog ═══ */}
+   463→      <Dialog open={searchDialog} onOpenChange={(open) => { if (!open) { setSearchDialog(false); setSearchQuery(''); setSearchResults([]); } }}>
+   464→        <DialogContent className="max-w-md">
+   465→          <DialogHeader>
+   466→            <DialogTitle>Search Meals</DialogTitle>
+   467→            <DialogDescription>Find and log a meal</DialogDescription>
+   468→          </DialogHeader>
+   469→          <div className="space-y-3">
+   470→            <div className="relative">
+   471→              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+   472→              <Input
+   473→                placeholder="Search meals..."
+   474→                value={searchQuery}
+   475→                onChange={(e) => handleSearch(e.target.value)}
+   476→                className="h-11 rounded-xl pl-9"
+   477→                autoFocus
+   478→              />
+   479→            </div>
+   480→            <ScrollArea className="max-h-72">
+   481→              <div className="space-y-2">
+   482→                {searchLoading && <div className="flex justify-center py-6"><SpinnerIcon /></div>}
+   483→                {!searchLoading && searchQuery && searchResults.length === 0 && (
+   484→                  <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">No results found</p>
+   485→                )}
+   486→                {!searchLoading && searchResults.map((meal) => (
+   487→                  <div
+   488→                    key={meal.id}
+   489→                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 hover:border-emerald-100 dark:hover:border-emerald-800 transition-colors cursor-pointer"
+   490→                    onClick={() => {
+   491→                      setSearchLogServing(meal.baseServingGms || 100);
+   492→                      setLogFromSearchDialog({ open: true, meal });
+   493→                    }}
+   494→                  >
+   495→                    <div className="flex-1 min-w-0">
+   496→                      <div className="flex items-center gap-2">
+   497→                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{meal.name}</p>
+   498→                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 shrink-0">{meal.cuisine}</Badge>
+   499→                      </div>
+   500→                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+   501→                        <span>{meal.nutrition?.calories || 0} kcal/100g</span>
+   502→                        <span>&middot;</span>
+   503→                        <span className="text-blue-600 font-medium">P: {meal.nutrition?.proteinG || 0}g</span>
+   504→                      </div>
+   505→                    </div>
+   506→                    <ChevronRight className="h-4 w-4 text-gray-300 dark:text-gray-600 shrink-0" />
+   507→                  </div>
+   508→                ))}
+   509→              </div>
+   510→            </ScrollArea>
+   511→          </div>
+   512→        </DialogContent>
+   513→      </Dialog>
+   514→
+   515→      {/* ═══ Feature 4: Log Meal from Search Dialog ═══ */}
+   516→      <Dialog open={logFromSearchDialog.open} onOpenChange={(open) => { if (!open) setLogFromSearchDialog({ open: false }); }}>
+   517→        <DialogContent className="max-w-md">
+   518→          <DialogHeader>
+   519→            <DialogTitle>Log Meal</DialogTitle>
+   520→            <DialogDescription className="flex items-center gap-2">
+   521→              {logFromSearchDialog.open && <span className="font-medium text-gray-700 dark:text-gray-300">{logFromSearchDialog.meal.name}</span>}
+   522→              {logFromSearchDialog.open && <Badge variant="outline" className="text-xs">{logFromSearchDialog.meal.cuisine}</Badge>}
+   523→            </DialogDescription>
+   524→          </DialogHeader>
+   525→          <div className="space-y-4">
+   526→            <div className="space-y-2">
+   527→              <Label className="text-sm font-medium">Serving Size (grams)</Label>
+   528→              <Input type="number" value={searchLogServing} onChange={(e) => setSearchLogServing(Number(e.target.value))} min={10} max={1000} className="h-11 rounded-xl" />
+   529→            </div>
+   530→            {logFromSearchDialog.open && logFromSearchDialog.meal.nutrition && (
+   531→              <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-3 text-sm space-y-1 border border-emerald-100 dark:border-emerald-800">
+   532→                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide mb-1.5">Estimated for {searchLogServing}g serving</p>
+   533→                <div className="grid grid-cols-2 gap-1 text-xs">
+   534→                  <span className="text-gray-600 dark:text-gray-400">Calories:</span><span className="font-bold text-gray-900 dark:text-gray-100">{Math.round((logFromSearchDialog.meal.nutrition!.calories / 100) * searchLogServing)} kcal</span>
+   535→                  <span className="text-gray-600 dark:text-gray-400">Protein:</span><span className="font-bold text-blue-600">{Math.round((logFromSearchDialog.meal.nutrition!.proteinG / 100) * searchLogServing * 10) / 10}g</span>
+   536→                  <span className="text-gray-600 dark:text-gray-400">Carbs:</span><span className="font-bold text-amber-600">{Math.round((logFromSearchDialog.meal.nutrition!.carbsG / 100) * searchLogServing * 10) / 10}g</span>
+   537→                  <span className="text-gray-600 dark:text-gray-400">Fat:</span><span className="font-bold text-rose-600">{Math.round((logFromSearchDialog.meal.nutrition!.fatG / 100) * searchLogServing * 10) / 10}g</span>
+   538→                </div>
+   539→              </div>
+   540→            )}
+   541→            <div className="space-y-2">
+   542→              <Label className="text-sm font-medium">Meal Slot</Label>
+   543→              <Select value={quickSlot} onValueChange={setQuickSlot}>
+   544→                <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+   545→                <SelectContent>{SLOTS.map((s) => <SelectItem key={s} value={s}>{SLOT_LABELS[s]}</SelectItem>)}</SelectContent>
+   546→              </Select>
+   547→            </div>
+   548→          </div>
+   549→          <DialogFooter>
+   550→            <Button variant="outline" onClick={() => setLogFromSearchDialog({ open: false })} className="rounded-xl">Cancel</Button>
+   551→            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold" onClick={handleLogFromSearch}>Log It</Button>
+   552→          </DialogFooter>
+   553→        </DialogContent>
+   554→      </Dialog>
+   555→
+   556→      {/* Quick Re-log Dialog */}
+   557→      <Dialog open={relogDialog.open} onOpenChange={(open) => setRelogDialog(open ? relogDialog : { open: false })}>
+   558→        <DialogContent className="max-w-sm">
+   559→          <DialogHeader>
+   560→            <DialogTitle>Log Again</DialogTitle>
+   561→            <DialogDescription>{relogDialog.open ? relogDialog.item.meal?.name || 'This meal' : ''} ({relogDialog.open ? relogDialog.item.servingGms : 0}g)</DialogDescription>
+   562→          </DialogHeader>
+   563→          <div className="space-y-3">
+   564→            <div className="space-y-2">
+   565→              <Label className="text-sm font-medium">Log as</Label>
+   566→              <Select value={relogSlot} onValueChange={setRelogSlot}>
+   567→                <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+   568→                <SelectContent>{SLOTS.map((s) => <SelectItem key={s} value={s}>{SLOT_LABELS[s]}</SelectItem>)}</SelectContent>
+   569→              </Select>
+   570→            </div>
+   571→          </div>
+   572→          <DialogFooter>
+   573→            <Button variant="outline" onClick={() => setRelogDialog({ open: false })} className="rounded-xl">Cancel</Button>
+   574→            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold" onClick={handleRelog}>Log Again</Button>
+   575→          </DialogFooter>
+   576→        </DialogContent>
+   577→      </Dialog>
+   578→    </motion.div>
+   579→  );
+   580→}
+   581→
+   582→function SpinnerIcon() {
+   583→  return (
+   584→    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 animate-spin text-emerald-600">
+   585→      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+   586→    </svg>
+   587→  );
+   588→}
+   589→

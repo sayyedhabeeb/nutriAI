@@ -215,14 +215,14 @@ export function FoodLogView() {
               onClick={() => setSelectedDate(date)}
               className={`flex flex-col items-center min-w-[52px] py-2 px-2 rounded-xl transition-all shrink-0 min-h-[44px] ${
                 isSelected
-                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200/60 dark:shadow-emerald-900/40 -translate-y-0.5'
-                  : `text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 ${isToday && !isSelected ? 'ring-1 ring-emerald-300 dark:ring-emerald-700' : ''}`
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200/60 dark:shadow-emerald-900/40 -translate-y-0.5 ring-2 ring-emerald-500 ring-offset-2 ring-offset-background'
+                  : `text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 ${isToday ? 'ring-1 ring-emerald-300 dark:ring-emerald-700' : ''}`
               }`}
             >
               <span className="text-[10px] font-medium uppercase">{format(parseISO(date), 'EEE')}</span>
               <span className={`text-sm font-bold ${isSelected ? '' : ''}`}>{format(parseISO(date), 'd')}</span>
-              {isToday && !isSelected && (
-                <span className="w-1 h-1 rounded-full bg-emerald-500 mt-0.5" />
+              {isToday && (
+                <span className={`w-1 h-1 rounded-full mt-0.5 ${isSelected ? 'bg-white' : 'bg-emerald-500'}`} />
               )}
             </button>
           );
@@ -262,10 +262,10 @@ export function FoodLogView() {
                 <p className={`text-lg font-bold ${s.color} tabular-nums`}>{Math.round(s.val)}</p>
                 <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">{s.label}</p>
                 {targetVal > 0 && (
-                  <div className="w-full h-1 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                  <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full ${
-                        s.label === 'Calories' ? 'bg-orange-500' : s.label === 'Protein' ? 'bg-blue-500' : s.label === 'Carbs' ? 'bg-amber-500' : 'bg-rose-500'
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        s.label === 'Calories' ? 'bg-emerald-500' : s.label === 'Protein' ? 'bg-blue-500' : s.label === 'Carbs' ? 'bg-amber-500' : 'bg-rose-500'
                       }`}
                       style={{ width: `${Math.min(100, Math.round(s.val / targetVal * 100))}%` }}
                     />
@@ -288,11 +288,11 @@ export function FoodLogView() {
       {/* Empty state */}
       {!loading && !hasItems && (
         <Card className="p-8 text-center rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
-          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-bounce [animation-duration:3s]">
-            <UtensilsCrossed className="h-8 w-8 text-gray-300 dark:text-gray-600" />
+          <div className="bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce [animation-duration:3s]">
+            <UtensilsCrossed className="h-10 w-10 text-emerald-500 dark:text-emerald-400" />
           </div>
           <p className="text-gray-700 dark:text-gray-300 font-semibold text-base">No meals logged</p>
-          <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Search for meals or add a custom food</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-3">Log your first meal to see it here</p>
         </Card>
       )}
 
@@ -343,17 +343,17 @@ export function FoodLogView() {
         );
       })}
 
-      {/* Feature 1: Quick Add FAB (above nav) */}
+      {/* FAB — opens search dialog */}
       <motion.div
         className="fixed bottom-24 right-4 z-40"
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
+        initial={{ scale: 0, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.2 }}
       >
         <Button
           size="icon"
-          className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-xl hover:shadow-2xl transition-shadow"
-          onClick={() => setQuickAddDialog(true)}
+          className="w-14 h-14 bg-emerald-600 hover:bg-emerald-700 rounded-full shadow-lg shadow-emerald-600/30 flex items-center justify-center animate-[bounce_0.6s_ease-in-out]"
+          onClick={() => { setSearchQuery(''); setSearchResults([]); setSearchDialog(true); }}
         >
           <Plus className="h-6 w-6" />
         </Button>

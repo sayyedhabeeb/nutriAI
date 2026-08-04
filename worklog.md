@@ -1556,3 +1556,163 @@ Work Log:
 8. **Add barcode scanning** for packaged foods
 9. **Implement OAuth social login** (Google/Apple) — replace decorative buttons
 10. **Add custom SVG empty state illustrations** for food log, chat, progress
+
+---
+Task ID: 10-a
+Agent: full-stack-developer subagent
+Task: v10 improve Dashboard, FoodLog, Scan views
+
+Work Log:
+- shared.tsx: Changed CalorieRing from motion.circle to regular circle with CSS transition (stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1)) for smooth fill animation
+- shared.tsx: Added useState/useEffect to animate from full circumference to target offset on mount
+- shared.tsx: Increased consumed calorie text from text-4xl to text-5xl font-extrabold
+- shared.tsx: Added optional pulse prop for animate-pulse shimmer on calorie number
+- DashboardView.tsx: Fixed "Glasses" label → "Water" for clarity
+- DashboardView.tsx: Added 💧 emoji next to water count
+- DashboardView.tsx: Changed quick stats from rounded-xl with border-t-2 to rounded-2xl with ring-1 ring-inset ring-gray-200/60 dark:ring-gray-700/40 for consistency
+- DashboardView.tsx: Added calPulse state with useEffect + useRef to detect consumed calorie changes and trigger 300ms animate-pulse
+- DashboardView.tsx: Added loading skeleton state (3 shimmer cards with slot-specific border colors) when generating meal plan
+- FoodLogView.tsx: Updated macro summary progress bar tracks to bg-gray-200 dark:bg-gray-700, changed Calories bar from orange to emerald, added transition-all duration-500
+- FoodLogView.tsx: Improved empty state with gradient circle background (from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30) and subtitle text
+- FoodLogView.tsx: Changed FAB to open search dialog instead of quick add, updated styling (bg-emerald-600, shadow-lg shadow-emerald-600/30, one-time bounce animation)
+- FoodLogView.tsx: Added ring-2 ring-emerald-500 ring-offset-2 ring-offset-background to selected date pill, today dot now shows in both selected and unselected states
+- UploadView.tsx: Split upload zone into smaller preview area + two stacked buttons (Take Photo with emerald bg, Choose from Gallery with outline)
+- UploadView.tsx: Added camera input with capture="environment" for native camera access
+- UploadView.tsx: Changed format badges from gray text to emerald-colored Badge components
+- UploadView.tsx: Added Recent Scans section fetching from /api/food-logs?limit=3 with loading skeleton and empty state
+- UploadView.tsx: Redesigned How it Works section with individual card steps connected by vertical lines
+- ESLint: 0 errors, 0 warnings
+
+Stage Summary:
+- Dashboard: clearer water label, animated calorie ring with CSS transitions, pulse shimmer on value change, consistent quick stat cards, loading skeleton for meal plan generation
+- FoodLog: improved empty state, FAB opens search, enhanced date picker with ring indicator, better progress bar colors
+- Scan/Upload: split camera/gallery buttons, emerald format badges, recent scans section, card-based step indicator
+- All changes include proper dark mode variants
+- ESLint clean: 0 errors, 0 warnings
+
+---
+Task ID: 10-b
+Agent: Main
+Task: Improve Progress, Settings, and Chat views of NutriAI
+
+Work Log:
+- ProgressView.tsx: Added pb-28 safe area padding to prevent bottom nav overlap
+- ProgressView.tsx: Added "Yearly" tab with summary card (total days logged, avg daily calories, best/worst day, weight change) and clean empty state with CalendarDays icon
+- ProgressView.tsx: Improved chart empty states — Flame icon for calorie, Dumbbell icon for macros, Scale icon for weight, all with text-gray-400/dark:text-gray-500
+- ProgressView.tsx: Added CSV export functionality via Blob + URL.createObjectURL, shows toast "Report exported!"
+- ProgressView.tsx: Weight chart already used AreaChart with emerald color (kept existing implementation)
+- ProgressView.tsx: Improved insight card with stronger gradient: from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20, border-emerald-100 dark:border-emerald-800/50, rounded-xl p-4
+- ProgressView.tsx: Added focus-visible:ring-emerald-500 to export dialog SelectTriggers and weight Input fields
+- SettingsView.tsx: Added emerald focus ring (focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background) to all Input and SelectTrigger components
+- SettingsView.tsx: Added save checkmark animation — button shows "✓ Saved!" for 1.5 seconds after successful save
+- SettingsView.tsx: Added auto-save indicator text with Save icon below each section header
+- SettingsView.tsx: Added two-step danger zone confirmation — first click shows warning, second click triggers action, auto-resets after 5 seconds
+- SettingsView.tsx: Added profile completion progress bar at top (checks 10 fields: firstName, lastName, age, heightCm, weightKg, gender, goalType, activityLevel, dietType, allergies)
+- ChatView.tsx: Improved input contrast — placeholder:text-gray-500 dark:placeholder:text-gray-400, added border and focus-visible:ring-emerald-500
+- ChatView.tsx: Improved typing indicator with 3 bouncing emerald-500 dots, Bot icon label
+- ChatView.tsx: Updated quick action icons (UtensilsCrossed, Target, Lightbulb, CalendarDays, Scale, Camera), added hover states (hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-200 dark:hover:border-emerald-800)
+- ChatView.tsx: Added welcome illustration — larger gradient circle (w-20 h-20) with from-emerald-100 to-teal-100, Sparkles icon inside
+- ChatView.tsx: Improved message bubbles — user: bg-emerald-600 text-white rounded-2xl rounded-br-md, AI: bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-2xl rounded-bl-md, added Bot icon before AI messages
+
+Stage Summary:
+- All 3 views updated with improved UX and visual polish
+- Export button now functional with CSV download
+- Yearly tab added to Progress view with summary data
+- Settings has profile completion bar, save animations, and danger zone confirmation
+- Chat has better contrast, typing indicator, improved bubbles, and welcome illustration
+- ESLint clean: 0 errors, 0 warnings
+
+---
+Task ID: 24
+Agent: Main (orchestrator) + 2 parallel full-stack-developer subagents (10-a, 10-b)
+Task: v10 — VLM-directed styling polish + new features across all 6 views
+
+Work Log:
+- Read worklog.md (1623 lines, 24 previous tasks)
+- Confirmed dev server running on port 3000, all APIs returning 200
+- Registered new test user (qauser10), completed full onboarding E2E
+- QA tested all 6 views via agent-browser — zero console errors
+- Captured VLM screenshots for all views
+- VLM analysis results: Dashboard 7.5/10, FoodLog 7.5/10, Scan 8/10, Chat 9/10, Progress 6/10, Settings 7/10
+- Identified key issues: ambiguous "Glasses" label, inconsistent card styles, missing safe area padding, bland empty states, no CSV export, no yearly tab
+- Note: hydration mismatch errors (fdprocessedid) confirmed as browser extension issue, not application bug
+- Launched 2 parallel subagents:
+  - Agent 10-a: DashboardView + FoodLogView + UploadView + shared.tsx (styling + features)
+  - Agent 10-b: ProgressView + SettingsView + ChatView (styling + features)
+- Post-implementation verification via agent-browser: all 6 views load with zero errors
+- VLM post-rating: Dashboard 8/10 (confirmed Water label, consistent cards), Scan 8/10 (confirmed split buttons), Chat 8.5/10 (confirmed welcome illustration, icons, border)
+- Tested Export button on Progress view — works without errors
+- Tested Save Profile on Settings — works with animation
+
+## Current Status Assessment
+- **Phase**: v10 Complete — Comprehensive styling polish + new features across all views
+- **Auth**: Fully working, social login buttons (decorative)
+- **Onboarding**: Full E2E flow verified, idempotent
+- **Database**: 77 meals, 19+ models, SQLite
+- **API**: 31 routes, all functional
+- **Frontend**: 8 views in 14 files (~5,500+ lines), responsive, dark mode, glassmorphism
+- **Gamification**: 12 achievements
+- **ESLint**: Clean (0 errors, 0 warnings)
+
+## Completed This Round
+### Bug Fixes
+1. **"Glasses" label ambiguity** — Changed to "Water" with 💧 emoji for clarity
+2. **Safe area overlap** — Added pb-28 to Progress view to prevent bottom nav hiding content
+3. **Input editability** — Added emerald focus-visible ring to all Settings inputs
+4. **Low contrast chat input** — Improved placeholder and border visibility
+
+### Styling Improvements (VLM-Directed)
+5. **Dashboard quick stats** — Unified to rounded-2xl with ring-1 depth (consistent with other views)
+6. **Calorie ring animation** — CSS transition on stroke-dashoffset (1s cubic-bezier) for smooth fill
+7. **Calorie number shimmer** — 300ms animate-pulse when consumed value changes
+8. **Meal plan loading skeleton** — 3 shimmer cards with slot-specific left border colors
+9. **FoodLog empty state** — Gradient circle background with icon + subtitle text
+10. **FoodLog FAB** — Opens search dialog, one-time bounce animation, emerald shadow
+11. **FoodLog date picker** — Ring-2 emerald indicator on selected date, today dot in all states
+12. **Macro progress bars** — Emerald (calories), blue (protein), amber (carbs), rose (fat) with smooth transitions
+13. **Scan split buttons** — "Take Photo" (emerald filled) + "Choose from Gallery" (outline)
+14. **Scan format badges** — Emerald Badge components instead of gray text
+15. **Scan step cards** — Individual cards with vertical connecting lines
+16. **Chat welcome illustration** — Gradient circle with Sparkles icon
+17. **Chat quick actions** — 6 buttons with lucide icons and emerald hover states
+18. **Chat message bubbles** — User (emerald, rounded-br-md) vs AI (gray, rounded-bl-md) with Bot icon
+19. **Chat typing indicator** — 3 bouncing emerald dots with Bot label
+20. **Settings save animation** — "✓ Saved!" for 1.5s after successful save
+21. **Settings danger zone** — Two-step confirmation (5s auto-reset)
+22. **Settings profile completion** — Progress bar checking 10 fields
+
+### New Features
+23. **Yearly progress tab** — Summary card with total days, avg calories, best/worst day, weight change
+24. **CSV export** — Downloads weekly/monthly data as CSV file
+25. **Recent scans section** — Shows last 3 food log entries on Scan view
+26. **Camera capture** — Take Photo button uses native camera with capture="environment"
+
+## Verification Results
+- ESLint: 0 errors, 0 warnings
+- Agent-browser QA: All 6 tabs + auth + onboarding tested, zero console errors
+- VLM post-ratings: Dashboard 8/10, Scan 8/10, Chat 8.5/10
+- Export button tested: works without errors
+- Save Profile tested: works with checkmark animation
+- All APIs returning 200
+
+## Unresolved Issues & Risks
+1. VLM food recognition not tested with real food photos E2E
+2. New achievements condition logic not fully implemented (World Traveler, Calorie King, Hydration Master)
+3. Social login buttons are decorative (no OAuth)
+4. No PWA manifest
+5. No notification/reminder system
+6. No barcode scanning
+7. No social/sharing features
+8. Hydration mismatch warnings from browser extensions (fdprocessedid) — not fixable in app code
+
+## Priority Recommendations for Next Phase
+1. **Test VLM food recognition** with a real food photo (capture via agent-browser screenshot or upload)
+2. **Implement new achievement condition logic** in achievements API
+3. **Add PWA manifest** for mobile install-ability
+4. **Add meal detail sheet/dialog** — Expandable meal cards showing full nutrition, ingredients, allergens
+5. **Add dark mode persistence** — Save theme preference to localStorage
+6. **Add notification/reminder system** (cron for water/meal reminders)
+7. **Implement OAuth social login** (Google/Apple)
+8. **Add barcode scanning** for packaged foods
+9. **Add custom SVG empty state illustrations** for a more polished look
+10. **Add onboarding skip option** for returning users

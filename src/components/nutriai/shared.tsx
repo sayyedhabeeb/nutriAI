@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Flame } from 'lucide-react';
 
@@ -74,16 +74,27 @@ export function NutritionFactsLabel({
   );
 }
 
-// ═══ Calorie Ring SVG (with gradient stroke + pulsing glow) ═══
-export function CalorieRing({ consumed, target }: { consumed: number; target: number }) {
+// ═══ Calorie Ring SVG (with gradient stroke + CSS transition + pulsing glow) ═══
+export function CalorieRing({ consumed, target, pulse }: { consumed: number; target: number; pulse?: boolean }) {
   const pct = target > 0 ? Math.min(consumed / target, 1) : 0;
   const radius = 74;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference * (1 - pct);
+  const targetOffset = circumference * (1 - pct);
   const remaining = Math.max(0, target - consumed);
   const gradId = 'calRingGrad';
   const glowId = 'calRingGlow';
   const isLow = pct < 0.5 && pct > 0;
+
+  // Start from full (empty) and animate to target on mount
+  const [dashOffset, setDashOffset] = useState(circumference);
+
+  useEffect(() => {
+    // Small delay to let CSS transition kick in from the initial full state
+    const timer = requestAnimationFrame(() => {
+      setDashOffset(targetOffset);
+    });
+    return () => cancelAnimationFrame(timer);
+  }, [targetOffset]);
 
   return (
     <div className="relative inline-flex items-center justify-center">
@@ -116,21 +127,20 @@ export function CalorieRing({ consumed, target }: { consumed: number; target: nu
         </defs>
         {/* Background track */}
         <circle cx="90" cy="90" r={radius} fill="none" className="stroke-gray-200 dark:stroke-gray-700" strokeWidth="12" />
-        {/* Animated progress arc */}
-        <motion.circle
+        {/* Animated progress arc with CSS transition */}
+        <circle
           cx="90" cy="90" r={radius} fill="none"
           stroke={pct > 1 ? '#f43f5e' : `url(#${gradId})`}
           strokeWidth="12" strokeLinecap="round"
           strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          style={{ transition: 'stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1)' }}
           filter={(isLow || pct >= 0.75) ? `url(#${glowId})` : undefined}
-          initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset }}
-          transition={{ duration: 1, ease: 'easeOut' }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <Flame className={`h-4 w-4 mb-1 ${pct > 1 ? 'text-rose-500' : 'text-orange-500'}`} />
-        <span className="text-4xl font-extrabold text-gray-900 dark:text-gray-100 tabular-nums tracking-tight">{consumed}</span>
+        <span className={`text-5xl font-extrabold text-gray-900 dark:text-gray-100 tabular-nums tracking-tight ${pulse ? 'animate-pulse' : ''}`}>{consumed}</span>
         <span className="text-[11px] text-gray-400 dark:text-gray-500 font-medium mt-0.5">
           of <span className="text-gray-600 dark:text-gray-300 font-semibold">{target}</span> kcal
         </span>

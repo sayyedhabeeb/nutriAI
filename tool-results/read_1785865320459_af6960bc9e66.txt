@@ -1,0 +1,651 @@
+   241→  // Insights logic (Feature 3)
+   242→  const targetCal = nutrition?.targets?.calories || 0;
+   243→  const consumedCal = nutrition?.consumed?.calories || 0;
+   244→  const pctConsumed = targetCal > 0 ? consumedCal / targetCal : 0;
+   245→  const targetProtein = nutrition?.targets?.proteinG || 0;
+   246→  const consumedProtein = nutrition?.consumed?.proteinG || 0;
+   247→  const pctProtein = targetProtein > 0 ? consumedProtein / targetProtein : 0;
+   248→  const hour = new Date().getHours();
+   249→  const timeOfDayTip = hour < 12
+   250→    ? 'Start your day with a protein-rich breakfast!'
+   251→    : hour < 17
+   252→      ? 'Keep up the good work! Stay consistent with your meals.'
+   253→      : 'Plan a balanced dinner to finish strong today.';
+   254→
+   255→  if (loading) {
+   256→    return (
+   257→      <div className="p-4 max-w-lg mx-auto space-y-4">
+   258→        <Skeleton className="h-8 w-56 rounded-xl" />
+   259→        <div className="flex justify-center"><Skeleton className="h-[190px] w-[190px] rounded-full" /></div>
+   260→        <div className="space-y-3"><Skeleton className="h-10 w-full rounded-xl" /><Skeleton className="h-10 w-full rounded-xl" /><Skeleton className="h-10 w-full rounded-xl" /></div>
+   261→        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><Skeleton className="h-56 w-full rounded-xl" /><Skeleton className="h-56 w-full rounded-xl" /></div>
+   262→      </div>
+   263→    );
+   264→  }
+   265→
+   266→  return (
+   267→    <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-4">
+   268→      {/* ═══ Hero Section with gradient bg & decorative blobs ═══ */}
+   269→      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500/5 to-teal-500/5 p-5 border border-emerald-100/50 dark:border-emerald-800/30 backdrop-blur-sm">
+   270→        <div className="absolute -top-8 -right-8 w-24 h-24 bg-emerald-200/20 rounded-full blur-2xl" />
+   271→        <div className="absolute -bottom-6 -left-6 w-20 h-20 bg-teal-200/20 rounded-full blur-2xl" />
+   272→        <div className="absolute top-1/2 right-1/4 w-12 h-12 bg-green-200/10 rounded-full blur-xl" />
+   273→        <div className="relative flex items-start justify-between">
+   274→          <div>
+   275→            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Hi, {displayName}! {'\uD83D\uDC4B'}</h1>
+   276→            <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-500 dark:text-gray-400">
+   277→              <CalendarIcon className="h-3.5 w-3.5" />
+   278→              <span>{todayStr}</span>
+   279→            </div>
+   280→          </div>
+   281→          <div className="flex items-center gap-2">
+   282→            {streak > 0 && (
+   283→              <Badge className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 px-2.5 py-1 gap-1 shadow-sm">
+   284→                <Zap className="h-3 w-3" />{streak} day{streak > 1 ? 's' : ''}
+   285→              </Badge>
+   286→            )}
+   287→            {initial ? (
+   288→              <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
+   289→                <span className="text-white font-bold text-sm">{initial}</span>
+   290→              </div>
+   291→            ) : (
+   292→              <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/40 rounded-xl flex items-center justify-center shadow-md">
+   293→                <User className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+   294→              </div>
+   295→            )}
+   296→          </div>
+   297→        </div>
+   298→      </div>
+   299→
+   300→      {/* ═══ Quick Stats Row ═══ */}
+   301→      <div className="grid grid-cols-3 gap-3">
+   302→        <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100/60 dark:border-gray-800/60 border-t-2 border-t-emerald-400 shadow-sm text-center">
+   303→          <p className="text-2xl font-extrabold tracking-tight text-gray-900 dark:text-gray-100 tabular-nums mb-1">{mealsLoggedToday}</p>
+   304→          <p className="text-[11px] text-gray-600 dark:text-gray-400 font-semibold">Meals Logged</p>
+   305→        </div>
+   306→        <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100/60 dark:border-gray-800/60 border-t-2 border-t-cyan-400 shadow-sm text-center">
+   307→          <p className="text-2xl font-extrabold tracking-tight text-cyan-600 dark:text-cyan-400 tabular-nums mb-1">{waterCount}</p>
+   308→          <p className="text-[11px] text-gray-600 dark:text-gray-400 font-semibold">Glasses</p>
+   309→        </div>
+   310→        <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100/60 dark:border-gray-800/60 border-t-2 border-t-amber-400 shadow-sm text-center">
+   311→          <p className="text-2xl font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400 tabular-nums mb-1">{streak}</p>
+   312→          <p className="text-[11px] text-gray-600 dark:text-gray-400 font-semibold">Day Streak</p>
+   313→        </div>
+   314→      </div>
+   315→
+   316→      {/* ═══ Calorie Ring Card ═══ */}
+   317→      <Card className="p-6 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60">
+   318→        <div className="flex justify-center">
+   319→          <CalorieRing consumed={consumedCal} target={targetCal} />
+   320→        </div>
+   321→        {pctConsumed >= 1 && (
+   322→          <div className="text-center rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 px-3 py-2">
+   323→            <motion.p
+   324→              initial={{ scale: 0.8, opacity: 0 }}
+   325→              animate={{ scale: 1, opacity: 1 }}
+   326→              transition={{ type: 'spring', stiffness: 200 }}
+   327→              className="text-sm text-emerald-600 dark:text-emerald-400 font-bold"
+   328→            >
+   329→              You&apos;ve reached your calorie goal! Great job! 🎉
+   330→            </motion.p>
+   331→          </div>
+   332→        )}
+   333→      </Card>
+   334→
+   335→      {/* ═══ Macro Progress Bars ═══ */}
+   336→      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm space-y-3 mb-5">
+   337→        <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">Today&apos;s Macros</h3>
+   338→        {[
+   339→          { label: 'Protein', val: consumedProtein, target: targetProtein, from: '#3b82f6', to: '#60a5fa', unit: 'g' },
+   340→          { label: 'Carbs', val: nutrition?.consumed?.carbsG || 0, target: nutrition?.targets?.carbsG || 0, from: '#f59e0b', to: '#fbbf24', unit: 'g' },
+   341→          { label: 'Fat', val: nutrition?.consumed?.fatG || 0, target: nutrition?.targets?.fatG || 0, from: '#f43f5e', to: '#fb7185', unit: 'g' },
+   342→        ].map((m) => {
+   343→          const pct = Math.min(Math.round((m.val / (m.target || 1)) * 100), 100);
+   344→          return (
+   345→            <div key={m.label}>
+   346→              <div className="flex justify-between mb-1.5">
+   347→                <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">{m.label}</span>
+   348→                <span className="text-xs text-gray-600 dark:text-gray-400 font-medium text-right tabular-nums">{m.val}{m.unit} / {m.target}{m.unit} &middot; {pct}%</span>
+   349→              </div>
+   350→              <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+   351→                <motion.div
+   352→                  className="h-full rounded-full"
+   353→                  style={{ background: `linear-gradient(90deg, ${m.from}, ${m.to})` }}
+   354→                  initial={{ width: 0 }}
+   355→                  animate={{ width: `${pct}%` }}
+   356→                  transition={{ duration: 0.8 }}
+   357→                />
+   358→              </div>
+   359→            </div>
+   360→          );
+   361→        })}
+   362→      </Card>
+   363→
+   364→      {/* ═══ Hydration Widget ═══ */}
+   365→      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60">
+   366→        <div className="flex items-center justify-between mb-3">
+   367→          <div className="flex items-center gap-2">
+   368→            <Droplets className="h-4 w-4 text-cyan-500" />
+   369→            <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">Hydration</h3>
+   370→          </div>
+   371→          <span className="text-xs text-gray-500 dark:text-gray-400">Goal: 8 glasses</span>
+   372→        </div>
+   373→        <div className="flex items-center gap-3">
+   374→          <div className="flex-1 flex gap-1.5">
+   375→            {[1, 2, 3, 4, 5, 6, 7, 8].map((g) => (
+   376→              <div
+   377→                key={g}
+   378→                className={`h-6 flex-1 rounded-lg transition-all duration-500 ${g <= waterCount ? 'bg-gradient-to-t from-cyan-500 to-cyan-300 dark:from-cyan-600 dark:to-cyan-400' : 'bg-gray-100 dark:bg-gray-800'}`}
+   379→              />
+   380→            ))}
+   381→          </div>
+   382→          <Button
+   383→            size="icon"
+   384→            className="w-9 h-9 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white shadow-sm"
+   385→            onClick={handleWaterAdd}
+   386→          >
+   387→            <Plus className="h-4 w-4" />
+   388→          </Button>
+   389→        </div>
+   390→        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">{waterCount} of 8 glasses today</p>
+   391→      </Card>
+   392→
+   393→      {/* ═══ Feature 3: Today's Insights Card ═══ */}
+   394→      <motion.div
+   395→        initial={{ opacity: 0, y: 8 }}
+   396→        animate={{ opacity: 1, y: 0 }}
+   397→        transition={{ delay: 0.3 }}
+   398→      >
+   399→        <Card className={`p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 backdrop-blur-sm ${pctConsumed > 1 ? 'bg-amber-50/50 dark:bg-amber-900/10' : pctConsumed >= 0.75 ? 'bg-emerald-50/50 dark:bg-emerald-900/10' : 'bg-blue-50/50 dark:bg-blue-900/10'}`}>
+   400→          <div className="flex items-start gap-3">
+   401→            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${pctConsumed > 1 ? 'bg-amber-100/80 dark:bg-amber-900/30' : pctConsumed >= 0.75 ? 'bg-emerald-100/80 dark:bg-emerald-900/30' : 'bg-blue-100/80 dark:bg-blue-900/30'}`}>
+   402→              <Lightbulb className={`h-4.5 w-4.5 ${pctConsumed > 1 ? 'text-amber-500' : pctConsumed >= 0.75 ? 'text-emerald-500' : 'text-blue-500'}`} />
+   403→            </div>
+   404→            <div className="flex-1 min-w-0 space-y-2">
+   405→              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Today&apos;s Insights</h3>
+   406→
+   407→              {/* Calorie status message */}
+   408→              {pctConsumed > 1 && (
+   409→                <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+   410→                  You&apos;ve exceeded your calorie goal by <span className="font-bold">{Math.round(consumedCal - targetCal)} kcal</span>. Consider lighter meals for the rest of the day.
+   411→                </p>
+   412→              )}
+   413→              {pctConsumed >= 0.75 && pctConsumed <= 1 && (
+   414→                <p className="text-xs text-emerald-700 dark:text-emerald-400 leading-relaxed">
+   415→                  Great progress! You&apos;re <span className="font-bold">{Math.round(targetCal - consumedCal)} kcal</span> away from your daily goal.
+   416→                </p>
+   417→              )}
+   418→              {pctConsumed < 0.75 && pctConsumed > 0 && (
+   419→                <p className="text-xs text-blue-700 dark:text-blue-400 leading-relaxed">
+   420→                  You still have <span className="font-bold">{Math.round(targetCal - consumedCal)} kcal</span> remaining. Time to fuel up!
+   421→                </p>
+   422→              )}
+   423→              {consumedCal === 0 && (
+   424→                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+   425→                  No meals logged yet today. Start with a balanced breakfast!
+   426→                </p>
+   427→              )}
+   428→
+   429→              {/* Protein status */}
+   430→              {consumedProtein > 0 && pctProtein >= 0.8 && (
+   431→                <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+   432→                  Protein goal almost reached! {'\uD83C\uDF89'} ({Math.round(consumedProtein)}/{Math.round(targetProtein)}g)
+   433→                </p>
+   434→              )}
+   435→
+   436→              {/* Time-of-day tip */}
+   437→              <p className="text-xs text-gray-500 dark:text-gray-400 italic">{'\uD83D\uDCAC'} {timeOfDayTip}</p>
+   438→            </div>
+   439→          </div>
+   440→        </Card>
+   441→      </motion.div>
+   442→
+   443→      {/* ═══ Feature 2: Meal Plan Generator Banner ═══ */}
+   444→      <motion.div
+   445→        initial={{ opacity: 0, y: 8 }}
+   446→        animate={{ opacity: 1, y: 0 }}
+   447→        transition={{ delay: 0.4 }}
+   448→      >
+   449→        <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-gradient-to-r from-emerald-500/5 to-teal-500/5">
+   450→          {!mealPlan?.exists ? (
+   451→            <div className="flex items-center justify-between">
+   452→              <div className="flex items-center gap-3">
+   453→                <div className="w-9 h-9 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center">
+   454→                  <Sparkles className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />
+   455→                </div>
+   456→                <div>
+   457→                  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Today&apos;s Plan</h3>
+   458→                  <p className="text-xs text-gray-500 dark:text-gray-400">Generate a personalized meal plan</p>
+   459→                </div>
+   460→              </div>
+   461→              <Button
+   462→                size="sm"
+   463→                className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium min-h-[36px]"
+   464→                onClick={handleGeneratePlan}
+   465→                disabled={planLoading}
+   466→              >
+   467→                {planLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Sparkles className="h-4 w-4 mr-1.5" />}
+   468→                Generate
+   469→              </Button>
+   470→            </div>
+   471→          ) : (
+   472→            <div className="space-y-2">
+   473→              <div className="flex items-center justify-between">
+   474→                <div className="flex items-center gap-3">
+   475→                  <div className="w-9 h-9 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center">
+   476→                    <Sparkles className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />
+   477→                  </div>
+   478→                  <div>
+   479→                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Today&apos;s Meal Plan</h3>
+   480→                    <p className="text-xs text-gray-500 dark:text-gray-400">AI-generated for your goals</p>
+   481→                  </div>
+   482→                </div>
+   483→                <Badge className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 text-xs">Active</Badge>
+   484→              </div>
+   485→
+   486→              {/* Plan items by slot */}
+   487→              {SLOTS.map((slot) => {
+   488→                const slotItems = (mealPlan?.items || []).filter((i) => i.mealSlot === slot);
+   489→                if (slotItems.length === 0) return null;
+   490→                const isExpanded = planExpanded[slot] || false;
+   491→                return (
+   492→                  <Collapsible
+   493→                    key={slot}
+   494→                    open={isExpanded}
+   495→                    onOpenChange={(open) => setPlanExpanded((prev) => ({ ...prev, [slot]: open }))}
+   496→                  >
+   497→                    <CollapsibleTrigger asChild>
+   498→                      <button className={`w-full flex items-center gap-2 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-white/80 dark:hover:bg-gray-800/50 transition-colors text-left ${SLOT_GRADIENT_COLORS[slot].from} ${SLOT_GRADIENT_COLORS[slot].to}`}>
+   499→                        <span>{SLOT_ICONS[slot]}</span>
+   500→                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">{SLOT_LABELS[slot]}</span>
+   501→                        <span className="text-xs text-gray-500 dark:text-gray-400 truncate flex-1">{slotItems[0]?.meal.name}</span>
+   502→                        <ChevronDown className={`h-3.5 w-3.5 text-gray-400 dark:text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+   503→                      </button>
+   504→                    </CollapsibleTrigger>
+   505→                    <AnimatePresence>
+   506→                      {isExpanded && (
+   507→                        <CollapsibleContent forceMount>
+   508→                          <motion.div
+   509→                            initial={{ height: 0, opacity: 0 }}
+   510→                            animate={{ height: 'auto', opacity: 1 }}
+   511→                            exit={{ height: 0, opacity: 0 }}
+   512→                            transition={{ duration: 0.2 }}
+   513→                            className="overflow-hidden"
+   514→                          >
+   515→                            <div className="pl-4 pr-1 pt-1 space-y-1.5">
+   516→                              {slotItems.map((item) => (
+   517→                                <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
+   518→                                  <div className="flex-1 min-w-0">
+   519→                                    <p className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">{item.meal.name}</p>
+   520→                                    <div className="flex items-center gap-1.5 mt-0.5">
+   521→                                      <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 font-medium border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">{item.meal.cuisine}</Badge>
+   522→                                      <span className="text-xs text-gray-400 dark:text-gray-500">{item.servingGms}g</span>
+   523→                                    </div>
+   524→                                    {item.nutrition && (
+   525→                                      <div className="flex gap-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+   526→                                        <span className="text-orange-600 dark:text-orange-400 font-medium">{item.nutrition.calories} kcal</span>
+   527→                                        <span>P: {item.nutrition.proteinG}g</span>
+   528→                                        <span>C: {item.nutrition.carbsG}g</span>
+   529→                                        <span>F: {item.nutrition.fatG}g</span>
+   530→                                      </div>
+   531→                                    )}
+   532→                                  </div>
+   533→                                  <Button
+   534→                                    size="sm"
+   535→                                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold min-h-[30px] rounded-lg px-2.5 shrink-0"
+   536→                                    onClick={(e) => {
+   537→                                      e.stopPropagation();
+   538→                                      setServingGms(item.servingGms);
+   539→                                      setLogDialog({
+   540→                                        open: true,
+   541→                                        meal: {
+   542→                                          meal: { id: item.meal.id, name: item.meal.name, mealType: item.mealSlot, cuisine: item.meal.cuisine, imageUrl: null, prepTimeMin: item.meal.prepTimeMin, isVeg: item.meal.isVeg, isVegan: item.meal.isVegan },
+   543→                                          score: 0,
+   544→                                          recommendedServingGms: item.servingGms,
+   545→                                          estimatedNutrition: item.nutrition,
+   546→                                          baseNutritionPer100g: item.nutrition ? { calories: Math.round(item.nutrition.calories / item.servingGms * 100), proteinG: Math.round(item.nutrition.proteinG / item.servingGms * 1000) / 10, carbsG: Math.round(item.nutrition.carbsG / item.servingGms * 1000) / 10, fatG: Math.round(item.nutrition.fatG / item.servingGms * 1000) / 10 } : null,
+   547→                                        },
+   548→                                        slot: item.mealSlot,
+   549→                                        baseNutritionPer100g: item.nutrition ? { calories: Math.round(item.nutrition.calories / item.servingGms * 100), proteinG: Math.round(item.nutrition.proteinG / item.servingGms * 1000) / 10, carbsG: Math.round(item.nutrition.carbsG / item.servingGms * 1000) / 10, fatG: Math.round(item.nutrition.fatG / item.servingGms * 1000) / 10 } : null,
+   550→                                        mealName: item.meal.name,
+   551→                                        cuisine: item.meal.cuisine,
+   552→                                        mealType: item.mealSlot,
+   553→                                        isVeg: item.meal.isVeg,
+   554→                                        isVegan: item.meal.isVegan,
+   555→                                      });
+   556→                                    }}
+   557→                                  >
+   558→                                    Log
+   559→                                  </Button>
+   560→                                </div>
+   561→                              ))}
+   562→                            </div>
+   563→                          </motion.div>
+   564→                        </CollapsibleContent>
+   565→                      )}
+   566→                    </AnimatePresence>
+   567→                  </Collapsible>
+   568→                );
+   569→              })}
+   570→            </div>
+   571→          )}
+   572→        </Card>
+   573→      </motion.div>
+   574→
+   575→      {/* ═══ Achievements Row ═══ */}
+   576→      {achievements.length > 0 && (
+   577→        <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60">
+   578→          <div className="flex items-center justify-between mb-3">
+   579→            <div className="flex items-center gap-2">
+   580→              <Trophy className="h-4 w-4 text-amber-500" />
+   581→              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Achievements</h3>
+   582→            </div>
+   583→            <span className="text-xs text-gray-500 dark:text-gray-400">
+   584→              {achievements.filter((a) => a.earned).length}/12 Unlocked
+   585→            </span>
+   586→          </div>
+   587→          {achievements.every((a) => !a.earned) ? (
+   588→            <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-2">Start logging meals to earn badges!</p>
+   589→          ) : (
+   590→            <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+   591→              {achievements.map((ach) => (
+   592→                <div
+   593→                  key={ach.id}
+   594→                  className={`shrink-0 w-16 flex flex-col items-center gap-1 p-2 rounded-xl border transition-colors ${
+   595→                    ach.earned
+   596→                      ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'
+   597→                      : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-40'
+   598→                  }`}
+   599→                >
+   600→                  {ach.earned ? (
+   601→                    <span className="text-2xl leading-none">{ach.icon}</span>
+   602→                  ) : (
+   603→                    <Lock className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+   604→                  )}
+   605→                  <span className={`text-[10px] font-medium text-center leading-tight ${
+   606→                    ach.earned ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-400 dark:text-gray-500'
+   607→                  }`}>
+   608→                    {ach.earned ? ach.name : 'Locked'}
+   609→                  </span>
+   610→                </div>
+   611→              ))}
+   612→            </div>
+   613→          )}
+   614→        </Card>
+   615→      )}
+   616→
+   617→      {/* ═══ Meal Slots with gradient headers & search buttons ═══ */}
+   618→      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   619→        {SLOTS.map((slot) => {
+   620→          const recs = recommendations[slot] || [];
+   621→          const grad = SLOT_GRADIENT_COLORS[slot];
+   622→          return (
+   623→            <Card key={slot} className={`p-0 rounded-xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden`}>
+   624→              <div className={`bg-gradient-to-r ${grad.from} ${grad.to} px-4 py-3`}>
+   625→                <div className="flex items-center justify-between">
+   626→                  <div className="flex items-center gap-2">
+   627→                    <span className="text-base">{SLOT_ICONS[slot]}</span>
+   628→                    <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100">{SLOT_LABELS[slot]}</h3>
+   629→                  </div>
+   630→                  <Button
+   631→                    variant="ghost" size="icon"
+   632→                    className="h-8 w-8 text-gray-400 dark:text-gray-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+   633→                    onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot }); }}
+   634→                  >
+   635→                    <Search className="h-4 w-4" />
+   636→                  </Button>
+   637→                </div>
+   638→              </div>
+   639→              <div className="px-4 pb-3 pt-2 space-y-2 max-h-64 overflow-y-auto">
+   640→                {recs.length === 0 && (
+   641→                  <div className="text-center py-3">
+   642→                    <p className="text-xs text-gray-400 dark:text-gray-500">No recommendations</p>
+   643→                    <Button variant="ghost" size="sm" className="text-emerald-600 dark:text-emerald-400 text-xs mt-1 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot }); }}>
+   644→                      <Search className="h-3 w-3 mr-1" />Search for meals
+   645→                    </Button>
+   646→                  </div>
+   647→                )}
+   648→                {recs.map((rec) => (
+   649→                  <div
+   650→                    key={rec.meal.id}
+   651→                    className="p-2.5 rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 space-y-1.5 hover:shadow-sm hover:border-emerald-100 dark:hover:border-emerald-800 transition-all cursor-pointer"
+   652→                    onClick={() => setDetailSheet({ open: true, rec })}
+   653→                  >
+   654→                    <div className="flex items-start justify-between gap-2">
+   655→                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200 leading-tight line-clamp-1">{rec.meal.name}</p>
+   656→                      <div className="flex items-center gap-1 shrink-0">
+   657→                        {rec.meal.isVeg && <span className="text-green-600 text-xs font-bold border border-green-300 dark:border-green-700 rounded px-1">V</span>}
+   658→                        {rec.meal.isVegan && <span className="text-green-700 text-xs font-bold border border-green-400 dark:border-green-600 rounded px-1">VG</span>}
+   659→                      </div>
+   660→                    </div>
+   661→                    <div className="flex items-center gap-2 flex-wrap">
+   662→                      <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 font-medium border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">{rec.meal.cuisine}</Badge>
+   663→                      {rec.meal.prepTimeMin && (
+   664→                        <span className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-0.5"><Clock className="h-3 w-3" />{rec.meal.prepTimeMin}m</span>
+   665→                      )}
+   666→                    </div>
+   667→                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+   668→                      <span className="font-medium text-gray-700 dark:text-gray-300">{rec.baseNutritionPer100g?.calories || 0} kcal/100g</span>
+   669→                      <span>&middot;</span>
+   670→                      <span>P: {rec.baseNutritionPer100g?.proteinG || 0}g</span>
+   671→                      {rec.estimatedNutrition && (
+   672→                        <span>&middot; <span className="text-emerald-600 dark:text-emerald-400">~{rec.estimatedNutrition.calories} kcal ({rec.recommendedServingGms}g)</span></span>
+   673→                      )}
+   674→                    </div>
+   675→                    <Button
+   676→                      size="sm"
+   677→                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold min-h-[32px] rounded-lg mt-1"
+   678→                      onClick={(e) => {
+   679→                        e.stopPropagation();
+   680→                        setServingGms(rec.recommendedServingGms);
+   681→                        setLogDialog({
+   682→                          open: true, meal: rec, slot,
+   683→                          baseNutritionPer100g: rec.baseNutritionPer100g,
+   684→                          mealName: rec.meal.name, cuisine: rec.meal.cuisine,
+   685→                          mealType: rec.meal.mealType, description: rec.meal.description,
+   686→                          isVeg: rec.meal.isVeg, isVegan: rec.meal.isVegan,
+   687→                        });
+   688→                      }}
+   689→                    >
+   690→                      I Ate This
+   691→                    </Button>
+   692→                  </div>
+   693→                ))}
+   694→              </div>
+   695→            </Card>
+   696→          );
+   697→        })}
+   698→      </div>
+   699→
+   700→      {/* ═══ Log Meal Dialog ═══ */}
+   701→      <Dialog open={logDialog.open} onOpenChange={(open) => setLogDialog(open ? logDialog : { open: false })}>
+   702→        <DialogContent className="max-w-md p-6">
+   703→          <DialogHeader>
+   704→            <DialogTitle>Log Meal</DialogTitle>
+   705→            <DialogDescription className="flex items-center gap-2">
+   706→              {logDialog.open && <span className="font-medium text-gray-700 dark:text-gray-300">{logDialog.mealName}</span>}
+   707→              {logDialog.open && logDialog.cuisine && <Badge variant="outline" className="text-xs">{logDialog.cuisine}</Badge>}
+   708→            </DialogDescription>
+   709→          </DialogHeader>
+   710→          <div className="space-y-4">
+   711→            <div className="space-y-2">
+   712→              <Label className="text-sm font-medium">Serving Size (grams)</Label>
+   713→              <Input type="number" value={servingGms} onChange={(e) => setServingGms(Number(e.target.value))} min={10} max={1000} className="h-11 rounded-xl" />
+   714→            </div>
+   715→            {logDialog.open && logDialog.baseNutritionPer100g && (
+   716→              <div className="space-y-3">
+   717→                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 text-sm space-y-1">
+   718→                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Per 100g</p>
+   719→                  <div className="grid grid-cols-2 gap-2.5 text-xs">
+   720→                    <span className="text-gray-600 dark:text-gray-400">Calories:</span><span className="font-bold text-gray-900 dark:text-gray-100">{logDialog.baseNutritionPer100g.calories} kcal</span>
+   721→                    <span className="text-gray-600 dark:text-gray-400">Protein:</span><span className="font-bold text-blue-600">{logDialog.baseNutritionPer100g.proteinG}g</span>
+   722→                    <span className="text-gray-600 dark:text-gray-400">Carbs:</span><span className="font-bold text-amber-600">{logDialog.baseNutritionPer100g.carbsG}g</span>
+   723→                    <span className="text-gray-600 dark:text-gray-400">Fat:</span><span className="font-bold text-rose-600">{logDialog.baseNutritionPer100g.fatG}g</span>
+   724→                  </div>
+   725→                </div>
+   726→                <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-3 text-sm space-y-1 border border-emerald-100 dark:border-emerald-800">
+   727→                  <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide mb-1.5">Estimated for {servingGms}g serving</p>
+   728→                  <div className="grid grid-cols-2 gap-2.5 text-xs">
+   729→                    <span className="text-gray-600 dark:text-gray-400">Calories:</span><span className="font-bold text-gray-900 dark:text-gray-100">{Math.round((logDialog.baseNutritionPer100g.calories / 100) * servingGms)} kcal</span>
+   730→                    <span className="text-gray-600 dark:text-gray-400">Protein:</span><span className="font-bold text-blue-600">{Math.round((logDialog.baseNutritionPer100g.proteinG / 100) * servingGms * 10) / 10}g</span>
+   731→                    <span className="text-gray-600 dark:text-gray-400">Carbs:</span><span className="font-bold text-amber-600">{Math.round((logDialog.baseNutritionPer100g.carbsG / 100) * servingGms * 10) / 10}g</span>
+   732→                    <span className="text-gray-600 dark:text-gray-400">Fat:</span><span className="font-bold text-rose-600">{Math.round((logDialog.baseNutritionPer100g.fatG / 100) * servingGms * 10) / 10}g</span>
+   733→                  </div>
+   734→                </div>
+   735→              </div>
+   736→            )}
+   737→            {logDialog.open && logDialog.baseNutritionPer100g && (
+   738→              <NutritionFactsLabel nutrition={logDialog.baseNutritionPer100g} servingGms={servingGms} label="Per Serving" />
+   739→            )}
+   740→            <div className="space-y-2">
+   741→              <Label className="text-sm font-medium">Meal Slot</Label>
+   742→              <Select value={logDialog.open ? logDialog.slot : 'lunch'} onValueChange={(v) => logDialog.open && setLogDialog({ ...logDialog, slot: v })}>
+   743→                <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+   744→                <SelectContent>{SLOTS.map((s) => <SelectItem key={s} value={s}>{SLOT_LABELS[s]}</SelectItem>)}</SelectContent>
+   745→              </Select>
+   746→            </div>
+   747→          </div>
+   748→          <DialogFooter>
+   749→            <Button variant="outline" onClick={() => setLogDialog({ open: false })} className="rounded-xl">Cancel</Button>
+   750→            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold" onClick={handleLogMeal}>Log It</Button>
+   751→          </DialogFooter>
+   752→        </DialogContent>
+   753→      </Dialog>
+   754→
+   755→      {/* ═══ Per-Slot Meal Search Dialog ═══ */}
+   756→      <Dialog open={slotSearchDialog.open} onOpenChange={(open) => { if (!open) { setSlotSearchDialog({ open: false }); setSearchQuery(''); setSearchResults([]); } }}>
+   757→        <DialogContent className="max-w-md">
+   758→          <DialogHeader>
+   759→            <DialogTitle>Search Meals</DialogTitle>
+   760→            <DialogDescription>Find and log a meal for {slotSearchDialog.open ? SLOT_LABELS[slotSearchDialog.slot] : ''}</DialogDescription>
+   761→          </DialogHeader>
+   762→          <div className="space-y-3">
+   763→            <div className="relative">
+   764→              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+   765→              <Input
+   766→                placeholder="Search meals..."
+   767→                value={searchQuery}
+   768→                onChange={(e) => handleSlotSearch(e.target.value)}
+   769→                className="h-11 rounded-xl pl-9"
+   770→                autoFocus
+   771→              />
+   772→            </div>
+   773→            <ScrollArea className="max-h-72">
+   774→              <div className="space-y-2">
+   775→                {searchLoading && <div className="flex justify-center py-6"><LoaderIcon className="h-5 w-5 animate-spin text-emerald-600" /></div>}
+   776→                {!searchLoading && searchQuery && searchResults.length === 0 && (
+   777→                  <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">No results found</p>
+   778→                )}
+   779→                {!searchLoading && searchResults.map((meal) => (
+   780→                  <div
+   781→                    key={meal.id}
+   782→                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 hover:border-emerald-100 dark:hover:border-emerald-800 transition-colors cursor-pointer"
+   783→                    onClick={() => handleLogFromSearch(meal)}
+   784→                  >
+   785→                    <div className="flex-1 min-w-0">
+   786→                      <div className="flex items-center gap-2">
+   787→                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{meal.name}</p>
+   788→                        <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 font-medium border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 shrink-0">{meal.cuisine}</Badge>
+   789→                      </div>
+   790→                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+   791→                        <span>{meal.nutrition?.calories || 0} kcal/100g</span>
+   792→                        <span>&middot;</span>
+   793→                        <span className="text-blue-600 font-medium">P: {meal.nutrition?.proteinG || 0}g</span>
+   794→                      </div>
+   795→                    </div>
+   796→                    <ChevronRight className="h-4 w-4 text-gray-300 dark:text-gray-600 shrink-0" />
+   797→                  </div>
+   798→                ))}
+   799→              </div>
+   800→            </ScrollArea>
+   801→          </div>
+   802→        </DialogContent>
+   803→      </Dialog>
+   804→
+   805→      {/* ═══ Meal Detail Sheet ═══ */}
+   806→      <Sheet open={detailSheet.open} onOpenChange={(open) => { if (!open) setDetailSheet({ open: false }); }}>
+   807→        <SheetContent side="bottom" className="max-w-lg mx-auto rounded-t-2xl max-h-[85vh]">
+   808→          {detailSheet.open && (
+   809→            <>
+   810→              <SheetHeader className="pt-2">
+   811→                <div className="flex items-center gap-2 pr-8">
+   812→                  {detailSheet.rec.meal.isVeg && <span className="text-green-600 text-xs font-bold border border-green-300 rounded px-1.5 py-0.5">Veg</span>}
+   813→                  {detailSheet.rec.meal.isVegan && <span className="text-green-700 text-xs font-bold border border-green-400 rounded px-1.5 py-0.5">Vegan</span>}
+   814→                </div>
+   815→                <SheetTitle className="text-lg">{detailSheet.rec.meal.name}</SheetTitle>
+   816→                <SheetDescription className="flex items-center gap-2 flex-wrap">
+   817→                  <Badge variant="outline" className="text-xs">{detailSheet.rec.meal.cuisine}</Badge>
+   818→                  <Badge variant="outline" className={`text-xs ${SLOT_BADGE_COLORS[detailSheet.rec.meal.mealType] || ''}`}>{detailSheet.rec.meal.mealType}</Badge>
+   819→                  {detailSheet.rec.meal.prepTimeMin && (
+   820→                    <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1"><Clock className="h-3 w-3" />{detailSheet.rec.meal.prepTimeMin} min</span>
+   821→                  )}
+   822→                </SheetDescription>
+   823→              </SheetHeader>
+   824→              <ScrollArea className="flex-1 px-4 pb-4">
+   825→                <div className="space-y-4">
+   826→                  {detailSheet.rec.meal.description && (
+   827→                    <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{detailSheet.rec.meal.description}</p>
+   828→                  )}
+   829→                  {detailSheet.rec.baseNutritionPer100g && (
+   830→                    <div>
+   831→                      <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Nutrition per 100g</h4>
+   832→                      <NutritionFactsLabel nutrition={detailSheet.rec.baseNutritionPer100g} servingGms={100} label="Per 100g" />
+   833→                    </div>
+   834→                  )}
+   835→                  {detailSheet.rec.estimatedNutrition && (
+   836→                    <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-3 border border-emerald-100 dark:border-emerald-800">
+   837→                      <h4 className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide mb-2">Recommended: {detailSheet.rec.recommendedServingGms}g serving</h4>
+   838→                      <div className="grid grid-cols-2 gap-1.5 text-xs">
+   839→                        <span className="text-gray-600 dark:text-gray-400">Calories:</span><span className="font-bold">{detailSheet.rec.estimatedNutrition.calories} kcal</span>
+   840→                        <span className="text-gray-600 dark:text-gray-400">Protein:</span><span className="font-bold text-blue-600">{detailSheet.rec.estimatedNutrition.proteinG}g</span>
+   841→                        <span className="text-gray-600 dark:text-gray-400">Carbs:</span><span className="font-bold text-amber-600">{detailSheet.rec.estimatedNutrition.carbsG}g</span>
+   842→                        <span className="text-gray-600 dark:text-gray-400">Fat:</span><span className="font-bold text-rose-600">{detailSheet.rec.estimatedNutrition.fatG}g</span>
+   843→                      </div>
+   844→                    </div>
+   845→                  )}
+   846→                </div>
+   847→              </ScrollArea>
+   848→              <SheetFooter className="border-t pt-3">
+   849→                <Button
+   850→                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold min-h-[44px]"
+   851→                  onClick={() => {
+   852→                    const r = detailSheet.rec;
+   853→                    setServingGms(r.recommendedServingGms);
+   854→                    setLogDialog({
+   855→                      open: true, meal: r, slot: r.meal.mealType,
+   856→                      baseNutritionPer100g: r.baseNutritionPer100g,
+   857→                      mealName: r.meal.name, cuisine: r.meal.cuisine,
+   858→                      mealType: r.meal.mealType, description: r.meal.description,
+   859→                      isVeg: r.meal.isVeg, isVegan: r.meal.isVegan,
+   860→                    });
+   861→                    setDetailSheet({ open: false });
+   862→                  }}
+   863→                >
+   864→                  Log This Meal
+   865→                </Button>
+   866→              </SheetFooter>
+   867→            </>
+   868→          )}
+   869→        </SheetContent>
+   870→      </Sheet>
+   871→    </motion.div>
+   872→  );
+   873→}
+   874→
+   875→// Simple inline icons
+   876→function CalendarIcon({ className }: { className?: string }) {
+   877→  return (
+   878→    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+   879→      <rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" />
+   880→    </svg>
+   881→  );
+   882→}
+   883→
+   884→function LoaderIcon({ className }: { className?: string }) {
+   885→  return (
+   886→    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+   887→      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+   888→    </svg>
+   889→  );
+   890→}
+   891→

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -80,6 +80,8 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
     items: MealPlanItemData[];
   } | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
+  const [calPulse, setCalPulse] = useState(false);
+  const prevConsumedRef = useRef(0);
   const [planExpanded, setPlanExpanded] = useState<Record<string, boolean>>({});
 
   const fetchData = useCallback(async () => {
@@ -241,6 +243,16 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
   // Insights logic (Feature 3)
   const targetCal = nutrition?.targets?.calories || 0;
   const consumedCal = nutrition?.consumed?.calories || 0;
+
+  // Shimmer pulse when calorie value changes
+  useEffect(() => {
+    if (prevConsumedRef.current !== consumedCal && consumedCal > 0) {
+      setCalPulse(true);
+      const t = setTimeout(() => setCalPulse(false), 300);
+      prevConsumedRef.current = consumedCal;
+      return () => clearTimeout(t);
+    }
+  }, [consumedCal]);
   const pctConsumed = targetCal > 0 ? consumedCal / targetCal : 0;
   const targetProtein = nutrition?.targets?.proteinG || 0;
   const consumedProtein = nutrition?.consumed?.proteinG || 0;
@@ -299,15 +311,15 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
 
       {/* ═══ Quick Stats Row ═══ */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100/60 dark:border-gray-800/60 border-t-2 border-t-emerald-400 shadow-sm text-center">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-3 ring-1 ring-inset ring-gray-200/60 dark:ring-gray-700/40 shadow-sm text-center">
           <p className="text-2xl font-extrabold tracking-tight text-gray-900 dark:text-gray-100 tabular-nums mb-1">{mealsLoggedToday}</p>
           <p className="text-[11px] text-gray-600 dark:text-gray-400 font-semibold">Meals Logged</p>
         </div>
-        <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100/60 dark:border-gray-800/60 border-t-2 border-t-cyan-400 shadow-sm text-center">
-          <p className="text-2xl font-extrabold tracking-tight text-cyan-600 dark:text-cyan-400 tabular-nums mb-1">{waterCount}</p>
-          <p className="text-[11px] text-gray-600 dark:text-gray-400 font-semibold">Glasses</p>
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-3 ring-1 ring-inset ring-gray-200/60 dark:ring-gray-700/40 shadow-sm text-center">
+          <p className="text-2xl font-extrabold tracking-tight text-cyan-600 dark:text-cyan-400 tabular-nums mb-1"> 💧{waterCount}</p>
+          <p className="text-[11px] text-gray-600 dark:text-gray-400 font-semibold">Water</p>
         </div>
-        <div className="bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100/60 dark:border-gray-800/60 border-t-2 border-t-amber-400 shadow-sm text-center">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-3 ring-1 ring-inset ring-gray-200/60 dark:ring-gray-700/40 shadow-sm text-center">
           <p className="text-2xl font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400 tabular-nums mb-1">{streak}</p>
           <p className="text-[11px] text-gray-600 dark:text-gray-400 font-semibold">Day Streak</p>
         </div>
@@ -316,7 +328,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
       {/* ═══ Calorie Ring Card ═══ */}
       <Card className="p-6 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60">
         <div className="flex justify-center">
-          <CalorieRing consumed={consumedCal} target={targetCal} />
+          <CalorieRing consumed={consumedCal} target={targetCal} pulse={calPulse} />
         </div>
         {pctConsumed >= 1 && (
           <div className="text-center rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 px-3 py-2">
@@ -447,7 +459,31 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
         transition={{ delay: 0.4 }}
       >
         <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-gradient-to-r from-emerald-500/5 to-teal-500/5">
-          {!mealPlan?.exists ? (
+          {planLoading && !mealPlan?.exists ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center">
+                    <Sparkles className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Today&apos;s Plan</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Generating your personalized plan...</p>
+                  </div>
+                </div>
+                <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
+              </div>
+              {SLOTS.map((slot, i) => (
+                <div key={slot} className={`flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-800 border-l-3 ${SLOT_BORDER_COLORS[slot]} bg-gray-50/50 dark:bg-gray-800/30`}>
+                  <Skeleton className="h-5 w-5 rounded-full" />
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-3.5 w-24 rounded" />
+                    <Skeleton className="h-3 w-40 rounded" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : !mealPlan?.exists ? (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center">

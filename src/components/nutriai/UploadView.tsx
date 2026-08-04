@@ -1,22 +1,30 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Camera, Loader2, Sparkles, UtensilsCrossed, Lightbulb,
+  Camera, Loader2, Sparkles, UtensilsCrossed, Lightbulb, ImageIcon, Clock, ScanLine,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { apiFetch } from './api';
 import { SLOTS, SLOT_LABELS, CUISINES, fadeIn } from './constants';
 import type { RecognizedFood } from './types';
+
+interface RecentScan {
+  id: string;
+  meal?: { name: string };
+  calories: number;
+  createdAt: string;
+}
 
 export function UploadView() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -30,6 +38,28 @@ export function UploadView() {
     mealType: string; cuisine: string;
   }>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Recent scans
+  const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
+  const [scansLoading, setScansLoading] = useState(true);
+
+  useEffect(() => {
+    apiFetch('/api/food-logs?limit=3')
+      .then((data: Record<string, unknown>) => {
+        const allItems = (data.itemsBySlot as Record<string, RecentScan[]> | undefined) || {};
+        const flat: RecentScan[] = [];
+        for (const slot of Object.keys(allItems)) {
+          for (const item of allItems[slot]) {
+            flat.push(item);
+          }
+        }
+        flat.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        setRecentScans(flat.slice(0, 3));
+      })
+      .catch(() => setRecentScans([]))
+      .finally(() => setScansLoading(false));
+  }, []);
 
   const handleFileSelect = (file: File) => {
     setImageFile(file);
@@ -87,6 +117,17 @@ export function UploadView() {
     } catch (err) { toast.error((err as Error).message); }
   };
 
+  const formatTimeAgo = (dateStr: string) => {
+    if (!dateStr) return '';
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  };
+
   return (
     <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-5 pb-4">
       {/* Header */}
@@ -100,69 +141,90 @@ export function UploadView() {
         </div>
       </div>
 
-      {/* Upload Zone */}
-      <Card className="rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+      {/* Preview Zone */}
+      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 overflow-hidden">
         <div
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className={`min-h-[280px] border-2 border-dashed transition-colors cursor-pointer flex items-center justify-center p-8 ${
+          className={`min-h-[160px] border-2 border-dashed transition-colors cursor-pointer flex items-center justify-center p-6 ${
             dragOver
               ? 'border-emerald-400 bg-emerald-50/30 dark:bg-emerald-900/20'
               : 'border-emerald-200 dark:border-emerald-700 hover:border-emerald-400 dark:hover:border-emerald-500 bg-gradient-to-b from-emerald-50/30 to-transparent dark:from-emerald-900/10'
-          } ${imagePreview ? 'p-4' : ''}`}
+          } ${imagePreview ? 'p-3' : ''}`}
         >
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])} />
+          <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])} />
           {imagePreview ? (
-            <div className="space-y-3 text-center">
-              <img src={imagePreview} alt="Preview" className="max-h-56 mx-auto rounded-xl object-contain" />
-              <p className="text-sm text-gray-500 dark:text-gray-400">Tap to change image</p>
+            <div className="space-y-2 text-center">
+              <img src={imagePreview} alt="Preview" className="max-h-40 mx-auto rounded-xl object-contain" />
+              <p className="text-xs text-gray-400 dark:text-gray-500">Tap to change image</p>
             </div>
           ) : (
-            <div className="space-y-4 text-center">
-              <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center mx-auto border border-emerald-100 dark:border-emerald-800 animate-[bounce_3s_ease-in-out_infinite]">
-                <Camera className="h-8 w-8 text-emerald-400 dark:text-emerald-500" />
+            <div className="text-center">
+              <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center mx-auto border border-emerald-100 dark:border-emerald-800 animate-[bounce_3s_ease-in-out_infinite]">
+                <ImageIcon className="h-7 w-7 text-emerald-400 dark:text-emerald-500" />
               </div>
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Take a photo or upload an image to identify your meal</p>
-                <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-2">Tap to Upload</p>
-              </div>
-              <p className="text-xs text-gray-400 dark:text-gray-500">Supports JPG, PNG, WebP</p>
-              <div className="flex gap-2 justify-center">
-                {['JPG', 'PNG', 'WebP'].map((fmt) => (
-                  <span key={fmt} className="px-2 py-0.5 rounded-full text-[10px] text-gray-300 dark:text-gray-600">{fmt}</span>
-                ))}
-              </div>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">Drop an image here or tap to browse</p>
             </div>
           )}
         </div>
       </Card>
 
-      {/* How it works — Connected Step Indicator */}
+      {/* Two Action Buttons */}
+      <div className="flex flex-col gap-3">
+        <Button
+          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white min-h-[44px] rounded-xl font-semibold flex items-center justify-center gap-2"
+          onClick={() => cameraInputRef.current?.click()}
+        >
+          <Camera className="h-5 w-5" />
+          Take Photo
+        </Button>
+        <Button
+          variant="outline"
+          className="w-full border-emerald-600 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 dark:border-emerald-500 dark:text-emerald-400 min-h-[44px] rounded-xl font-semibold flex items-center justify-center gap-2"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <ImageIcon className="h-5 w-5" />
+          Choose from Gallery
+        </Button>
+      </div>
+
+      {/* Format Badges */}
+      <div className="flex gap-2 justify-center">
+        {['JPG', 'PNG', 'WebP'].map((fmt) => (
+          <Badge key={fmt} className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 text-xs font-medium">{fmt}</Badge>
+        ))}
+      </div>
+
+      {/* How it works — Card Steps with Connecting Lines */}
       <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-gray-50/50 dark:bg-gray-800/30 p-5">
-        <h3 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-6">How it works</h3>
-        <div className="relative">
-          {/* Connecting line behind circles */}
-          <div className="absolute top-[18px] left-[calc(16.67%+18px)] right-[calc(16.67%+18px)] h-0.5 bg-emerald-200 dark:bg-emerald-800 -z-0" />
-          <div className="grid grid-cols-3 gap-4 relative z-10">
-            {[
-              { step: 1, icon: Camera, title: 'Upload Photo', desc: 'Take or select a food photo' },
-              { step: 2, icon: Sparkles, title: 'AI Analyzes', desc: 'Identifies food & nutrition' },
-              { step: 3, icon: UtensilsCrossed, title: 'Log Meal', desc: 'One-tap meal logging' },
-            ].map((item) => (
-              <div key={item.step} className="flex flex-col items-center text-center gap-2">
-                <div className="w-9 h-9 rounded-full bg-emerald-600 text-white text-sm font-bold flex items-center justify-center ring-4 ring-white dark:ring-gray-900 shadow-sm shadow-emerald-200 dark:shadow-emerald-900/30">{item.step}</div>
-                <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center">
+        <h3 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">How it works</h3>
+        <div className="space-y-0">
+          {[
+            { step: 1, icon: Camera, title: 'Upload Photo', desc: 'Take or select a food photo' },
+            { step: 2, icon: Sparkles, title: 'AI Analyzes', desc: 'Identifies food & nutrition' },
+            { step: 3, icon: UtensilsCrossed, title: 'Log Meal', desc: 'One-tap meal logging' },
+          ].map((item, idx) => (
+            <div key={item.step}>
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
+                <div className="w-9 h-9 rounded-full bg-emerald-600 text-white text-sm font-bold flex items-center justify-center shrink-0 shadow-sm shadow-emerald-200 dark:shadow-emerald-900/30">{item.step}</div>
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center shrink-0">
                   <item.icon className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
                 </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{item.title}</p>
-                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 leading-tight">{item.desc}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">{item.title}</p>
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{item.desc}</p>
                 </div>
               </div>
-            ))}
-          </div>
+              {idx < 2 && (
+                <div className="flex justify-center py-1">
+                  <div className="w-0.5 h-4 bg-emerald-200 dark:bg-emerald-800 rounded-full" />
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </Card>
 
@@ -192,12 +254,38 @@ export function UploadView() {
         </div>
       </Card>
 
-      {/* Empty state note */}
-      {!imagePreview && !results.length && (
-        <p className="text-center text-xs text-gray-400 dark:text-gray-500">
-          No recent scans. Upload a food photo to get started.
-        </p>
-      )}
+      {/* Recent Scans */}
+      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <ScanLine className="h-4 w-4 text-emerald-500" />
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Recent Scans</h3>
+        </div>
+        {scansLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-12 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : recentScans.length === 0 ? (
+          <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">No recent scans yet</p>
+        ) : (
+          <div className="space-y-2">
+            {recentScans.map((scan) => (
+              <div key={scan.id} className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{scan.meal?.name || 'Unknown'}</p>
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatTimeAgo(scan.createdAt)}
+                  </p>
+                </div>
+                <span className="text-sm font-bold text-gray-700 dark:text-gray-300 tabular-nums">{Math.round(scan.calories)}</span>
+                <span className="text-[10px] text-gray-400 dark:text-gray-500">kcal</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       {/* Recognize Button */}
       {imageFile && !results.length && (

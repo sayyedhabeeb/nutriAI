@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Sparkles, Utensils, TrendingUp, Lightbulb, Loader2, Dumbbell, Camera, CalendarDays, Scale } from 'lucide-react';
+import { Send, Sparkles, UtensilsCrossed, TrendingUp, Lightbulb, Loader2, Target, CalendarDays, Scale, Camera, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -37,11 +37,12 @@ interface SuggestedMeal {
 }
 
 const QUICK_ACTIONS = [
-  { label: 'Suggest a meal', icon: Utensils, message: 'Suggest a healthy meal I can eat right now based on my current nutrition intake.', isSuggestMeal: true },
-  { label: 'Am I on track?', icon: TrendingUp, message: 'Am I on track to hit my daily nutrition goals today?' },
+  { label: 'Suggest a meal', icon: UtensilsCrossed, message: 'Suggest a healthy meal I can eat right now based on my current nutrition intake.', isSuggestMeal: true },
+  { label: 'Am I on track?', icon: Target, message: 'Am I on track to hit my daily nutrition goals today?' },
   { label: 'Nutrition tips', icon: Lightbulb, message: 'Give me a quick nutrition tip that can help me improve my diet.' },
   { label: 'My meal plan', icon: CalendarDays, message: 'Show me my meal plan for today and suggest alternatives if needed.' },
   { label: 'Log my weight', icon: Scale, message: 'I want to update my weight. How should I track it?' },
+  { label: 'Scan food photo', icon: Camera, message: 'I want to scan a food photo to log my meal.' },
 ];
 
 export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void }) {
@@ -185,7 +186,7 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
           mealSlot: logSlot,
         }),
       });
-      toast.success('🍽️ Logged ' + logDialog.meal.name + '!');
+      toast.success('\uD83C\uDF7D\uFE0F Logged ' + logDialog.meal.name + '!');
       setLogDialog({ open: false });
       // Add AI confirmation message
       addAiMessage(`Great! I've logged ${logDialog.meal.name} for you. Keep going!`);
@@ -233,12 +234,12 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
       {/* Messages / Empty State */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pb-2">
         {!hasUserMessages && !loading ? (
-          /* Warm centered empty state */
+          /* Warm centered empty state with illustration */
           <div className="flex flex-col items-center justify-center h-full -mt-8">
             <div className="relative mb-4">
               <div className="absolute inset-0 rounded-full bg-gradient-to-br from-emerald-200 to-teal-200 dark:from-emerald-800 dark:to-teal-800 blur-md opacity-40" />
-              <div className="relative w-16 h-16 rounded-full bg-white dark:bg-gray-900 flex items-center justify-center border border-emerald-100 dark:border-emerald-800 shadow-md animate-pulse">
-                <Sparkles className="h-9 w-9 text-emerald-600 dark:text-emerald-400" />
+              <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/40 dark:to-teal-900/40 flex items-center justify-center shadow-lg animate-pulse">
+                <Sparkles className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
               </div>
             </div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Hi, I&apos;m NutriAI!</h2>
@@ -248,9 +249,9 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
                 <button
                   key={action.label}
                   onClick={() => sendMessage(action.message, action.isSuggestMeal)}
-                  className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-gradient-to-br from-white to-gray-50/80 dark:from-gray-800 dark:to-gray-800/50 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 font-medium shadow-sm hover:shadow-md hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 dark:hover:bg-emerald-900/30 dark:hover:border-emerald-800 dark:hover:text-emerald-400 transition-colors"
+                  className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-gradient-to-br from-white to-gray-50/80 dark:from-gray-800 dark:to-gray-800/50 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 font-medium shadow-sm hover:shadow-md hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-200 dark:hover:border-emerald-800 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
                 >
-                  <action.icon className="h-3.5 w-3.5" />
+                  <action.icon className="h-3.5 w-3.5 shrink-0" />
                   {action.label}
                 </button>
               ))}
@@ -270,15 +271,15 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
                 >
                   {msg.role === 'ai' && (
                     <div className="flex items-center gap-1 mb-1 pl-1">
-                      <Sparkles className="h-3 w-3 text-emerald-500" />
+                      <Bot className="h-3 w-3 text-emerald-500" />
                       <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">NutriAI</span>
                     </div>
                   )}
                   <div
-                    className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                    className={`max-w-[85%] px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
                       msg.role === 'user'
-                        ? 'bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-br-md'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-bl-md border-l-2 border-emerald-200 dark:border-emerald-800'
+                        ? 'bg-emerald-600 text-white rounded-2xl rounded-br-md'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-2xl rounded-bl-md'
                     }`}
                   >
                     {msg.content}
@@ -332,12 +333,14 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
                 animate={{ opacity: 1, y: 0 }}
                 className="flex justify-start"
               >
-                <div className="bg-gray-100 dark:bg-gray-800 px-4 py-3 rounded-2xl rounded-bl-md">
-                  <div className="flex gap-1.5">
-                    <span className="w-2 h-2 bg-emerald-400 dark:bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-2 h-2 bg-emerald-400 dark:bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-2 h-2 bg-emerald-400 dark:bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
+                <div className="flex items-center gap-1 mb-1 pl-1">
+                  <Bot className="h-3 w-3 text-emerald-500" />
+                  <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">NutriAI</span>
+                </div>
+                <div className="flex gap-1 items-center p-3 bg-gray-100 dark:bg-gray-800 rounded-2xl rounded-bl-md">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce [animation-delay:0ms]" />
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce [animation-delay:150ms]" />
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce [animation-delay:300ms]" />
                 </div>
               </motion.div>
             )}
@@ -353,7 +356,7 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
               <button
                 key={action.label}
                 onClick={() => sendMessage(action.message, action.isSuggestMeal)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 font-medium whitespace-nowrap shadow-sm hover:shadow-md hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 dark:hover:bg-emerald-900/30 dark:hover:border-emerald-800 dark:hover:text-emerald-400 transition-colors shrink-0"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 font-medium whitespace-nowrap shadow-sm hover:shadow-md hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-200 dark:hover:border-emerald-800 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors shrink-0"
               >
                 <action.icon className="h-3.5 w-3.5" />
                 {action.label}
@@ -380,7 +383,7 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about nutrition..."
             disabled={loading}
-            className="flex-1 h-12 rounded-xl bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:font-medium ring-1 ring-inset ring-gray-200 dark:ring-gray-700"
+            className="flex-1 h-12 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400 placeholder:font-medium focus-visible:ring-2 focus-visible:ring-emerald-500"
           />
           <Button
             type="submit"
@@ -416,7 +419,7 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium">Meal Slot</Label>
                 <Select value={logSlot} onValueChange={setLogSlot}>
-                  <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-11 rounded-xl focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="breakfast">Breakfast</SelectItem>
                     <SelectItem value="lunch">Lunch</SelectItem>
@@ -434,7 +437,7 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
                   onChange={(e) => setLogServingGms(Number(e.target.value))}
                   min={10}
                   max={1000}
-                  className="h-11 rounded-xl"
+                  className="h-11 rounded-xl focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 />
                 <p className="text-xs text-gray-400 dark:text-gray-500">
                   Estimated: {Math.round(logDialog.meal.caloriesPer100g * logServingGms / 100)} kcal
