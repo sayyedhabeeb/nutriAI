@@ -1,0 +1,741 @@
+
+Table of Contents
+Note: Right-click the Table of Contents and select "Update Field" to refresh page numbers.
+
+
+1. Executive Summary
+NutriAI is an AI-powered diet recommendation and food tracking platform that differentiates itself through a vision-first approach: users photograph their meals, and a Vision AI model identifies the food items, estimates serving sizes, and matches them against a curated food database. The system automatically calculates nutritional values and updates daily progress in real time. This document provides the complete system design blueprint for building NutriAI as a simplified, self-contained, production-ready system.
+The original NutriAI specification was designed for a large-scale cloud deployment using AWS (ECS, RDS, S3, ElastiCache, CloudWatch), React Native mobile apps, JWT-based authentication, PostgreSQL with Redis caching, and Firebase push notifications. This blueprint re-architects the entire system for a dramatically simpler deployment footprint while preserving all core AI and nutritional intelligence capabilities.
+Key architectural simplifications include: replacing PostgreSQL with MySQL accessed through Prisma ORM for type-safe database operations; replacing JWT/OAuth authentication with simple session-based auth using express-session stored in MySQL; replacing AWS S3 with local disk storage managed by Multer for food image uploads; removing Redis, Firebase, and all AWS infrastructure dependencies; and replacing the React Native mobile app with a responsive React web application using Tailwind CSS.
+Most critically, this blueprint introduces a new feature not present in the original specification: the Unknown Food Auto-Add capability. When a user uploads a food photograph that the Vision AI successfully identifies but that does not exist in the food database, the system prompts the user to confirm the food name, specify the portion size, and provide or confirm nutritional values. The food is then automatically added to the database as a new cooked food entry, making it immediately available for all users. This feature enables the food database to grow organically through user contributions, significantly reducing the initial data population burden.
+The system retains only two AI models: GPT-4o Vision (via OpenAI API) for food recognition from images, and a locally hosted Qwen 2.5 3B Instruct model (via Ollama) for meal ranking from pre-filtered candidate lists. All nutritional calculations (BMI, BMR, TDEE, macro distribution, meal filtering, scoring) remain deterministic backend algorithms that operate at database query speed without any AI involvement.
+2. System Architecture Overview
+The simplified NutriAI architecture follows a clean three-tier design pattern: a React single-page application as the frontend, a single Express.js server as the backend API, and a MySQL database as the persistence layer. Two external AI services (GPT-4o Vision API and a local Ollama instance running Qwen 2.5 3B) are accessed through dedicated adapter modules within the backend. This architecture eliminates the need for any cloud infrastructure beyond the single server hosting the application.
+2.1 Architecture Diagram
++-------------------+     HTTPS/JSON      +-------------------------+
+|                   | <=================> |                         |
+|   React Web App   |                    |    Express.js API       |
+|   (Vite + Tailwind)|                    |    Server (Node.js)     |
+|   Port 5173 (dev) |                    |    Port 3000             |
++-------------------+                    +---+--------+--------+----+
+                                           |         |         |
+                                    +-----+  +----+---+  +-----+-----+
+                                    | MySQL |  | Local |  |  GPT-4o   |
+                                    | (via  |  | /up-  |  |  Vision   |
+                                    | Prisma)|  | loads |  |  API      |
+                                    +-------+  +-------+  +-----------+
+                                                        +-----------+
+                                                        | Ollama    |
+                                                        | Qwen 2.5  |
+                                                        | 3B Local  |
+                                                        +-----------+
+2.2 Key Architectural Decisions
+3. Technology Stack
+3.1 Backend Stack
+3.2 Frontend Stack
+3.3 Key Dependencies (package.json)
+{
+  "dependencies": {
+    "express": "^4.21.0",
+    "@prisma/client": "^5.22.0",
+    "express-session": "^1.18.0",
+    "express-mysql-session": "^3.0.0",
+    "bcrypt": "^5.1.1",
+    "multer": "^1.4.5-lts.1",
+    "openai": "^4.73.0",
+    "ollama": "^0.5.12",
+    "zod": "^3.23.8",
+    "winston": "^3.14.2",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "express-rate-limit": "^7.4.1",
+    "cookie-parser": "^1.4.7",
+    "morgan": "^1.10.0"
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0",
+    "typescript": "^5.6.0",
+    "tsx": "^4.19.0",
+    "@types/express": "^5.0.0",
+    "@types/bcrypt": "^5.0.2",
+    "@types/express-session": "^1.18.0",
+    "@types/multer": "^1.4.12",
+    "@types/cors": "^2.8.17",
+    "@types/morgan": "^1.9.9",
+    "@types/uuid": "^10.0.0",
+    "nodemon": "^3.1.0"
+  }
+}
+4. Authentication System (Simple Session-Based)
+The authentication system uses express-session with a MySQL session store, providing a straightforward and reliable mechanism for managing user sessions without the complexity of JWT tokens, refresh token rotation, or OAuth integration. This approach is ideal for a web application where the frontend and backend share the same domain. Sessions are stored server-side in a MySQL table managed by express-mysql-session, with only a signed session cookie sent to the client browser.
+4.1 Session Configuration
+The session middleware is configured with the following parameters: the session secret is loaded from the SESSION_SECRET environment variable (a minimum 32-character random string generated at deployment time), the cookie is configured with httpOnly: true and sameSite: 'lax' to prevent cross-site request forgery and cross-site scripting attacks, the session maximum age is set to 7 days (604800000 milliseconds), and the rolling option is enabled to refresh the session expiry on each request, keeping active users logged in indefinitely.
+4.2 Auth Flow
+4.3 Security Measures
+Password security uses bcrypt with a cost factor of 12 salt rounds, providing approximately 250ms per hash computation on modern hardware. Login attempts are rate-limited to 10 requests per 15 minutes per IP address using express-rate-limit with a sliding window. Helmet.js is applied as global middleware to set 15 security-related HTTP headers including Content-Security-Policy, X-Frame-Options DENY, and X-Content-Type-Options nosniff. CORS is restricted to the frontend origin only. All API endpoints use Zod schemas for request validation, rejecting malformed input before it reaches any service layer.
+5. Database Design (Prisma Schema for MySQL)
+The database schema comprises 18 models organized into five logical groups: User Management, Food Database, Daily Tracking, Recommendations, and System. All models use auto-incrementing integer primary keys (optimized for MySQL), DateTime fields for timestamps, and explicit indexing on query-critical columns. The schema is designed for Prisma ORM with MySQL as the database provider, leveraging Prisma's type-safe query builder for all database operations.
+5.1 Complete Prisma Schema
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══ User Management ═══
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique @db.VarChar(255)
+  passwordHash  String    @map("password_hash") @db.VarChar(255)
+  name          String?   @db.VarChar(100)
+  role          String    @default("user") @db.VarChar(20)
+  isVerified    Boolean   @default(false) @map("is_verified")
+  isActive      Boolean   @default(true) @map("is_active")
+  lastLoginAt   DateTime? @map("last_login_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  profile       UserProfile?
+  goal          UserGoal?
+  allergies     UserAllergy[]
+  preference    UserPreference?
+  foodLogs      FoodLog[]
+  dailyNutritions DailyNutrition[]
+  waterLogs     WaterLog[]
+  weightLogs    WeightLog[]
+  mealPlanDays  MealPlanDay[]
+  @@map("users")
+}
+
+model UserProfile {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @unique @map("user_id")
+  firstName   String   @map("first_name") @db.VarChar(50)
+  lastName    String?  @map("last_name") @db.VarChar(50)
+  age         Int?
+  gender      String?  @db.VarChar(20)
+  heightCm    Float?   @map("height_cm")
+  weightKg    Float?   @map("weight_kg")
+  country     String?  @db.VarChar(100)
+  timezone    String   @default("UTC") @db.VarChar(50)
+  avatarUrl   String?  @map("avatar_url") @db.Text
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("user_profiles")
+}
+
+model UserGoal {
+  id                   Int      @id @default(autoincrement())
+  userId               Int      @unique @map("user_id")
+  goalType             String   @map("goal_type") @db.VarChar(30)
+  activityLevel        String   @map("activity_level") @db.VarChar(30)
+  workoutFrequency     String?  @map("workout_frequency") @db.VarChar(30)
+  targetWeightKg       Float?   @map("target_weight_kg")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("user_goals")
+}
+
+model UserAllergy {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  allergyName String   @map("allergy_name") @db.VarChar(50)
+  createdAt   DateTime @default(now()) @map("created_at")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@map("user_allergies")
+}
+
+model UserPreference {
+  id                Int      @id @default(autoincrement())
+  userId            Int      @unique @map("user_id")
+  cuisinePreference  String?  @map("cuisine_preference") @db.VarChar(50)
+  dietType          String?  @map("diet_type") @db.VarChar(20)
+  budgetLevel       String?  @map("budget_level") @db.VarChar(20)
+  macroOverrideJson String?  @map("macro_override_json") @db.Text
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("user_preferences")
+}
+
+// ═══ Food Database ═══
+model Meal {
+  id              Int       @id @default(autoincrement())
+  name            String    @db.VarChar(200)
+  description     String?   @db.Text
+  mealType        String    @map("meal_type") @db.VarChar(20)
+  cuisine         String    @db.VarChar(50)
+  isVeg           Boolean   @default(false) @map("is_veg")
+  isVegan         Boolean   @default(false) @map("is_vegan")
+  isEggetarian    Boolean   @default(false) @map("is_eggetarian")
+  baseServingGms  Int       @default(100) @map("base_serving_gms")
+  prepTimeMin    Int?      @map("prep_time_min")
+  imageUrl        String?   @map("image_url") @db.Text
+  isActive        Boolean   @default(true) @map("is_active")
+  source          String    @default("admin") @db.VarChar(30)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  nutrition       MealNutrition?
+  servings        MealServing[]
+  aliases         MealAlias[]
+  tags            MealTag[]
+  ingredients     MealIngredient[]
+  logItems        FoodLogItem[]
+  planItems       MealPlanItem[]
+  @@index([cuisine, mealType, isActive])
+  @@index([name])
+  @@map("meals")
+}
+
+model MealNutrition {
+  id              Int     @id @default(autoincrement())
+  mealId          Int     @unique @map("meal_id")
+  calories        Decimal @db.Decimal(8,1)
+  proteinG        Decimal @map("protein_g") @db.Decimal(6,1)
+  carbsG          Decimal @map("carbs_g") @db.Decimal(6,1)
+  fatG            Decimal @map("fat_g") @db.Decimal(6,1)
+  fiberG          Decimal? @map("fiber_g") @db.Decimal(6,1)
+  sugarG          Decimal? @map("sugar_g") @db.Decimal(6,1)
+  sodiumMg        Decimal? @map("sodium_mg") @db.Decimal(8,1)
+  perServingGms   Int     @default(100) @map("per_serving_gms")
+  createdAt       DateTime @default(now()) @map("created_at")
+  meal            Meal    @relation(fields: ealId], references: [id], onDelete: Cascade)
+  @@map("meal_nutrition")
+}
+
+model MealServing {
+  id            Int     @id @default(autoincrement())
+  mealId        Int     @map("meal_id")
+  servingName   String  @map("serving_name") @db.VarChar(50)
+  servingGms    Int     @map("serving_grams")
+  multiplier    Float   @db.Double
+  createdAt     DateTime @default(now()) @map("created_at")
+  meal          Meal    @relation(fields: ealId], references: [id], onDelete: Cascade)
+  @@index(ealId])
+  @@map("meal_servings")
+}
+
+model MealAlias {
+  id          Int     @id @default(autoincrement())
+  mealId      Int     @map("meal_id")
+  aliasName   String  @map("alias_name") @db.VarChar(200)
+  createdAt   DateTime @default(now()) @map("created_at")
+  meal        Meal    @relation(fields: ealId], references: [id], onDelete: Cascade)
+  @@index([aliasName])
+  @@index(ealId])
+  @@map("meal_aliases")
+}
+
+model MealTag {
+  id        Int     @id @default(autoincrement())
+  mealId    Int     @map("meal_id")
+  tagName   String  @map("tag_name") @db.VarChar(50)
+  meal      Meal    @relation(fields: ealId], references: [id], onDelete: Cascade)
+  @@map("meal_tags")
+}
+
+model MealIngredient {
+  id              Int     @id @default(autoincrement())
+  mealId          Int     @map("meal_id")
+  ingredientName  String  @map("ingredient_name") @db.VarChar(100)
+  containsAllergen Boolean @default(false) @map("contains_allergen")
+  meal            Meal    @relation(fields: ealId], references: [id], onDelete: Cascade)
+  @@map("meal_ingredients")
+}
+
+// ═══ Daily Tracking ═══
+model FoodLog {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @map("user_id")
+  logDate         DateTime @map("log_date")
+  totalCalories   Decimal? @map("total_calories") @db.Decimal(8,1)
+  totalProtein    Decimal? @map("total_protein") @db.Decimal(8,1)
+  totalCarbs      Decimal? @map("total_carbs") @db.Decimal(8,1)
+  totalFat        Decimal? @map("total_fat") @db.Decimal(8,1)
+  status          String   @default("active") @db.VarChar(20)
+  createdAt       DateTime @default(now()) @map("created_at")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items           FoodLogItem[]
+  @@index([userId, logDate])
+  @@map("food_logs")
+}
+
+model FoodLogItem {
+  id              Int      @id @default(autoincrement())
+  foodLogId       Int      @map("food_log_id")
+  mealId          Int?     @map("meal_id")
+  servingGms      Int      @map("serving_grams")
+  calories        Decimal  @db.Decimal(8,1)
+  proteinG        Decimal  @map("protein_g") @db.Decimal(6,1)
+  carbsG          Decimal  @map("carbs_g") @db.Decimal(6,1)
+  fatG            Decimal  @map("fat_g") @db.Decimal(6,1)
+  mealSlot        String   @map("meal_slot") @db.VarChar(20)
+  loggedAt        DateTime @default(now()) @map("logged_at")
+  source          String   @default("tap") @db.VarChar(20)
+  foodLog         FoodLog @relation(fields: [foodLogId], references: [id], onDelete: Cascade)
+  meal            Meal?    @relation(fields: ealId], references: [id])
+  @@index([foodLogId])
+  @@map("food_log_items")
+}
+
+model DailyNutrition {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @map("user_id")
+  date            DateTime @db.Date
+  targetCalories  Decimal  @map("target_calories") @db.Decimal(8,1)
+  consumedCalories Decimal  @map("consumed_calories") @db.Decimal(8,1)
+  targetProtein   Decimal  @map("target_protein") @db.Decimal(6,1)
+  consumedProtein  Decimal  @map("consumed_protein") @db.Decimal(6,1)
+  targetCarbs     Decimal  @map("target_carbs") @db.Decimal(6,1)
+  consumedCarbs    Decimal  @map("consumed_carbs") @db.Decimal(6,1)
+  targetFat       Decimal  @map("target_fat") @db.Decimal(6,1)
+  consumedFat      Decimal  @map("consumed_fat") @db.Decimal(6,1)
+  createdAt       DateTime @default(now()) @map("created_at")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, date])
+  @@map("daily_nutrition")
+}
+
+model WaterLog {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @map("user_id")
+  logDate         DateTime @map("log_date") @db.Date
+  glassesConsumed Int      @default(0) @map("glasses_consumed")
+  targetGlasses   Int      @default(8) @map("target_glasses")
+  createdAt       DateTime @default(now()) @map("created_at")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, logDate])
+  @@map("water_logs")
+}
+
+model WeightLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  weightKg    Decimal  @map("weight_kg") @db.Decimal(5,1)
+  logDate     DateTime @map("log_date") @db.Date
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, logDate])
+  @@map("weight_logs")
+}
+
+// ═══ Recommendations & Plans ═══
+model MealPlanDay {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @map("user_id")
+  planDate        DateTime @map("plan_date") @db.Date
+  targetCalories  Decimal  @map("target_calories") @db.Decimal(8,1)
+  targetProtein   Decimal  @map("target_protein") @db.Decimal(6,1)
+  targetCarbs     Decimal  @map("target_carbs") @db.Decimal(6,1)
+  targetFat       Decimal  @map("target_fat") @db.Decimal(6,1)
+  status          String   @default("active") @db.VarChar(20)
+  createdAt       DateTime @default(now()) @map("created_at")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items           MealPlanItem[]
+  @@unique([userId, planDate])
+  @@map("meal_plan_days")
+}
+
+model MealPlanItem {
+  id                Int      @id @default(autoincrement())
+  planDayId         Int      @map("plan_day_id")
+  mealSlot          String   @map("meal_slot") @db.VarChar(20)
+  mealId            Int      @map("meal_id")
+  servingGms        Int      @default(0) @map("serving_grams")
+  recommendedCalories Decimal  @map("recommended_calories") @db.Decimal(8,1)
+  rankScore         Decimal? @map("rank_score") @db.Decimal(3,2)
+  createdAt         DateTime @default(now()) @map("created_at")
+  planDay           MealPlanDay @relation(fields: [planDayId], references: [id], onDelete: Cascade)
+  meal              Meal    @relation(fields: ealId], references: [id])
+  @@index([planDayId, mealSlot])
+  @@map("meal_plan_items")
+}
+
+// ═══ System & AI ═══
+model AiLog {
+  id              Int      @id @default(autoincrement())
+  userId          Int?     @map("user_id")
+  modelType       String   @map("model_type") @db.VarChar(30)
+  requestPayload  String?  @map("request_payload") @db.MediumText
+  responsePayload String?  @map("response_payload") @db.MediumText
+  latencyMs       Int?     @map("latency_ms")
+  tokensUsed      Int?     @map("tokens_used")
+  costUsd         Decimal? @map("cost_usd") @db.Decimal(8,4)
+  createdAt       DateTime @default(now()) @map("created_at")
+  @@index(odelType, createdAt])
+  @@map("ai_logs")
+}
+
+// ═══ Unknown Food Submissions (NEW FEATURE) ═══
+model UnknownFoodSubmission {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @map("user_id")
+  imageFilePath   String   @map("image_file_path") @db.VarChar(500)
+  aiDetectedName  String   @map("ai_detected_name") @db.VarChar(200)
+  confirmedName   String   @map("confirmed_name") @db.VarChar(200)
+  confirmedPortion Int      @map("confirmed_portion")
+  caloriesPer100g  Decimal  @map("calories_per_100g") @db.Decimal(8,1)
+  proteinPer100g   Decimal  @map("protein_per_100g") @db.Decimal(6,1)
+  carbsPer100g     Decimal  @map("carbs_per_100g") @db.Decimal(6,1)
+  fatPer100g       Decimal  @map("fat_per_100g") @db.Decimal(6,1)
+  status          String   @default("pending") @db.VarChar(20)
+  createdAt       DateTime @default(now()) @map("created_at")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("unknown_food_submissions")
+}
+The schema uses MySQL-specific annotations such as @db.VarChar for string length constraints, @db.Decimal for precise numeric types, and @db.Date for date-only fields. Indexes are placed on all foreign key columns and frequently queried column combinations. The @@map directives ensure Prisma generates camelCase property names while the actual MySQL columns use snake_case naming conventions, maintaining consistency with MySQL best practices.
+6. Backend Service Architecture
+The NutriAI backend is organized as a modular monolith with 11 specialized services, each following a Controller-Service-Repository layered architecture. This approach keeps the codebase maintainable and testable while allowing future extraction into microservices if scaling demands require it. All services share a single Express.js process and communicate through direct function calls with well-defined TypeScript interfaces.
+6.1 Service Registry
+6.2 Service Dependency Matrix
+The dependency matrix below shows which services call which other services. The AuthService is a dependency for all user-facing services, as the authentication middleware protects all routes except login and register. OnboardingService is the most interconnected service, orchestrating UserService, NutritionEngineService, and MealPlanService during the user onboarding sequence. FoodRecognitionService depends on FoodDatabaseService for alias matching after Vision AI returns results, and on the new UnknownFoodService when a recognized food is not found in the database.
+The new UnknownFoodService represents a critical addition to the architecture. When FoodRecognitionService identifies a food item via Vision AI with confidence above 0.7 but FoodDatabaseService cannot find a matching entry in the database, the flow is redirected to UnknownFoodService. This service manages the multi-step user confirmation process, creates the new Meal and associated records (MealNutrition, MealAlias, MealServing), and then returns the newly created food to FoodRecognitionService for immediate logging in the user's food log.
+7. AI Architecture
+A core design principle of NutriAI is the deliberate minimization of AI model usage. The platform requires exactly two AI models, each with a narrowly scoped responsibility. This approach dramatically reduces infrastructure costs, lowers latency, improves reliability, and makes the system easier to debug and maintain. All nutritional calculations, meal filtering, scoring, and progress analysis are implemented as deterministic backend algorithms.
+7.1 AI-1: Vision AI (GPT-4o via OpenAI API)
+The Vision AI is responsible exclusively for identifying cooked food items from user-uploaded images. It receives a food photograph (as a base64-encoded image buffer, not a URL) and returns a structured JSON response containing the identified food name, estimated serving size in grams, and a confidence score between 0.0 and 1.0. The Vision AI does NOT calculate nutritional values, recommend meals, or make dietary judgments. Its output is simply a food identifier that the backend uses to look up nutrition data from the MySQL meal database via Prisma.
+Vision AI System Prompt:You are a food recognition assistant for a diet tracking application. Your ONLY task is to identify cooked food items visible in the image. Follow these rules strictly: (1) Recognize ONLY cooked/prepared foods. Ignore raw ingredients, packaged items, and non-food objects. (2) Estimate the serving size in grams based on the visible portion. (3) Provide a confidence score (0.0 to 1.0). (4) Return ONLY valid JSON. (5) Do NOT calculate nutritional values. (6) Do NOT recommend alternative foods. (7) Use common, standardized food names. (8) For multi-item plates, identify each item separately. Return format: { "foods": [{ "name": "...", "serving_description": "...", "serving_weight_grams": N, "confidence": N.N }] }
+7.2 AI-2: Meal Recommendation AI (Local Qwen 2.5 3B via Ollama)
+The Meal Recommendation AI is a lightweight language model responsible for ranking pre-filtered meal candidates. It runs locally via Ollama, eliminating per-call API charges entirely. The model receives a filtered list of up to 20 candidate meals along with the user's nutritional goals, remaining calorie/protein budget, 7-day consumption history, and stated preferences. It returns a ranked list of exactly three meals with fit scores. The model does NOT perform any nutrition calculation, food recognition, or database operations. It is purely a ranking function that considers user preferences and variety constraints.
+Meal Recommendation Prompt:You are a meal ranking assistant. Given the context, rank the candidates and return the top 3: User Goal: {goal}, Remaining Nutrition: {calories} kcal, {protein}g protein, {carbs}g carbs, {fat}g fat, Candidates: {candidates}, Recent History: {history}. Ranking criteria: (1) Macro fit: How well does the meal fit the remaining budget? (2) Variety: Prefer meals NOT consumed in the last 7 days. (3) Preference match: Prioritize matching cuisine. (4) Balance: Do not exceed calorie budget by more than 15%. Return ONLY JSON: { "recommendations": [{ "meal_id": N, "name": "...", "fit_score": N.N }] }
+8. Vision AI Food Recognition Pipeline
+The food recognition pipeline is the most complex user-facing flow in NutriAI, orchestrating image capture, upload, AI processing, database matching, and user confirmation into a seamless experience. The entire pipeline completes in under 5 seconds on a standard broadband connection. When a food is not found in the database, the new Unknown Food Auto-Add feature is triggered (detailed in Section 9).
+8.1 Pipeline Steps
+(1)  User captures/selects food photo via React upload component
+(2)  Client-side: compress image (max 2MB, quality 0.7, max 1024px, JPEG)
+(3)  POST /api/food-recognize with multipart/form-data (image file)
+(4)  Multer saves image to /uploads/{uuid}.jpg with metadata validation
+(5)  Backend reads saved file, converts to base64 buffer
+(6)  Build system prompt + image payload for GPT-4o Vision API
+(7)  Call OpenAI API with timeout of 15 seconds
+(8)  Parse JSON response: { foods: [{ name, serving_description, serving_weight_grams, confidence }] }
+(9)  Validate confidence >= 0.7 for each detected food item
+(10) Normalize food name: lowercase, trim, remove quantity prefixes
+(11) Alias matching: exact match against meal_aliases table (case-insensitive)
+(12) Keyword extraction: remove 'plate of', 'bowl of', 'serving of' and re-match
+(13) DB lookup: Fetch Meal + MealNutrition from Prisma
+(14) IF food NOT found AND confidence >= 0.7 --> trigger Unknown Food flow (Section 9)
+(15) IF food NOT found AND confidence < 0.7 --> return 'unrecognized' with manual search suggestion
+(16) Return: { meal_id, name, serving, calories, protein, carbs, fat, confidence }
+8.2 Confidence Thresholds and UX Behavior
+9. NEW FEATURE: Unknown Food Auto-Add to Database
+This is a completely new feature that does not exist in the original NutriAI specification. When a user uploads a food photograph that the Vision AI successfully identifies with a confidence score of 0.7 or higher, but the identified food item cannot be found in the database through any alias matching strategy, the system initiates a multi-step interactive flow that allows the user to add the food as a new entry in the database. This feature enables the food database to grow organically through real user contributions, dramatically reducing the initial data population burden and ensuring the system can handle regional, home-cooked, and culturally specific foods that may not exist in any standard food database.
+9.1 Flow Diagram
+  VISION AI: { foods: [{ name: 'homemade paneer tikka', confidence: 0.85 }] }
+                      |
+                      v
+  ALIAS MATCHING: No match found in meal_aliases table
+                      |
+                      v
+  [DECISION] confidence >= 0.7?  -->  YES
+                      |
+                      v
+  ┌─────────────────────────────────────────────────┐
+  │     UNKNOWN FOOD FLOW TRIGGERED                     │
+  │                                                   │
+  │  Step 1: Show detected food name + AI portion estimate  │
+  │          to user in confirmation dialog              │
+  │                                                   │
+  │  Step 2: User confirms or edits the food name         │
+  │          (auto-filled from AI detection)            │
+  │                                                   │
+  │                                                   │
+  │  Step 3: User selects/enters portion size in grams   │
+  │          (slider: 50g - 1000g, pre-filled from AI)  │
+  │                                                   │
+  │  Step 4: AI suggests nutrition per 100g (optional)    │
+  │          User confirms or manually edits:              │
+  │          calories, protein, carbs, fat per 100g       │
+  │                                                   │
+  │  Step 5: User selects meal type (breakfast/lunch/     │
+  │          dinner/snack) and cuisine preference          │
+  │                                                   │
+  │  Step 6: User confirms --> CREATE new Meal record   │
+  │          with source='user_contributed'                │
+  │                                                   │
+  │  Step 7: Auto-create MealNutrition, MealAlias,     │
+  │          MealServing records in MySQL               │
+  │                                                   │
+  │  Step 8: Return new meal_id to FoodRecognitionService │
+  │          --> Continue normal food log flow           │
+  └─────────────────────────────────────────────────┘
+9.2 API Endpoints for Unknown Food
+9.3 Database Operations
+When the user confirms the unknown food details, the UnknownFoodService performs the following database operations in a single Prisma transaction to ensure atomicity. First, it creates a new Meal record with the confirmed name, meal type, cuisine, and source set to 'user_contributed'. Then it creates the MealNutrition record with the confirmed nutritional values per 100 grams. A MealAlias record is created with the confirmed name as the primary alias, and additional alias variants are generated automatically (lowercase, trimmed, without quantity words). Finally, a default MealServing record is created with a 1.0x multiplier matching the base serving size. The new meal is immediately available for all users through the standard search and recommendation pipeline, not just the contributing user.
+9.4 Validation Rules
+10. Nutrition Engine
+The Nutrition Engine is the scientific core of NutriAI, implementing well-established formulas from sports nutrition and clinical dietetics. All calculations are deterministic, fast (sub-millisecond), and require no AI involvement. The engine is invoked during onboarding, when user profile changes, and whenever the activity level or goal is updated. This section provides the exact formulas and lookup tables used by the NutritionEngineService.
+10.1 BMI Calculation
+Body Mass Index is calculated using the standard formula: BMI = weight_kg / (height_m * height_m). The resulting value is classified according to the World Health Organization categories: Underweight (BMI < 18.5), Normal weight (18.5 - 24.9), Overweight (25.0 - 29.9), and Obese (BMI >= 30.0). This classification is displayed to the user during onboarding and on the progress screen to provide contextual feedback about their current body composition status.
+10.2 BMR Calculation (Mifflin-St Jeor Equation)
+The Mifflin-St Jeor equation is considered the most accurate estimation formula for BMR in clinical practice. The formulas are gender-specific: Male: BMR = (10 * weight_kg) + (6.25 * height_cm) - (5 * age) + 5. Female: BMR = (10 * weight_kg) + (6.25 * height_cm) - (5 * age) - 161. For users selecting 'Other' gender, the system calculates both formulas and returns the arithmetic average. For example, a 28-year-old male weighing 75 kg at 175 cm would have: BMR = (10 * 75) + (6.25 * 175) - (5 * 28) + 5 = 750 + 1093.75 - 140 + 5 = 1708.75 kcal/day.
+10.3 TDEE and Target Calorie Adjustment
+Total Daily Energy Expenditure is calculated by multiplying the BMR by an activity multiplier. The multipliers are: Sedentary (1.2), Lightly Active (1.375), Moderately Active (1.55), Very Active (1.725), and Extra Active (1.9). Target calories are then adjusted based on the user's fitness goal: Muscle Gain (TDEE + 500), Lose Fat (TDEE - 500), Maintain (TDEE), Recomp (TDEE - 250), Weight Gain (TDEE + 750), and Athlete (TDEE + 300). Macro grams are calculated as: protein grams = (target_calories * protein_percentage) / 4, carbs grams = (target_calories * carbs_percentage) / 4, fat grams = (target_calories * fat_percentage) / 9.
+10.4 Meal Distribution Logic
+The user's total daily calorie and macro targets are distributed across four meal slots using default percentages: Breakfast (25%), Lunch (30%), Dinner (30%), and Snack (15%). When a user logs a meal, the remaining calorie and macro budget is dynamically redistributed proportionally across the remaining meal slots. For example, if the user consumes 700 kcal at breakfast (exceeding the planned 550 kcal), the remaining 1,650 kcal is redistributed proportionally across Lunch, Dinner, and Snack. The recalculation also adjusts macro targets proportionally.
+11. Recommendation Engine Algorithm
+The Recommendation Engine is a pure backend algorithm (NOT an AI model) that processes the meal database through a deterministic, multi-stage filtering and scoring pipeline to produce 20 candidate meals. These 20 candidates are then passed to the Meal Recommendation AI (local Qwen 2.5 3B) for final ranking and selection of the top 3 meals presented to the user.
+11.1 9-Stage Filtering Pipeline
+11.2 Scoring Formula
+Each candidate meal receives a composite score (0-100) calculated using the weighted formula: fit_score = (macro_fit * 0.50) + (variety_score * 0.30) + (preference_score * 0.20). The macro_fit component measures how closely the meal's nutritional profile matches the remaining calorie budget for the current slot, with a penalty applied if protein falls below 70% of the slot target. The variety_score rewards meals not consumed in the last 7 days (100 if never consumed, scaled linearly by days since last consumption). The preference_score assigns 100 points for cuisine match, 70 for neutral (Mixed preference), and 40 for mismatch. This weighted formula prioritizes nutritional accuracy (50%) while still considering meal variety (30%) and user preference alignment (20%).
+12. REST API Documentation
+All API endpoints are prefixed with /api/v1/ and use JSON request/response payloads. Authentication is session-based using cookies. Rate limiting is applied at 100 requests per minute per IP for standard endpoints and 10 per minute for AI-invoking endpoints. The following tables document every endpoint in the system.
+12.1 Authentication Endpoints
+12.2 User and Onboarding
+12.3 Meals and Food Log
+12.4 Food Recognition and Unknown Food
+12.5 Nutrition, Recommendations, and Progress
+13. Image Upload System (Local Disk + Multer)
+Image storage has been completely simplified from the original AWS S3 + presigned URL architecture. The new system uses Multer middleware for handling multipart/form-data uploads directly through Express, storing files on the local filesystem in an /uploads directory served statically. This eliminates all external storage dependencies, reduces latency (no network round-trip to S3), and has zero recurring cost.
+13.1 Multer Configuration
+The Multer middleware is configured with the following settings: file size limit of 2MB (hard limit), allowed MIME types restricted to image/jpeg and image/png, file filter that rejects non-image files with a clear error message, destination directory set to /uploads relative to the project root, and a custom filename function that generates UUID-based filenames with the .jpg extension to prevent conflicts and support concurrent uploads. The uploaded file is stored locally, and its relative path is returned to the client for reference.
+13.2 Static File Serving
+Uploaded images are served statically via Express: app.use('/uploads', express.static('uploads')). This allows the frontend to display food images using simple URL paths like /uploads/{uuid}.jpg. For production, Nginx should be configured to serve the /uploads directory directly, bypassing the Express process for better performance. A cleanup cron job (optional) can be configured to delete images older than 30 days, as food photographs are not needed long-term after the recognition is complete and the food has been logged.
+14. React Web App UI
+The React web application provides a responsive, mobile-friendly interface using Tailwind CSS for styling and Zustand for state management. The application follows a Healthify-inspired design language with clean cards, generous whitespace, a neutral color palette with green accent highlights, and large touch-friendly targets. The app is built with Vite for fast development and HMR, and uses React Router for client-side routing.
+14.1 Screen Descriptions
+14.2 State Management (Zustand)
+Zustand manages four store modules: authStore (user data, session status, login/logout actions), nutritionStore (daily targets, consumed values, remaining budget), mealStore (meal recommendations, plan data), and settingsStore (user preferences, UI settings). Each store is persisted to localStorage on every meaningful state change, ensuring that the app can restore state on page refresh without requiring re-fetching from the API. The stores are hydrated on app launch using Zustand's persist middleware.
+15. Backend Folder Structure
+src/
+  controllers/
+    auth.controller.ts
+    user.controller.ts
+    onboarding.controller.ts
+    meal.controller.ts
+    foodLog.controller.ts
+    foodRecognition.controller.ts
+    unknownFood.controller.ts    # NEW
+    nutrition.controller.ts
+    recommendation.controller.ts
+    progress.controller.ts
+    waterLog.controller.ts
+  services/
+    auth.service.ts
+    user.service.ts
+    onboarding.service.ts
+    nutritionEngine.service.ts
+    mealPlan.service.ts
+    foodRecognition.service.ts
+    foodDatabase.service.ts
+    recommendation.service.ts
+    mealLog.service.ts
+    progress.service.ts
+    unknownFood.service.ts      # NEW
+    waterLog.service.ts
+  middleware/
+    auth.middleware.ts         # Session check
+    rateLimit.middleware.ts
+    validator.middleware.ts    # Zod schemas
+    errorHandler.middleware.ts
+    logger.middleware.ts
+  routes/
+    auth.routes.ts
+user.routes.ts
+meal.routes.ts
+    foodLog.routes.ts
+foodRecognition.routes.ts
+    unknownFood.routes.ts    # NEW
+    nutrition.routes.ts
+recommendation.routes.ts
+    progress.routes.ts
+waterLog.routes.ts
+  validators/
+    auth.validator.ts
+onboarding.validator.ts
+    foodLog.validator.ts
+unknownFood.validator.ts  # NEW
+  utils/
+    hash.util.ts
+date.util.ts
+nutritionCalculator.util.ts
+ai.util.ts
+  config/
+    database.config.ts
+ai.config.ts
+app.config.ts
+  prisma/
+    schema.prisma
+seed.ts
+migrations/
+  uploads/      # Multer destination (gitignored)
+  app.ts  server.ts  env.ts  # Entry points
+16. Error Handling and Logging
+The error handling framework provides consistent, machine-readable error responses across all API endpoints. Every error is categorized by domain, assigned a unique numeric code, and includes a human-readable message and an ISO 8601 timestamp. The framework supports graceful degradation: when a non-critical component fails, the system continues to function with reduced capability rather than returning a 500 error to the user.
+16.1 Error Code Registry
+16.2 Graceful Degradation
+When a non-critical dependency fails, specific fallback behaviors are implemented. If Vision AI times out (no response within 15 seconds), the system returns an empty recognition result and prompts the user to manually search for their food. If the Meal Recommendation AI is unavailable (Ollama server down), the system falls back to pure deterministic scoring using the weighted composite formula, producing slightly less personalized but still functional recommendations. If image upload fails, the client caches the compressed image locally and retries on the next interaction.
+16.3 Logging Configuration
+Logging is implemented with Winston in structured JSON format. Every log entry includes a timestamp, log level (error, warn, info, http, debug), request ID (generated per request), service context, and optional metadata fields. In production, logs are written to both a rotating file transport (with 14-day retention and 10MB max file size) and the console. Error-level logs are always written. The logging system redacts sensitive fields (passwords, email addresses are partially masked as u***@domain.com) to prevent data leakage in log files.
+17. Deployment Guide
+The simplified NutriAI system is designed for deployment on a single Virtual Private Server (VPS) or any Linux server with at least 2GB RAM and 2 CPU cores. This section provides complete deployment instructions for both development and production environments.
+17.1 Docker Compose Setup (Recommended)
+The recommended deployment method uses Docker Compose with three services: the NutriAI Express app, a MySQL 8.0 database, and an Ollama instance serving the Qwen 2.5 3B model. A docker-compose.yml file defines all three services with environment variable configuration, volume mounts for data persistence, health checks, and restart policies. The MySQL service mounts a named volume for data persistence across container restarts. The Ollama service exposes port 11434 for the Meal Recommendation AI. Environment variables for DATABASE_URL, OPENAI_API_KEY, SESSION_SECRET, and OLLAMA_BASE_URL are loaded from a .env file on the host.
+17.2 Production Deployment with Nginx
+For production, Nginx sits in front of the Node.js process, handling SSL termination, static file serving (for the React build and uploaded images), and reverse proxying API requests to Express on port 3000. SSL certificates are obtained free via Let's Encrypt with certbot. PM2 manages the Node.js process with auto-restart on crashes, log rotation, and cluster mode for multi-core utilization. The Nginx configuration includes security headers, Gzip compression, and a 50MB max upload size. MySQL backups are scheduled via a daily cron job using mysqldump with 30-day retention.
+17.3 Environment Variables
+18. AI Cost Optimization
+One of the most significant advantages of this simplified architecture is the dramatic reduction in infrastructure costs. By eliminating AWS services (S3, ECS, RDS, ElastiCache, CloudWatch, WAF, CloudFront), the total monthly infrastructure cost drops to approximately $5-20/month for a basic VPS. AI costs are the only variable expense, and the architecture minimizes them through intelligent caching and the use of a free, self-hosted model for meal ranking.
+18.1 Cost Breakdown Per User Per Month
+18.2 Optimization Strategies
+Several additional optimization strategies further reduce costs. First, Vision AI response caching stores recognition results keyed by image perceptual hash (using a simplified hash for speed) in an in-memory Map with 6-hour TTL, so repeated photos of the same meal skip the API call entirely. Second, prompt compression reduces token count by approximately 30% by using abbreviated instructions. Third, batch processing of recognition calls during off-peak hours can leverage potential provider discounts. Fourth, tiered model selection routes simple single-food images to a cheaper, faster model while complex multi-food images receive the full GPT-4o treatment, reducing average cost per call by an estimated 25%.
+
+S Y S T E M   D E S I G N   B L U E P R I N T
+NutriAI
+Simplified AI Diet Tracker
+Express.js  +  MySQL/Prisma  +  React  +  AI  |  Production-Ready Full-Stack System
+Version 1.0  |  August 2026
+GPT-4o Vision  +  Local Qwen 2.5 3B
+Session-Based Auth  |  No AWS  |  No JWT
+Includes: Unknown Food Auto-Add Feature
+
+Confidential  |  For Development Team Use Only | ---
+Decision | Original | Simplified | Rationale | ---
+Database | PostgreSQL + Redis | MySQL + Prisma | Type-safe ORM, no cache layer needed at this scale | ---
+Auth | JWT + OAuth (Google/Apple) | express-session + bcrypt | Simplicity, no token management complexity | ---
+Image Storage | AWS S3 + CloudFront CDN | Local disk + Multer | Zero cost, no external dependencies | ---
+Caching | Redis (ElastiCache) | In-memory Map / none | Single server does not need distributed cache | ---
+Notifications | Firebase FCM + SendGrid | Removed (web only) | Web app uses in-app notifications | ---
+Frontend | React Native (mobile) | React + Vite (web) | Single codebase, responsive, no app store deployment | ---
+Deployment | AWS ECS + ALB + RDS | Docker Compose / VPS | Single server, $5-20/month hosting cost | ---
+Monitoring | CloudWatch + Grafana | Winston logs + /health | Sufficient for production MVP | ---
+Technology | Version | Purpose | ---
+Node.js | 20 LTS | JavaScript runtime | ---
+Express.js | 4.21+ | HTTP framework and API server | ---
+TypeScript | 5.x | Type safety across the backend | ---
+Prisma | 5.x | Type-safe ORM for MySQL | ---
+MySQL | 8.0+ | Primary relational database | ---
+bcrypt | 5.1+ | Password hashing (12 salt rounds) | ---
+express-session | 1.18+ | Server-side session management | ---
+Multer | 1.4+ | Multipart file upload handling | ---
+OpenAI SDK | 4.x | GPT-4o Vision API client | ---
+Ollama SDK | 0.5+ | Local Qwen 2.5 3B inference | ---
+Zod | 3.23+ | Request validation schemas | ---
+Winston | 3.14+ | Structured JSON logging | ---
+Helmet | 7.1+ | Security HTTP headers | ---
+cors | 2.8+ | Cross-origin resource sharing | ---
+express-rate-limit | 7.4+ | Rate limiting middleware | ---
+Technology | Version | Purpose | ---
+React | 18.3+ | UI component library | ---
+Vite | 5.x | Build tool and dev server | ---
+TypeScript | 5.x | Type safety in components | ---
+Tailwind CSS | 3.4+ | Utility-first CSS framework | ---
+Zustand | 4.5+ | Lightweight state management | ---
+Axios | 1.7+ | HTTP client with interceptors | ---
+React Router | 6.26+ | Client-side routing | ---
+Recharts | 2.12+ | Chart library for progress visualization | ---
+React Dropzone | 14.3+ | Drag-and-drop image upload | ---
+Step | Action | Details | ---
+1 | User submits registration form | POST /api/auth/register with {email, password, name} | ---
+2 | Server validates and creates user | Check duplicate email, hash password with bcrypt (12 rounds), insert User record | ---
+3 | Session created automatically | express-session creates session, stores userId in req.session.userId | ---
+4 | User redirected to onboarding | If profile incomplete, redirect to /onboarding | ---
+5 | Login: validate credentials | POST /api/auth/login, compare bcrypt hash, set session | ---
+6 | Protected routes | Auth middleware checks req.session.userId on every protected request | ---
+7 | Logout | POST /api/auth/logout, session.destroy() clears server-side session | ---
+Service | Responsibility | Dependencies | ---
+AuthService | Session-based login, register, logout, session middleware | MySQL (session store) | ---
+UserService | Profile CRUD, preferences, account settings | Prisma | ---
+OnboardingService | Multi-step onboarding orchestration, Nutrition Engine trigger | UserService, NutritionEngine, Prisma | ---
+NutritionEngineService | BMI/BMR/TDEE calculation, macro target computation | None (pure compute) | ---
+MealPlanService | Daily meal plan generation, plan caching | RecommendationService, Prisma | ---
+FoodRecognitionService | Image preprocessing, Vision AI orchestration, result validation | OpenAI SDK, FoodDatabaseService | ---
+FoodDatabaseService | Meal search, alias matching, nutrition data retrieval | Prisma | ---
+RecommendationService | Candidate filtering pipeline, scoring, AI ranking | Ollama SDK, FoodDatabaseService | ---
+MealLogService | Food log creation, daily nutrition aggregation, undo | Prisma, NutritionEngineService | ---
+ProgressService | Progress snapshots, streak calculation, trend data | Prisma | ---
+UnknownFoodService (NEW) | Handle unrecognized foods: user confirmation, DB creation | Prisma, FoodRecognitionService | ---
+Confidence | Level | UX Behavior | Visual Indicator | ---
+>= 0.9 | High | Auto-confirm, log directly, skip confirmation step | Green badge | ---
+0.7 - 0.89 | Medium | Show result for user confirmation with confirmation dialog | Yellow badge | ---
+0.5 - 0.69 | Low | Show result with warning: user must verify manually | Orange badge | ---
+< 0.5 | Very Low | Ask user to try a clearer photo or manual search | Red badge | ---
+Method | Endpoint | Request Body | Response | Description | ---
+POST | /api/unknown-food/submit | {image_file, ai_detected_name, confirmed_name, confirmed_portion, calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, meal_type, cuisine} | 201: {meal_id, name, nutrition} | Submit new food after confirmation | ---
+GET | /api/unknown-food/pending | - | 200: {submissions[]} | Get user's pending submissions | ---
+PUT | /api/unknown-food/:id/confirm | {final_nutrition} | 200: {meal} | Admin confirms user submission | ---
+DELETE | /api/unknown-food/:id | - | 204 | Reject/remove submission | ---
+Field | Validation Rule | ---
+confirmed_name | Required, 2-200 characters, no special characters | ---
+confirmed_portion | Required, integer, 10-2000 grams | ---
+calories_per_100g | Required, 0-5000 kcal | ---
+protein_per_100g | Required, 0-200g | ---
+carbs_per_100g | Required, 0-500g | ---
+fat_per_100g | Required, 0-500g | ---
+meal_type | Required, enum: breakfast/lunch/dinner/snack | ---
+cuisine | Optional, free text, max 50 characters | ---
+ai_detected_name | Auto-filled from Vision AI, user can override | ---
+Stage | Filter | Description | Approx. Reduction | ---
+1 | Allergy Removal | Remove meals with user's allergens | 5,000 -> 4,200 | ---
+2 | Cuisine Filter | Match user's preferred cuisine (skip if 'Mixed') | 4,200 -> 2,500 | ---
+3 | Meal Type Filter | Match current slot (breakfast/lunch/dinner/snack) | 2,500 -> 1,200 | ---
+4 | Recent Removal | Remove meals consumed in last 7 days | 1,200 -> 900 | ---
+5 | Calorie Cap | Within remaining budget (15% tolerance) | 900 -> 600 | ---
+6 | Protein Floor | Minimum 10g protein per meal | 600 -> 350 | ---
+7 | Dietary Filter | Match diet type (veg/non-veg/vegan/eggetarian) | 350 -> 200 | ---
+8 | Scoring | Multi-factor composite score (0-100) | All scored | ---
+9 | Top 20 Selection | Select top 20 scored candidates for AI | 20 candidates | ---
+Method | Endpoint | Request Body | Response | Description | ---
+POST | /api/v1/auth/register | {email, password, name} | 201: {user, session} | Register new account | ---
+POST | /api/v1/auth/login | {email, password} | 200: {user, session} | Login with credentials | ---
+POST | /api/v1/auth/logout | {} | 204: No Content | Destroy session | ---
+GET | /api/v1/auth/me | - | 200: {user, profile} | Get current user + profile | ---
+Method | Endpoint | Request Body | Response | Description | ---
+GET | /api/v1/users/profile | - | 200: {profile} | Get user profile | ---
+PUT | /api/v1/users/profile | {first_name, age, gender, height_cm, weight_kg, ...} | 200: {profile} | Update profile | ---
+POST | /api/v1/onboarding/complete | {goal_type, activity_level, workout_frequency, cuisine_preference, diet_type, allergies[], budget_level} | 200: {goals, nutrition} | Complete onboarding | ---
+PUT | /api/v1/users/goals | {goal_type, activity_level, ...} | 200: {goals} | Update fitness goals | ---
+Method | Endpoint | Request Body | Response | Description | ---
+GET | /api/v1/meals/search?q=biryani&cuisine=indian | - | 200: [{meal}] | Search meal database | ---
+GET | /api/v1/meals/:id | - | 200: {meal, nutrition} | Get meal details | ---
+POST | /api/v1/food-logs | {meal_id, serving_id, meal_slot} | 201: {food_log_item} | Log a meal (tap) | ---
+POST | /api/v1/food-logs/photo | FormData: image_file | 201: {food_log_item} | Log via photo (triggers Vision AI) | ---
+POST | /api/v1/food-logs/text | {description} | 201: {food_log_item} | Log via text description | ---
+GET | /api/v1/food-logs/today | - | 200: {log, items, summary} | Get today's food log | ---
+DELETE | /api/v1/food-logs/:id | - | 204 | Remove a log entry | ---
+Method | Endpoint | Request Body | Response | Description | ---
+POST | /api/v1/food-recognize | FormData: image_file | 200: {foods[]} or 404 with unknown_food flag | Vision AI recognition | ---
+POST | /api/v1/unknown-food/submit | {...confirmed_food_details...} | 201: {meal_id, name, nutrition} | Submit unknown food (NEW) | ---
+GET | /api/v1/unknown-food/pending | - | 200: {submissions[]} | Get pending unknown food submissions | ---
+Method | Endpoint | Request Body | Response | Description | ---
+GET | /api/v1/nutrition/daily?date=2026-08-04 | - | 200: {targets, consumed} | Daily nutrition status | ---
+GET | /api/v1/recommendations/:slot | - | 200: {meals[3]} | Get meal recommendations (breakfast/lunch/dinner/snack) | ---
+GET | /api/v1/progress/summary?period=week | - | 200: {progress_data} | Progress summary | ---
+GET | /api/v1/progress/weekly | - | 200: {weekly_data} | Weekly progress chart data | ---
+POST | /api/v1/water-log | {glasses_consumed} | 201: {water_log} | Log water intake | ---
+POST | /api/v1/weight-log | {weight_kg, notes?} | 201: {weight_log} | Log weight entry | ---
+Screen | Description | Key Components | ---
+Dashboard | Main landing page after login. Shows calorie ring, macro progress bars, and 4 meal card slots (Breakfast, Lunch, Dinner, Snack) each with 3 recommended meal options and 'I Ate This' buttons. | CalorieRing, MacroBar, MealCard | ---
+Food Log | Daily food log view with date selector, today's summary, and chronological list of logged meals with time stamps and nutrition details. | DateStrip, FoodItemRow, DailySummary | ---
+Upload | Food photo upload with drag-and-drop zone or file picker. Shows recognition progress, results, and confirmation dialog. Includes the Unknown Food confirmation flow when food is not in database. | Dropzone, RecognitionResult, UnknownFoodForm | ---
+Progress | Charts and trends for weight, calories, macros over week/month/3-month periods. Streak counter and AI-generated insights. | WeightChart, CalorieChart, StreakBadge | ---
+Onboarding | Multi-step wizard: Profile (name, age, gender, height, weight), Goal (goal type, activity level), Preferences (cuisine, diet, allergies). | StepWizard, FormFields, allergySelector | ---
+Settings | User preferences, account management, profile editing, and logout option. | ProfileForm, PreferenceForm, LogoutButton | ---
+Domain | Range | Examples | HTTP Status | ---
+AUTH | 001-099 | AUTH_001: Invalid credentials, AUTH_010: Not logged in | 401, 403 | ---
+VALIDATION | 001-099 | VAL_001: Missing field, VAL_010: Invalid format | 400 | ---
+FOOD | 001-099 | FOOD_001: Not found, FOOD_020: Unknown food pending | 404, 422 | ---
+NUTRITION | 001-099 | NUT_001: Calculation error, NUT_010: Invalid macro | 422 | ---
+AI | 001-099 | AI_001: Vision timeout, AI_010: Model overloaded | 502, 503 | ---
+SYSTEM | 001-099 | SYS_001: DB connection failed, SYS_010: Upload failed | 500, 503 | ---
+Variable | Example Value | Description | ---
+DATABASE_URL | mysql://root:pass@localhost:3306/nutriai | Prisma MySQL connection string | ---
+SESSION_SECRET | a1b2c3d4e5f6... | Min 32-char random string for sessions | ---
+OPENAI_API_KEY | sk-proj-... | OpenAI API key for GPT-4o Vision | ---
+OLLAMA_BASE_URL | http://localhost:11434 | Ollama server URL for local Qwen | ---
+OLLAMA_MODEL | qwen2.5:3b-instruct | Model name for meal recommendation AI | ---
+PORT | 3000 | Express server port | ---
+NODE_ENV | production | Node environment | ---
+Component | Cost Model | Per User/Day | Per User/Month | Notes | ---
+Vision AI (GPT-4o) | $0.01-0.03/image | $0.03-0.12 | $0.90-3.60 | 3-4 photos/day | ---
+Vision AI (after caching) | 60% cache hit rate | $0.01-0.05 | $0.30-1.50 | Similar meals reuse results | ---
+Meal AI (Local Qwen) | Free (self-hosted) | $0 | $0 | Single GPU instance handles 10K+ MAU | ---
+Infrastructure (VPS) | $5-20/month total | $0.001-0.002 | $0.03-0.06 | Shared across all users | ---
+TOTAL | Combined | $0.01-0.05 | $0.33-1.56 | Target: below $2/user/month | ---
