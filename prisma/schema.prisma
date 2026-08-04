@@ -251,7 +251,7 @@ model MealPlanItem {
   meal              Meal       @relation(fields: [mealId], references: [id])
 }
 
-// ═══ AI Logs ═══
+// ═══ System & AI ═══
 model AiLog {
   id              String   @id @default(cuid())
   userId          String?
@@ -279,4 +279,12 @@ model UnknownFoodSubmission {
   status           String   @default("pending")
   createdAt        DateTime @default(now())
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ═══ Session Store (persistent) ═══
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  expiresAt  DateTime
+  createdAt DateTime @default(now())
 }

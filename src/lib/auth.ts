@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { db } from '@/lib/db';
 
 const SALT_ROUNDS = 10;
 
@@ -10,55 +11,44 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
-// Persistent session store using globalThis to survive HMR
-const globalForSessions = globalThis as unknown as {
-  __nutriaiSessions: Map<string, { userId: string; createdAt: number; expiresAt: number }> | undefined;
-};
-
-if (!globalForSessions.__nutriaiSessions) {
-  globalForSessions.__nutriaiSessions = new Map();
-}
-
-const sessions = globalForSessions.__nutriaiSessions;
-
+// Session CRUD via Prisma (survives Turbopack module isolation)
 export function createSession(userId: string): string {
   const sessionId = crypto.randomUUID();
-  const now = Date.now();
-  sessions.set(sessionId, {
-    userId,
-    createdAt: now,
-    expiresAt: now + 7 * 24 * 60 * 60 * 1000,
-  });
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  db.session.create({ data: { userId, expiresAt } });
   return sessionId;
 }
 
 export function getSession(sessionId: string | null): { userId: string } | null {
   if (!sessionId) return null;
-  const session = sessions.get(sessionId);
-  if (!session) return null;
-  if (Date.now() > session.expiresAt) {
-    sessions.delete(sessionId);
+  try {
+    const session = db.session.findUnique({ where: { id: sessionId } });
+    if (!session) return null;
+    if (new Date(session.expiresAt) < new Date()) {
+      db.session.delete({ where: { id: sessionId } });
+      return null;
+    }
+    return { userId: session.userId };
+  } catch {
     return null;
-  }
-  return { userId: session.userId };
+   }
 }
 
 export function destroySession(sessionId: string): void {
-  sessions.delete(sessionId);
+  try {
+    db.session.delete({ where: { id: sessionId } });
+  } catch {}
 }
 
 // Clean expired sessions periodically
-if (typeof globalThis !== 'undefined' && !(globalThis as Record<string, unknown>).__nutriaiSessionCleanup) {
+if (!(globalThis as Record<string, unknown>).__nutriaiSessionCleanup) {
   (globalThis as Record<string, unknown>).__nutriaiSessionCleanup = true;
   setInterval(() => {
-    const now = Date.now();
-    for (const [key, session] of sessions) {
-      if (now > session.expiresAt) sessions.delete(key);
-    }
+    const expired = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    try { db.session.deleteMany({ where: { expiresAt: { lt: expired } } }); } catch {}
   }, 60 * 60 * 1000);
 }
 
-// Helper to get session from request
 export function getSessionFromRequest(request: Request): { userId: string } | null {
   const authHeader = request.headers.get('authorization');
   if (authHeader?.startsWith('Bearer ')) {
