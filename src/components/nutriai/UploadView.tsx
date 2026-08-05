@@ -12,7 +12,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Camera, Loader2, Sparkles, UtensilsCrossed, Lightbulb, ImageIcon, Clock, ScanLine,
+  Camera, Loader2, Sparkles, UtensilsCrossed, Lightbulb, ImageIcon, Clock, ScanLine, Plus,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { apiFetch } from './api';
@@ -29,7 +29,6 @@ interface RecentScan {
 export function UploadView() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [dragOver, setDragOver] = useState(false);
   const [recognizing, setRecognizing] = useState(false);
   const [results, setResults] = useState<RecognizedFood[]>([]);
   const [unknownForms, setUnknownForms] = useState<Record<number, {
@@ -43,6 +42,7 @@ export function UploadView() {
   // Recent scans
   const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
   const [scansLoading, setScansLoading] = useState(true);
+  const [quickRelogging, setQuickRelogging] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch('/api/food-logs?limit=3')
@@ -66,13 +66,6 @@ export function UploadView() {
     const reader = new FileReader();
     reader.onload = (e) => setImagePreview(e.target?.result as string);
     reader.readAsDataURL(file);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) handleFileSelect(file);
   };
 
   const handleRecognize = async () => {
@@ -129,7 +122,11 @@ export function UploadView() {
   };
 
   return (
-    <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-5 pb-4">
+    <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-5 pb-28">
+      {/* Hidden file inputs */}
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])} />
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])} />
+
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
@@ -141,62 +138,52 @@ export function UploadView() {
         </div>
       </div>
 
-      {/* Preview Zone */}
-      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 overflow-hidden">
-        <div
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className={`min-h-[160px] border-2 border-dashed transition-colors cursor-pointer flex items-center justify-center p-6 ${
-            dragOver
-              ? 'border-emerald-400 bg-emerald-50/30 dark:bg-emerald-900/20'
-              : 'border-emerald-200 dark:border-emerald-700 hover:border-emerald-400 dark:hover:border-emerald-500 bg-gradient-to-b from-emerald-50/30 to-transparent dark:from-emerald-900/10'
-          } ${imagePreview ? 'p-3' : ''}`}
-        >
-          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])} />
-          <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])} />
-          {imagePreview ? (
-            <div className="space-y-2 text-center">
-              <img src={imagePreview} alt="Preview" className="max-h-40 mx-auto rounded-xl object-contain" />
-              <p className="text-xs text-gray-400 dark:text-gray-500">Tap to change image</p>
-            </div>
-          ) : (
-            <div className="text-center">
-              <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center mx-auto border border-emerald-100 dark:border-emerald-800 animate-[bounce_3s_ease-in-out_infinite]">
-                <ImageIcon className="h-7 w-7 text-emerald-400 dark:text-emerald-500" />
-              </div>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">Drop an image here or tap to browse</p>
-            </div>
-          )}
+      {/* Image Preview (shown when image is selected) */}
+      {imagePreview && (
+        <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 overflow-hidden p-3">
+          <div className="text-center space-y-2">
+            <img src={imagePreview} alt="Preview" className="max-h-40 mx-auto rounded-xl object-contain" />
+            <p className="text-xs text-gray-400 dark:text-gray-500">Tap &quot;Scan Another&quot; to change image</p>
+          </div>
+        </Card>
+      )}
+
+      {/* Hero Area — shown when no image selected */}
+      {!imagePreview && (
+        <div className="text-center py-6 space-y-3">
+          <motion.div
+            className="w-20 h-20 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/30"
+            animate={{ y: [0, -8, 0] }}
+            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <UtensilsCrossed className="h-9 w-9 text-white" />
+          </motion.div>
+          <div className="space-y-1">
+            <p className="text-lg font-bold text-gray-900 dark:text-gray-100">Point your camera at your meal</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">AI will identify the food and estimate nutrition</p>
+          </div>
         </div>
-      </Card>
+      )}
 
-      {/* Two Action Buttons */}
-      <div className="flex flex-col gap-3">
-        <Button
-          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white min-h-[44px] rounded-xl font-semibold flex items-center justify-center gap-2"
-          onClick={() => cameraInputRef.current?.click()}
-        >
-          <Camera className="h-5 w-5" />
-          Take Photo
-        </Button>
-        <Button
-          variant="outline"
-          className="w-full border-emerald-600 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 dark:border-emerald-500 dark:text-emerald-400 min-h-[44px] rounded-xl font-semibold flex items-center justify-center gap-2"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <ImageIcon className="h-5 w-5" />
-          Choose from Gallery
-        </Button>
-      </div>
-
-      {/* Format Badges */}
-      <div className="flex gap-2 justify-center">
-        {['JPG', 'PNG', 'WebP'].map((fmt) => (
-          <Badge key={fmt} className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 text-xs font-medium">{fmt}</Badge>
-        ))}
-      </div>
+      {/* Primary CTA — Take Photo */}
+      {!results.length && (
+        <div className="space-y-2">
+          <Button
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-12 text-base rounded-xl font-semibold flex items-center justify-center gap-2 min-h-[44px]"
+            onClick={() => cameraInputRef.current?.click()}
+          >
+            <Camera className="h-5 w-5" />
+            Take Photo
+          </Button>
+          <button
+            type="button"
+            className="w-full text-sm text-emerald-600 dark:text-emerald-400 font-medium underline underline-offset-2 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors py-1"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Choose from Gallery
+          </button>
+        </div>
+      )}
 
       {/* How it works — Card Steps with Connecting Lines */}
       <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-gray-50/50 dark:bg-gray-800/30 p-5">
@@ -232,7 +219,7 @@ export function UploadView() {
       <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-amber-100 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/10 p-5">
         <div className="flex items-start gap-3">
           <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0 mt-0.5">
-            <Lightbulb className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <Lightbulb className="h-4 w-4 text-amber-600 dark:amber-400" />
           </div>
           <div className="space-y-2">
             <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tips for best results</h3>
@@ -279,8 +266,43 @@ export function UploadView() {
                     {formatTimeAgo(scan.createdAt)}
                   </p>
                 </div>
-                <span className="text-sm font-bold text-gray-700 dark:text-gray-300 tabular-nums">{Math.round(scan.calories)}</span>
-                <span className="text-[10px] text-gray-400 dark:text-gray-500">kcal</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-sm font-bold text-gray-700 dark:text-gray-300 tabular-nums">{Math.round(scan.calories)}</span>
+                  <span className="text-[10px] text-gray-400 dark:text-gray-500">kcal</span>
+                  <button
+                    onClick={async () => {
+                      // Find the meal ID from the scan data — quick re-log using food-logs/quick
+                      setQuickRelogging(scan.id);
+                      try {
+                        await apiFetch('/api/food-logs/quick', {
+                          method: 'POST',
+                          body: JSON.stringify({
+                            name: scan.meal?.name || 'Food',
+                            calories: Math.round(scan.calories),
+                            proteinG: 0,
+                            carbsG: 0,
+                            fatG: 0,
+                            mealSlot: 'lunch',
+                            servingGms: 100,
+                          }),
+                        });
+                        toast.success(`Re-logged ${scan.meal?.name || 'food'}!`);
+                      } catch (err) {
+                        toast.error((err as Error).message || 'Failed to re-log');
+                      } finally {
+                        setQuickRelogging(null);
+                      }
+                    }}
+                    disabled={quickRelogging === scan.id}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors border border-emerald-200 dark:border-emerald-800 shrink-0"
+                    title="Re-log this meal"
+                  >
+                    {quickRelogging === scan.id
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <Plus className="h-3.5 w-3.5" />
+                    }
+                  </button>
+                </div>
               </div>
             ))}
           </div>

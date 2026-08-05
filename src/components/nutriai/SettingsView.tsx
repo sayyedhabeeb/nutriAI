@@ -12,12 +12,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Settings, User, Target, Heart, Loader2, LogOut, AlertTriangle, Save } from 'lucide-react';
+import { Settings, User, Target, Heart, Loader2, LogOut, AlertTriangle, Save, Camera, Sun, Moon, Monitor } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { useSyncExternalStore } from 'react';
 import { apiFetch } from './api';
+import { ThemeToggle } from './ThemeToggle';
 import {
   ALLERGENS, CUISINES, GOAL_TYPES, ACTIVITY_LEVELS, DIET_TYPES, DIET_LABELS,
   formatLabel, fadeIn,
 } from './constants';
+
+const emptySubscribe = () => () => {};
 
 const GENDER_OPTIONS = [
   { value: 'male', label: 'Male' },
@@ -33,6 +38,8 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
   const [saving, setSaving] = useState(false);
   const [savedSection, setSavedSection] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const { theme, setTheme } = useTheme();
+  const themeMounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
   const [profile, setProfile] = useState({ firstName: '', lastName: '', age: '', gender: 'male', heightCm: '', weightKg: '' });
   const [goals, setGoals] = useState({ goalType: 'maintain', activityLevel: 'moderately_active', targetWeightKg: '' });
   const [prefs, setPrefs] = useState<{ cuisinePreference: string; dietType: string; allergies: string[] }>({ cuisinePreference: 'Mixed', dietType: 'non-veg', allergies: [] });
@@ -146,27 +153,35 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
   return (
     <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-5 pb-28">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 flex items-center justify-center">
-          <Settings className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 flex items-center justify-center">
+            <Settings className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
+            <p className="text-xs text-gray-400 dark:text-gray-500">Manage your profile and preferences</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
-          <p className="text-xs text-gray-400 dark:text-gray-500">Manage your profile and preferences</p>
-        </div>
+        <ThemeToggle aria-label="Toggle theme" />
       </div>
 
       {/* Account Info Card */}
       <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-gradient-to-r from-emerald-500/5 to-teal-500/5 p-5">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center shadow-md">
-            <span className="text-white font-bold text-xl">{((user?.name as string) || 'U').charAt(0).toUpperCase()}</span>
+          <div className="relative">
+            <div className="w-14 h-14 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center shadow-md">
+              <span className="text-white font-bold text-xl">{((user?.name as string) || 'U').charAt(0).toUpperCase()}</span>
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-md border border-gray-200 dark:border-gray-700">
+              <Camera className="h-3 w-3 text-gray-600 dark:text-gray-400" />
+            </div>
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-gray-900 dark:text-gray-100">{user?.name as string || 'User'}</p>
             <p className="text-sm text-gray-500 dark:text-gray-300">{user?.email as string || ''}</p>
             <div className="flex items-center gap-2 mt-1">
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400">{(user?.role as string || 'user').charAt(0).toUpperCase() + (user?.role as string || 'user').slice(1)}</Badge>
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400">Free Plan</Badge>
               {user?.createdAt && <span className="text-[10px] text-gray-400 dark:text-gray-500">Joined {new Date(user.createdAt as string).toLocaleDateString()}</span>}
             </div>
           </div>
@@ -188,16 +203,55 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
         <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">Profile {completionPct}% complete</p>
       </Card>
 
+      {/* ═══ Appearance Section ═══ */}
+      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-5">
+        <div className="flex items-center gap-2 mb-1">
+          <Sun className="h-4 w-4 text-emerald-600" />
+          <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Appearance</span>
+        </div>
+        <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-4">Choose your preferred theme</p>
+        <div className="grid grid-cols-3 gap-2">
+          {([
+            { value: 'light', label: 'Light', Icon: Sun },
+            { value: 'dark', label: 'Dark', Icon: Moon },
+            { value: 'system', label: 'System', Icon: Monitor },
+          ] as const).map(({ value, label, Icon }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setTheme(value)}
+              disabled={!themeMounted}
+              className={`flex flex-col items-center gap-2 rounded-xl p-3 border-2 transition-all min-h-[80px] ${
+                (themeMounted && theme === value)
+                  ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 ring-2 ring-emerald-500/20'
+                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'
+              }`
+              }
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                (themeMounted && theme === value)
+                  ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+              }`}>
+                <Icon className="h-4 w-4" />
+              </div>
+              <span className={`text-xs font-medium ${
+                (themeMounted && theme === value)
+                  ? 'text-emerald-700 dark:text-emerald-400'
+                  : 'text-gray-600 dark:text-gray-400'
+              }`}>{label}</span>
+            </button>
+          ))}
+        </div>
+      </Card>
+
       {/* ═══ Profile Section ═══ */}
       <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-5">
         <div className="flex items-center gap-2 mb-1">
           <User className="h-4 w-4 text-emerald-600" />
           <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Personal Profile</span>
         </div>
-        <div className="flex items-center gap-1.5 mb-4">
-          <Save className="h-3 w-3 text-gray-400 dark:text-gray-500" />
-          <span className="text-[10px] text-gray-400 dark:text-gray-500">Changes are saved manually</span>
-        </div>
+        <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-4">Tap Save to apply changes</p>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -274,10 +328,7 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
           <Target className="h-4 w-4 text-emerald-600" />
           <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Fitness Goals</span>
         </div>
-        <div className="flex items-center gap-1.5 mb-4">
-          <Save className="h-3 w-3 text-gray-400 dark:text-gray-500" />
-          <span className="text-[10px] text-gray-400 dark:text-gray-500">Changes are saved manually</span>
-        </div>
+        <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-4">Tap Save to apply changes</p>
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-gray-500 dark:text-gray-400">Goal Type</Label>
@@ -310,10 +361,7 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
           <Heart className="h-4 w-4 text-emerald-600" />
           <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Dietary Preferences</span>
         </div>
-        <div className="flex items-center gap-1.5 mb-4">
-          <Save className="h-3 w-3 text-gray-400 dark:text-gray-500" />
-          <span className="text-[10px] text-gray-400 dark:text-gray-500">Changes are saved manually</span>
-        </div>
+        <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-4">Tap Save to apply changes</p>
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-gray-500 dark:text-gray-400">Cuisine Preference</Label>

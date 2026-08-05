@@ -59,8 +59,30 @@ export function FoodLogView() {
   } | { open: false }>({ open: false });
   const [searchLogServing, setSearchLogServing] = useState(100);
 
+  // Feature: Recent Meals Quick Re-add
+  const [recentMeals, setRecentMeals] = useState<{ id: string; name: string; mealId: string | null; calories: number; servingGms: number }[]>([]);
+
   const dates = Array.from({ length: 7 }, (_, i) => format(subDays(new Date(), 6 - i), 'yyyy-MM-dd'));
   const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+  // Fetch recent meals for quick re-add chips
+  useEffect(() => {
+    apiFetch('/api/food-logs?limit=20').then((data: Record<string, unknown>) => {
+      const allItems = (data.itemsBySlot as Record<string, { id: string; mealId: string | null; servingGms: number; calories: number; meal: { name: string } | null }[]> | undefined) || {};
+      const flat: { id: string; name: string; mealId: string | null; calories: number; servingGms: number }[] = [];
+      const seen = new Set<string>();
+      for (const slot of Object.keys(allItems)) {
+        for (const item of allItems[slot]) {
+          const name = item.meal?.name || 'Food';
+          if (!seen.has(name) && item.mealId) {
+            seen.add(name);
+            flat.push({ id: item.id, name, mealId: item.mealId, calories: item.calories, servingGms: item.servingGms });
+          }
+        }
+      }
+      setRecentMeals(flat.slice(0, 5));
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     apiFetch('/api/nutrition/daily').then((d: Record<string, unknown>) => {
@@ -187,6 +209,41 @@ export function FoodLogView() {
     <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-4">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Food Log</h1>
 
+      {/* Recent Meals Quick Re-add */}
+      {recentMeals.length > 0 && (
+        <div className="space-y-1.5">
+          <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Recent</span>
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            {recentMeals.map((meal) => (
+              <button
+                key={meal.id}
+                onClick={() => {
+                  // Reuse the relog dialog with a synthetic FoodLogItem
+                  const fakeItem: FoodLogItem = {
+                    id: meal.id,
+                    mealId: meal.mealId,
+                    servingGms: meal.servingGms,
+                    calories: meal.calories,
+                    proteinG: 0,
+                    carbsG: 0,
+                    fatG: 0,
+                    mealSlot: 'lunch',
+                    meal: { name: meal.name, nutrition: null },
+                  };
+                  setRelogDialog({ open: true, item: fakeItem });
+                  // Default slot based on time
+                  const hour = new Date().getHours();
+                  setRelogSlot(hour < 11 ? 'breakfast' : hour >= 16 ? 'dinner' : hour >= 14 ? 'snack' : 'lunch');
+                }}
+                className="shrink-0 px-3 py-1.5 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors"
+              >
+                {meal.name} <span className="text-gray-400 dark:text-gray-500 text-xs">{Math.round(meal.calories)}kcal</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Feature 4: Search bar */}
       <motion.div
         initial={{ opacity: 0, y: -4 }}
@@ -255,11 +312,11 @@ export function FoodLogView() {
             const targetKey = s.unit === 'kcal' ? 'calories' : s.label === 'Protein' ? 'proteinG' : s.label === 'Carbs' ? 'carbsG' : 'fatG';
             const targetVal = nutritionTargets[targetKey] || 0;
             return (
-              <div key={s.label} className="flex flex-col items-center gap-1.5 border border-gray-100 dark:border-gray-800 rounded-xl p-2.5 shadow-sm">
-                <div className={`w-8 h-8 rounded-full ${s.iconBg} flex items-center justify-center`}>
-                  <s.Icon className={`h-4 w-4 ${s.color}`} />
+              <div key={s.label} className="flex flex-col items-center gap-0.5 border border-gray-100 dark:border-gray-800 rounded-xl p-2 shadow-sm">
+                <div className={`w-7 h-7 rounded-full ${s.iconBg} flex items-center justify-center`}>
+                  <s.Icon className={`h-3.5 w-3.5 ${s.color}`} />
                 </div>
-                <p className={`text-lg font-bold ${s.color} tabular-nums`}>{Math.round(s.val)}</p>
+                <p className={`text-base font-bold ${s.color} tabular-nums leading-tight`}>{Math.round(s.val)}</p>
                 <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">{s.label}</p>
                 {targetVal > 0 && (
                   <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -292,7 +349,8 @@ export function FoodLogView() {
             <UtensilsCrossed className="h-10 w-10 text-emerald-500 dark:text-emerald-400" />
           </div>
           <p className="text-gray-700 dark:text-gray-300 font-semibold text-base">No meals logged</p>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mt-3">Log your first meal to see it here</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">Log your first meal to see it here</p>
+          <Button onClick={() => setSearchDialog(true)} className="mt-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-6 h-9 text-sm font-semibold">+ Add Your First Meal</Button>
         </Card>
       )}
 

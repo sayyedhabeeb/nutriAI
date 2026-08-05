@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Flame } from 'lucide-react';
+import { Flame, UtensilsCrossed } from 'lucide-react';
 
 // ═══ Nutrition Facts Label Component ═══
 export function NutritionFactsLabel({
@@ -139,14 +139,26 @@ export function CalorieRing({ consumed, target, pulse }: { consumed: number; tar
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <Flame className={`h-4 w-4 mb-1 ${pct > 1 ? 'text-rose-500' : 'text-orange-500'}`} />
-        <span className={`text-5xl font-extrabold text-gray-900 dark:text-gray-100 tabular-nums tracking-tight ${pulse ? 'animate-pulse' : ''}`}>{consumed}</span>
-        <span className="text-[11px] text-gray-400 dark:text-gray-500 font-medium mt-0.5">
-          of <span className="text-gray-600 dark:text-gray-300 font-semibold">{target}</span> kcal
-        </span>
-        <span className={`text-xs font-bold mt-1 ${pct >= 1 ? 'text-emerald-600 dark:text-emerald-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-          {pct >= 1 ? '✓ Goal reached!' : `${remaining} remaining`}
-        </span>
+        {consumed === 0 ? (
+          <>
+            <UtensilsCrossed className="h-7 w-7 text-emerald-500 dark:text-emerald-400 mb-1.5" />
+            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 leading-tight">Log your first meal!</span>
+            <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium mt-1">
+              Goal: <span className="text-gray-600 dark:text-gray-300 font-semibold">{target}</span> kcal
+            </span>
+          </>
+        ) : (
+          <>
+            <Flame className={`h-4 w-4 mb-1 ${pct > 1 ? 'text-rose-500' : 'text-orange-500'}`} />
+            <span className={`text-5xl font-extrabold text-gray-900 dark:text-gray-100 tabular-nums tracking-tight ${pulse ? 'animate-pulse' : ''}`}>{consumed}</span>
+            <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium mt-0.5">
+              of <span className="text-gray-600 dark:text-gray-300 font-semibold">{target}</span> kcal
+            </span>
+            <span className={`text-xs font-bold mt-1 ${pct >= 1 ? 'text-emerald-600 dark:text-emerald-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+              {pct >= 1 ? '✓ Goal reached!' : `${remaining} remaining`}
+            </span>
+          </>
+        )}
       </div>
     </div>
   );

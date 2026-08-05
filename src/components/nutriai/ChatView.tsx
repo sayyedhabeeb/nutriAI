@@ -46,8 +46,16 @@ const QUICK_ACTIONS = [
 ];
 
 export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void }) {
+  const getTimeWelcome = () => {
+    const h = new Date().getHours();
+    if (h < 11) return "Good morning! Ready to plan healthy meals?";
+    if (h < 16) return "Hey there! How's your nutrition going today?";
+    if (h < 21) return "Good evening! Time to log dinner?";
+    return "Still up? Let's review your day's nutrition.";
+  };
+
   const [messages, setMessages] = useState<Message[]>([
-    { id: 'welcome', role: 'ai', content: "Hi! I'm your nutrition assistant. Ask me about your diet, meal suggestions, or nutrition tips!" },
+    { id: 'welcome', role: 'ai', content: getTimeWelcome() },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -235,16 +243,16 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pb-2">
         {!hasUserMessages && !loading ? (
           /* Warm centered empty state with illustration */
-          <div className="flex flex-col items-center justify-center h-full -mt-8">
-            <div className="relative mb-4">
+          <div className="flex flex-col items-center justify-center h-full -mt-2">
+            <div className="relative mb-3">
               <div className="absolute inset-0 rounded-full bg-gradient-to-br from-emerald-200 to-teal-200 dark:from-emerald-800 dark:to-teal-800 blur-md opacity-40" />
-              <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/40 dark:to-teal-900/40 flex items-center justify-center shadow-lg animate-pulse">
-                <Sparkles className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
+              <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/40 dark:to-teal-900/40 flex items-center justify-center shadow-lg animate-pulse">
+                <Sparkles className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
               </div>
             </div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Hi, I&apos;m NutriAI!</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 text-center max-w-xs">Ask me about your diet, meal suggestions, or nutrition tips</p>
-            <div className="grid grid-cols-2 gap-2 w-full max-w-xs mt-4 justify-center">
+            <div className="grid grid-cols-2 gap-2 w-full max-w-xs mt-3 justify-center">
               {QUICK_ACTIONS.map((action) => (
                 <button
                   key={action.label}
@@ -389,7 +397,7 @@ export function ChatView({ onNavigate }: { onNavigate?: (v: ViewType) => void })
             type="submit"
             size="icon"
             disabled={!input.trim() || loading}
-            className="h-12 w-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 shrink-0"
+            className={`h-12 w-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 ${!input.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <Send className="h-4 w-4" />
           </Button>

@@ -27,7 +27,7 @@ import {
 import { apiFetch } from './api';
 import { PIE_COLORS, fadeIn } from './constants';
 
-export function ProgressView() {
+export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void } = {}) {
   const [tab, setTab] = useState('weekly');
   const [weeklyData, setWeeklyData] = useState<Record<string, unknown>[]>([]);
   const [summary, setSummary] = useState<Record<string, unknown> | null>(null);
@@ -390,15 +390,30 @@ export function ProgressView() {
                 </div>
               )}
               {allCaloriesZero ? (
-                <div className="h-full flex flex-col items-center justify-center py-8">
-                  <Flame className="h-12 w-12 mb-3 text-gray-400 dark:text-gray-500" />
-                  <p className="text-sm font-medium text-gray-400 dark:text-gray-500">No calorie data yet</p>
+                <div className="h-full flex flex-col items-center justify-center py-6">
+                  <div className="w-14 h-14 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3">
+                    <BarChart3 className="h-7 w-7 text-gray-400 dark:text-gray-500" />
+                  </div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Log meals to see your trends</p>
+                  <Button
+                    onClick={onNavigate ? () => onNavigate('foodlog') : undefined}
+                    className="mt-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-5 h-9 text-sm font-semibold"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />Log Meal
+                  </Button>
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} barCategoryGap="20%">
                     <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: '#6b7280' }}
+                      axisLine={false}
+                      tickLine={false}
+                      domain={[0, (dataMax: number) => Math.ceil(Math.max(dataMax, (chartData[0]?.target || 0) * 1.1) / 500) * 500]}
+                      ticks={[0, 500, 1000, 1500, 2000, 2500, 3000]}
+                      allowDecimals={false}
+                    />
                     <Tooltip
                       contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
                     />
@@ -410,8 +425,14 @@ export function ProgressView() {
                     </defs>
                     <Bar dataKey="calories" fill="url(#barGrad)" radius={[4, 4, 0, 0]} name="Consumed" />
                     <Bar dataKey="target" fill="#e5e7eb" radius={[4, 4, 0, 0]} name="Target" />
-                    {!allCaloriesZero && chartData[0]?.target > 0 && (
-                      <ReferenceLine y={chartData[0].target} stroke="#10b981" strokeDasharray="6 3" strokeOpacity={0.6} />
+                    {chartData[0]?.target > 0 && (
+                      <ReferenceLine
+                        y={chartData[0].target}
+                        stroke="#f43f5e"
+                        strokeDasharray="6 3"
+                        strokeOpacity={0.5}
+                        label={{ value: 'Goal', position: 'right', fill: '#f43f5e', fontSize: 10, fontWeight: 600 }}
+                      />
                     )}
                   </BarChart>
                 </ResponsiveContainer>

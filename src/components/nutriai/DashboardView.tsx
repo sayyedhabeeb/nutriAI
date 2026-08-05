@@ -258,6 +258,13 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
   const consumedProtein = nutrition?.consumed?.proteinG || 0;
   const pctProtein = targetProtein > 0 ? consumedProtein / targetProtein : 0;
   const hour = new Date().getHours();
+  const timeGreeting = hour < 11
+    ? { text: 'Good morning', emoji: '\u2600\uFE0F', gradientFrom: 'from-yellow-500/5', gradientTo: 'to-amber-500/5', border: 'border-yellow-100/50 dark:border-yellow-800/30', blob1: 'bg-yellow-200/20', blob2: 'bg-amber-200/20' }
+    : hour < 16
+      ? { text: 'Good afternoon', emoji: '\uD83C\uDF24\uFE0F', gradientFrom: 'from-emerald-500/5', gradientTo: 'to-teal-500/5', border: 'border-emerald-100/50 dark:border-emerald-800/30', blob1: 'bg-emerald-200/20', blob2: 'bg-teal-200/20' }
+      : hour < 21
+        ? { text: 'Good evening', emoji: '\uD83C\uDF05', gradientFrom: 'from-orange-500/5', gradientTo: 'to-rose-500/5', border: 'border-orange-100/50 dark:border-orange-800/30', blob1: 'bg-orange-200/20', blob2: 'bg-rose-200/20' }
+        : { text: 'Good night', emoji: '\uD83C\uDF19', gradientFrom: 'from-violet-500/5', gradientTo: 'to-purple-500/5', border: 'border-violet-100/50 dark:border-violet-800/30', blob1: 'bg-violet-200/20', blob2: 'bg-purple-200/20' };
   const timeOfDayTip = hour < 12
     ? 'Start your day with a protein-rich breakfast!'
     : hour < 17
@@ -276,15 +283,15 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
   }
 
   return (
-    <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-4">
+    <motion.div {...fadeIn} className="p-4 max-w-lg mx-auto space-y-4 pb-28">
       {/* ═══ Hero Section with gradient bg & decorative blobs ═══ */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500/5 to-teal-500/5 p-5 border border-emerald-100/50 dark:border-emerald-800/30 backdrop-blur-sm">
-        <div className="absolute -top-8 -right-8 w-24 h-24 bg-emerald-200/20 rounded-full blur-2xl" />
-        <div className="absolute -bottom-6 -left-6 w-20 h-20 bg-teal-200/20 rounded-full blur-2xl" />
+      <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-r ${timeGreeting.gradientFrom} ${timeGreeting.gradientTo} p-5 border ${timeGreeting.border} backdrop-blur-sm`}>
+        <div className={`absolute -top-8 -right-8 w-24 h-24 ${timeGreeting.blob1} rounded-full blur-2xl`} />
+        <div className={`absolute -bottom-6 -left-6 w-20 h-20 ${timeGreeting.blob2} rounded-full blur-2xl`} />
         <div className="absolute top-1/2 right-1/4 w-12 h-12 bg-green-200/10 rounded-full blur-xl" />
         <div className="relative flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Hi, {displayName}! {'\uD83D\uDC4B'}</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{timeGreeting.text}, {displayName}! {timeGreeting.emoji}</h1>
             <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-500 dark:text-gray-400">
               <CalendarIcon className="h-3.5 w-3.5" />
               <span>{todayStr}</span>
@@ -326,7 +333,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
       </div>
 
       {/* ═══ Calorie Ring Card ═══ */}
-      <Card className="p-6 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60">
+      <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60">
         <div className="flex justify-center">
           <CalorieRing consumed={consumedCal} target={targetCal} pulse={calPulse} />
         </div>
@@ -359,12 +366,12 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                 <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">{m.label}</span>
                 <span className="text-xs text-gray-600 dark:text-gray-400 font-medium text-right tabular-nums">{m.val}{m.unit} / {m.target}{m.unit} &middot; {pct}%</span>
               </div>
-              <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden ring-1 ring-inset ring-gray-300/50 dark:ring-gray-600/50">
                 <motion.div
                   className="h-full rounded-full"
-                  style={{ background: `linear-gradient(90deg, ${m.from}, ${m.to})` }}
+                  style={{ background: `linear-gradient(90deg, ${m.from}, ${m.to})`, minWidth: pct > 0 ? '4px' : '0px' }}
                   initial={{ width: 0 }}
-                  animate={{ width: `${pct}%` }}
+                  animate={{ width: `${Math.max(pct, 0)}%` }}
                   transition={{ duration: 0.8 }}
                 />
               </div>

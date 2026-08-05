@@ -14,7 +14,6 @@ import { UploadView } from '@/components/nutriai/UploadView';
 import { ProgressView } from '@/components/nutriai/ProgressView';
 import { SettingsView } from '@/components/nutriai/SettingsView';
 import { ChatView } from '@/components/nutriai/ChatView';
-import { ThemeToggle } from '@/components/nutriai/ThemeToggle';
 
 export default function NutriAIPage() {
   const [view, setView] = useState<ViewType>('auth');
@@ -63,7 +62,7 @@ export default function NutriAIPage() {
           {view === 'foodlog' && <FoodLogView key="foodlog" />}
           {view === 'upload' && <UploadView key="upload" />}
           {view === 'chat' && <ChatView key="chat" onNavigate={setView} />}
-          {view === 'progress' && <ProgressView key="progress" />}
+          {view === 'progress' && <ProgressView key="progress" onNavigate={(v) => { setView(v as ViewType); setActiveTab(v as TabType); }} />}
           {view === 'settings' && <SettingsView key="settings" onLogout={handleLogout} />}
         </AnimatePresence>
       </main>
@@ -98,9 +97,6 @@ export default function NutriAIPage() {
                 </div>
               </button>
             ))}
-            <div className="ml-1 flex items-center">
-              <ThemeToggle aria-label="Toggle theme" />
-            </div>
           </div>
         </nav>
       )}
