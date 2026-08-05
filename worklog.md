@@ -1716,3 +1716,35 @@ Work Log:
 8. **Add barcode scanning** for packaged foods
 9. **Add custom SVG empty state illustrations** for a more polished look
 10. **Add onboarding skip option** for returning users
+
+---
+Task ID: 25
+Agent: Main
+Task: Fix critical food photo upload/scan bug (500 Internal Server Error)
+
+Work Log:
+- User reported Internal Server Error when uploading food photos on Scan view
+- VLM screenshot analysis confirmed: image uploaded successfully, but server returned 500
+- **Root Cause 1**: `/api/food-recognize/route.ts` hardcoded `data:image/jpeg;base64,` MIME type regardless of actual file type. When user uploaded a PNG, VLM API rejected with `图片输入格式/解析错误` (image format/parsing error)
+- **Fix 1**: Changed to use `file.type` for dynamic MIME type: `data:${mimeType};base64,${base64}`
+- **Root Cause 2**: After fixing MIME type, VLM succeeded but Prisma query failed with `Unknown argument 'mode'` — `mode: 'insensitive'` is not supported in SQLite
+- **Fix 2**: Removed all `mode: 'insensitive'` from Prisma queries (SQLite is case-insensitive by default for ASCII)
+- Applied same fixes to `/api/food-logs/photo/route.ts` which had identical bugs
+- Additional improvements: file type validation, 10MB size limit, better error messages for format failures, removed invalid `model: 'gpt-4o'` parameter, added `thinking: { type: 'disabled' }`
+- E2E test: Uploaded user's PNG screenshot of idli → VLM correctly identified "Idli" at 95% confidence → matched to "Idli Sambar" in database ✅
+
+Stage Summary:
+- Food photo scanning now works correctly for JPG, PNG, and WebP formats
+- Two API routes fixed: `/api/food-recognize` and `/api/food-logs/photo`
+- VLM food recognition E2E verified for the first time
+- ESLint: 0 errors
+
+## Unresolved Issues (updated)
+1. ~~VLM food recognition not tested with real food photos E2E~~ → ✅ FIXED & VERIFIED (Idli detected at 95%)
+2. New achievements condition logic not fully implemented
+3. Social login buttons are decorative (no OAuth)
+4. No PWA manifest
+5. No notification/reminder system
+6. No barcode scanning
+7. No social/sharing features
+8. Hydration mismatch warnings from browser extensions (fdprocessedid) — not fixable in app code

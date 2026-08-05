@@ -19,9 +19,21 @@ export async function POST(request: Request) {
       return error('Image file is required');
     }
 
-    // Read file as buffer
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!allowedTypes.includes(file.type) && !file.type.startsWith('image/')) {
+      return error('Unsupported image format. Please use JPG, PNG, or WebP.');
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      return error('Image is too large. Maximum size is 10MB.');
+    }
+
+    // Read file as buffer with correct MIME type
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
+    const mimeType = file.type || 'image/jpeg';
 
     // Save to uploads
     const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -34,8 +46,9 @@ export async function POST(request: Request) {
     const base64 = buffer.toString('base64');
 
     // Call VLM
-    const result = await AI.chat({
-      model: 'gpt-4o',
+    const sdk = await AI.create();
+    const result = await sdk.chat.completions.createVision({
+      thinking: { type: 'disabled' },
       messages: [
         {
           role: 'user',
@@ -43,7 +56,7 @@ export async function POST(request: Request) {
             { type: 'text', text: VISION_PROMPT },
             {
               type: 'image_url',
-              image_url: { url: `data:image/jpeg;base64,${base64}` },
+              image_url: { url: `data:${mimeType};base64,${base64}` },
             },
           ],
         },
@@ -92,23 +105,18 @@ export async function POST(request: Request) {
     // Match foods against database
     const results = [];
     for (const food of aiResponse.foods || []) {
-      // Search by name and aliases
-      const searchTerms = [food.name.toLowerCase().trim()];
-
-      // Try to find in database
+      // Try to find in database (SQLite is case-insensitive by default for ASCII)
       const words = food.name.toLowerCase().split(/\s+/);
-      // Try full name first, then individual significant words
       let dbMeal = await db.meal.findFirst({
         where: {
           isActive: true,
           OR: [
-            { name: { contains: food.name, mode: 'insensitive' } },
-            { aliases: { some: { aliasName: { contains: food.name, mode: 'insensitive' } } } },
-            // Also search by individual words for better matching
+            { name: { contains: food.name } },
+            { aliases: { some: { aliasName: { contains: food.name } } } },
             ...words
               .filter((w) => w.length > 3)
               .map((word) => ({
-                name: { contains: word, mode: 'insensitive' },
+                name: { contains: word },
               })),
           ],
         },
@@ -143,6 +151,10 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     console.error('Food photo recognition error:', err);
+    const msg = err instanceof Error ? err.message : 'Recognition failed';
+    if (msg.includes('format') || msg.includes('解析')) {
+      return error('Failed to process image. Please try a different format (JPG, PNG, or WebP).');
+    }
     return serverError();
   }
 }

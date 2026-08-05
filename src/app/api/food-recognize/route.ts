@@ -17,15 +17,27 @@ export async function POST(request: Request) {
       return error('Image file is required');
     }
 
-    // Read file as buffer
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!allowedTypes.includes(file.type) && !file.type.startsWith('image/')) {
+      return error('Unsupported image format. Please use JPG, PNG, or WebP.');
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      return error('Image is too large. Maximum size is 10MB.');
+    }
+
+    // Read file as buffer with correct MIME type
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const base64 = buffer.toString('base64');
+    const mimeType = file.type || 'image/jpeg';
 
     // Call VLM
     const zai = await ZAI.create();
     const result = await zai.chat.completions.createVision({
-      model: 'gpt-4o',
+      thinking: { type: 'disabled' },
       messages: [
         {
           role: 'user',
@@ -33,7 +45,7 @@ export async function POST(request: Request) {
             { type: 'text', text: VISION_PROMPT },
             {
               type: 'image_url',
-              image_url: { url: `data:image/jpeg;base64,${base64}` },
+              image_url: { url: `data:${mimeType};base64,${base64}` },
             },
           ],
         },
@@ -86,8 +98,8 @@ export async function POST(request: Request) {
         where: {
           isActive: true,
           OR: [
-            { name: { contains: food.name, mode: 'insensitive' } },
-            { aliases: { some: { aliasName: { contains: food.name, mode: 'insensitive' } } } },
+            { name: { contains: food.name } },
+            { aliases: { some: { aliasName: { contains: food.name } } } },
           ],
         },
         include: { nutrition: true, servings: true },
@@ -118,6 +130,10 @@ export async function POST(request: Request) {
     return created({ foods: results });
   } catch (err) {
     console.error('Food recognize error:', err);
+    const msg = err instanceof Error ? err.message : 'Recognition failed';
+    if (msg.includes('format') || msg.includes('解析')) {
+      return error('Failed to process image. Please try a different format (JPG, PNG, or WebP).');
+    }
     return serverError();
   }
 }
