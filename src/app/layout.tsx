@@ -6,6 +6,9 @@ import { ThemeProvider } from 'next-themes';
 export const metadata: Metadata = {
   title: 'NutriAI - Smart Diet Tracker',
   description: 'AI-powered diet recommendation and food tracking platform',
+  icons: {
+    icon: '/logo.svg',
+  },
 };
 
 export default function RootLayout({

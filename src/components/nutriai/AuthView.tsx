@@ -66,7 +66,7 @@ export function AuthView({ onAuth }: { onAuth: (v: ViewType) => void }) {
         <CardContent className="pt-6 px-6 pb-6">
           <div className="flex gap-3 mb-4">
             <Button variant="outline" className="flex-1 h-11 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium" onClick={() => toast.info('Google Sign-In coming soon!')}>
-              <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25L12.25 2.67c-1.06-.55-2.2-.83-3.38-.83-3.03 0-5.78 1.14-7.81 3.01C.56 7.21.09 9.1.09 11.25c0 3.66-2.09 6.84-5.15 8.41-1.08.56-2.2.83-3.38.83-1.88 0-3.6-.66-5.01-1.76l-.08-.07c-.03-.03-.06-.04-.1-.06l-4.2-3.68c-.73-.65-1.78-.95-2.79-.75-1.01.2-2.05.77-2.94 1.62-.89 1.85-.89 3.27.39 4.69 1.19l.08.07c.03.03.06.04.1.06 2.08 1.84 3.6 3.6 5.15 3.6 1.74 0 3.36-.68 4.59-1.91l2.6-2.6z" fill="currentColor"/></svg>
+              <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24"><path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" fill="currentColor"/></svg>
               Google
             </Button>
             <Button variant="outline" className="flex-1 h-11 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium" onClick={() => toast.info('Apple Sign-In coming soon!')}>

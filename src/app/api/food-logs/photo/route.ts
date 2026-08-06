@@ -3,7 +3,7 @@ import { getSessionFromRequest } from '@/lib/auth';
 import { created, unauthorized, serverError, error } from '@/lib/response';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
-import AI from 'z-ai-web-dev-sdk';
+import { getFoodRecognitionClient, logAiCall } from '@/lib/ai/client';
 
 const VISION_PROMPT = `You are a food recognition assistant. Identify cooked food items in this image. Return ONLY JSON: { "foods": [{ "name": "...", "serving_description": "...", "serving_weight_grams": N, "confidence": N.N }] }`;
 
@@ -45,22 +45,13 @@ export async function POST(request: Request) {
     // Convert to base64
     const base64 = buffer.toString('base64');
 
-    // Call VLM
-    const sdk = await AI.create();
-    const result = await sdk.chat.completions.createVision({
-      thinking: { type: 'disabled' },
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: VISION_PROMPT },
-            {
-              type: 'image_url',
-              image_url: { url: `data:${mimeType};base64,${base64}` },
-            },
-          ],
-        },
-      ],
+    // Call local Gemma vision model (LM Studio / OpenAI-compatible)
+    const ai = getFoodRecognitionClient();
+    const result = await ai.vision({
+      system: VISION_PROMPT,
+      user: 'Identify the food(s) in this image and return the JSON as instructed.',
+      imageBase64: base64,
+      mimeType,
     });
 
     // Parse AI response
@@ -73,27 +64,10 @@ export async function POST(request: Request) {
       }>;
     }
 
-    interface AIMessage {
-      content?: string;
-    }
-    interface AIChoice {
-      message?: AIMessage;
-    }
-    interface AIResult {
-      choices?: AIChoice[];
-    }
-
     let aiResponse: AIResponse;
     try {
-      let content = '';
-      if (typeof result === 'string') {
-        content = result;
-      } else {
-        const r = result as AIResult;
-        content = r.choices?.[0]?.message?.content || '';
-      }
       // Extract JSON from response (may be wrapped in markdown code blocks)
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      const jsonMatch = result.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         return error('Failed to parse AI response', 500, 'AI_001');
       }
@@ -103,7 +77,17 @@ export async function POST(request: Request) {
     }
 
     // Match foods against database
-    const results = [];
+    type MealWithNutrition = Awaited<ReturnType<typeof db.meal.findFirst>>;
+    interface RecognizedResult {
+      name: string;
+      servingDescription: string;
+      servingWeightGrams: number;
+      confidence: number;
+      matched: boolean;
+      unknown_food?: boolean;
+      meal: MealWithNutrition;
+    }
+    const results: RecognizedResult[] = [];
     for (const food of aiResponse.foods || []) {
       // Try to find in database (SQLite is case-insensitive by default for ASCII)
       const words = food.name.toLowerCase().split(/\s+/);
@@ -154,6 +138,19 @@ export async function POST(request: Request) {
     const msg = err instanceof Error ? err.message : 'Recognition failed';
     if (msg.includes('format') || msg.includes('解析')) {
       return error('Failed to process image. Please try a different format (JPG, PNG, or WebP).');
+    }
+    if (
+      msg.includes('AI request failed') ||
+      msg.includes('Empty AI') ||
+      msg.includes('fetch failed') ||
+      msg.includes('ECONNREFUSED') ||
+      msg.includes('ENOTFOUND') ||
+      msg.includes('timed out') ||
+      msg.includes('unreachable')
+    ) {
+      return error(
+        'Food recognition is temporarily unavailable. Please make sure the local AI server is running.'
+      );
     }
     return serverError();
   }
