@@ -333,11 +333,11 @@ export function UploadView() {
               {food.matched && food.meal && (
                 <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-3 space-y-1 border border-green-100 dark:border-green-800">
                   <p className="text-sm text-green-800 dark:text-green-400 font-medium">&#10003; Found in database</p>
-                  <p className="text-xs text-green-700 dark:text-green-400">
-                    {(food.meal as Record<string, unknown>).nutrition
-                      ? `${(food.meal as Record<string, Record<string, unknown>>).nutrition?.calories} kcal, ${(food.meal as Record<string, Record<string, unknown>>).nutrition?.proteinG}g protein per 100g`
-                      : 'Nutrition data available'}
-                  </p>
+                  {food.estimatedNutrition && (
+                    <p className="text-xs text-green-700 dark:text-green-400">
+                      {food.estimatedNutrition.calories} kcal, {food.estimatedNutrition.proteinG}g protein, {food.estimatedNutrition.carbsG}g carbs, {food.estimatedNutrition.fatG}g fat for ~{food.servingWeightGrams}g
+                    </p>
+                  )}
                   <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white mt-2 rounded-lg" onClick={() => handleLogRecognized((food.meal as Record<string, unknown>).id as string, food.servingWeightGrams)}>Log This</Button>
                 </div>
               )}

@@ -39,6 +39,7 @@ export interface RecognizedFood {
   confidence: number;
   matched: boolean;
   unknown_food?: boolean;
+  estimatedNutrition: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; sugarG: number; sodiumMg: number } | null;
   meal: Record<string, unknown> | null;
 }
 

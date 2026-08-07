@@ -144,15 +144,30 @@ export function getSlotTargets(
 }
 
 // Scale nutrition by serving size
+export interface NutritionValues {
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  fiberG?: number;
+  sugarG?: number;
+  sodiumMg?: number;
+}
+
+export type ScaledNutrition = Required<NutritionValues>;
+
 export function scaleNutrition(
-  basePer100g: { calories: number; proteinG: number; carbsG: number; fatG: number },
+  basePer100g: NutritionValues,
   servingGms: number
-): { calories: number; proteinG: number; carbsG: number; fatG: number } {
+): ScaledNutrition {
   const factor = servingGms / 100;
   return {
     calories: Math.round(basePer100g.calories * factor),
     proteinG: Math.round(basePer100g.proteinG * factor * 10) / 10,
     carbsG: Math.round(basePer100g.carbsG * factor * 10) / 10,
     fatG: Math.round(basePer100g.fatG * factor * 10) / 10,
+    fiberG: Math.round((basePer100g.fiberG ?? 0) * factor * 10) / 10,
+    sugarG: Math.round((basePer100g.sugarG ?? 0) * factor * 10) / 10,
+    sodiumMg: Math.round((basePer100g.sodiumMg ?? 0) * factor),
   };
 }

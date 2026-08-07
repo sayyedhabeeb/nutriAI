@@ -4,6 +4,7 @@ import { created, unauthorized, serverError, error } from '@/lib/response';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { getFoodRecognitionClient, logAiCall } from '@/lib/ai/client';
+import { scaleNutrition, type NutritionValues } from '@/lib/nutrition-engine';
 
 const VISION_PROMPT = `You are a food recognition assistant. Identify cooked food items in this image. Return ONLY JSON: { "foods": [{ "name": "...", "serving_description": "...", "serving_weight_grams": N, "confidence": N.N }] }`;
 
@@ -77,7 +78,11 @@ export async function POST(request: Request) {
     }
 
     // Match foods against database
-    type MealWithNutrition = Awaited<ReturnType<typeof db.meal.findFirst>>;
+    type MealWithNutrition = Awaited<
+      ReturnType<
+        typeof db.meal.findFirst<{ include: { nutrition: true; servings: true } }>
+      >
+    >;
     interface RecognizedResult {
       name: string;
       servingDescription: string;
@@ -85,11 +90,14 @@ export async function POST(request: Request) {
       confidence: number;
       matched: boolean;
       unknown_food?: boolean;
+      estimatedNutrition: ReturnType<typeof scaleNutrition> | null;
       meal: MealWithNutrition;
     }
     const results: RecognizedResult[] = [];
     for (const food of aiResponse.foods || []) {
-      // Try to find in database (SQLite is case-insensitive by default for ASCII)
+      const servingWeightGrams = food.serving_weight_grams || 200;
+
+      // Try to find in database
       const words = food.name.toLowerCase().split(/\s+/);
       let dbMeal = await db.meal.findFirst({
         where: {
@@ -111,19 +119,23 @@ export async function POST(request: Request) {
         results.push({
           name: food.name,
           servingDescription: food.serving_description,
-          servingWeightGrams: food.serving_weight_grams,
+          servingWeightGrams,
           confidence: food.confidence,
           matched: true,
+          estimatedNutrition: dbMeal.nutrition
+            ? scaleNutrition(dbMeal.nutrition as NutritionValues, servingWeightGrams)
+            : null,
           meal: dbMeal,
         });
       } else if (food.confidence >= 0.7) {
         results.push({
           name: food.name,
           servingDescription: food.serving_description,
-          servingWeightGrams: food.serving_weight_grams,
+          servingWeightGrams,
           confidence: food.confidence,
           matched: false,
           unknown_food: true,
+          estimatedNutrition: null,
           meal: null,
         });
       }

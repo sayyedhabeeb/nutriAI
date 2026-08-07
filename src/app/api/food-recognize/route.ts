@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import { getSessionFromRequest } from '@/lib/auth';
 import { created, unauthorized, serverError, error } from '@/lib/response';
 import { getFoodRecognitionClient, logAiCall } from '@/lib/ai/client';
+import { scaleNutrition, type NutritionValues } from '@/lib/nutrition-engine';
 
 const VISION_PROMPT = `You are a food recognition assistant for a nutrition tracking app. Analyze the food image carefully.
 
@@ -93,11 +94,16 @@ export async function POST(request: Request) {
     }
 
     // Match foods (and their variants) against the database
-    type MealWithNutrition = Awaited<ReturnType<typeof db.meal.findFirst>>;
+    type MealWithNutrition = Awaited<
+      ReturnType<
+        typeof db.meal.findFirst<{ include: { nutrition: true; servings: true } }>
+      >
+    >;
     interface VariantResult {
       name: string;
       matched: boolean;
       meal: MealWithNutrition;
+      estimatedNutrition: ReturnType<typeof scaleNutrition> | null;
     }
     interface RecognizedResult {
       name: string;
@@ -106,6 +112,7 @@ export async function POST(request: Request) {
       confidence: number;
       needsConfirmation: boolean;
       variants: VariantResult[];
+      estimatedNutrition: ReturnType<typeof scaleNutrition> | null;
       matched: boolean;
       unknown_food?: boolean;
       meal: MealWithNutrition;
@@ -113,6 +120,8 @@ export async function POST(request: Request) {
     const results: RecognizedResult[] = [];
     for (const food of aiResponse.foods || []) {
       if (!food.name) continue;
+
+      const servingWeightGrams = food.serving_weight_grams || 200;
 
       const findMatch = async (name: string) =>
         db.meal.findFirst({
@@ -128,6 +137,11 @@ export async function POST(request: Request) {
 
       const dbMeal = await findMatch(food.name);
 
+      const scaleFor = (meal: MealWithNutrition) =>
+        meal?.nutrition
+          ? scaleNutrition(meal.nutrition as NutritionValues, servingWeightGrams)
+          : null;
+
       const variantResults: VariantResult[] = [];
       for (const variant of (food.variants || []).slice(0, 6)) {
         if (!variant || variant.toLowerCase() === food.name.toLowerCase()) {
@@ -138,6 +152,7 @@ export async function POST(request: Request) {
           name: variant,
           matched: !!variantMeal,
           meal: variantMeal,
+          estimatedNutrition: scaleFor(variantMeal),
         });
       }
 
@@ -146,10 +161,11 @@ export async function POST(request: Request) {
         results.push({
           name: food.name,
           servingDescription: food.serving_description || '',
-          servingWeightGrams: food.serving_weight_grams || 200,
+          servingWeightGrams,
           confidence,
           needsConfirmation: food.needs_confirmation ?? confidence < 0.75,
           variants: variantResults,
+          estimatedNutrition: scaleFor(dbMeal),
           matched: true,
           meal: dbMeal,
         });
@@ -157,10 +173,11 @@ export async function POST(request: Request) {
         results.push({
           name: food.name,
           servingDescription: food.serving_description || '',
-          servingWeightGrams: food.serving_weight_grams || 200,
+          servingWeightGrams,
           confidence,
           needsConfirmation: food.needs_confirmation ?? confidence < 0.75,
           variants: variantResults,
+          estimatedNutrition: scaleFor(dbMeal),
           matched: false,
           unknown_food: true,
           meal: null,
