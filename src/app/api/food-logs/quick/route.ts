@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { getSessionFromRequest } from '@/lib/auth';
 import { success, created, unauthorized, serverError, error } from '@/lib/response';
+import { syncMealPlanWithLogs } from '@/lib/meal-plan-sync';
 
 function getTodayStr(): string {
   return new Date().toISOString().split('T')[0];
@@ -139,6 +140,14 @@ export async function POST(request: Request) {
       },
     });
 
+    // Reconcile today's meal plan: drop slots just eaten and re-scale the rest.
+    let planSync: Awaited<ReturnType<typeof syncMealPlanWithLogs>> | null = null;
+    try {
+      planSync = await syncMealPlanWithLogs(session.userId);
+    } catch (syncErr) {
+      console.warn('Meal plan sync failed:', syncErr);
+    }
+
     return created({
       logItem,
       foodLogTotals: {
@@ -147,6 +156,7 @@ export async function POST(request: Request) {
         totalCarbs: totals._sum.carbsG || 0,
         totalFat: totals._sum.fatG || 0,
       },
+      planSync,
     });
   } catch (err) {
     console.error('Quick add food log error:', err);

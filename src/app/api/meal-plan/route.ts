@@ -1,7 +1,7 @@
 import { db } from '@/lib/db';
 import { getSessionFromRequest } from '@/lib/auth';
 import { success, unauthorized, serverError } from '@/lib/response';
-import { scaleNutrition } from '@/lib/nutrition-engine';
+import { buildPlanItems } from '@/lib/meal-plan-view';
 
 function getTodayStr(): string {
   return new Date().toISOString().split('T')[0];
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
               include: { nutrition: true },
             },
           },
-          orderBy: { mealSlot: 'asc' },
+          orderBy: { createdAt: 'asc' },
         },
       },
     });
@@ -32,33 +32,6 @@ export async function GET(request: Request) {
       return success({ exists: false, planDate: today, items: [] });
     }
 
-    const items = planDay.items.map((item) => {
-      const scaled = item.meal.nutrition
-        ? scaleNutrition(
-            { calories: item.meal.nutrition.calories, proteinG: item.meal.nutrition.proteinG, carbsG: item.meal.nutrition.carbsG, fatG: item.meal.nutrition.fatG },
-            item.servingGms
-          )
-        : null;
-
-      return {
-        id: item.id,
-        mealSlot: item.mealSlot,
-        servingGms: item.servingGms,
-        recommendedCalories: item.recommendedCalories,
-        rankScore: item.rankScore,
-        meal: {
-          id: item.meal.id,
-          name: item.meal.name,
-          mealType: item.meal.mealType,
-          cuisine: item.meal.cuisine,
-          isVeg: item.meal.isVeg,
-          isVegan: item.meal.isVegan,
-          prepTimeMin: item.meal.prepTimeMin,
-        },
-        nutrition: scaled,
-      };
-    });
-
     return success({
       exists: true,
       planDate: planDay.planDate,
@@ -66,7 +39,7 @@ export async function GET(request: Request) {
       targetProtein: planDay.targetProtein,
       targetCarbs: planDay.targetCarbs,
       targetFat: planDay.targetFat,
-      items,
+      items: buildPlanItems(planDay.items),
     });
   } catch (err) {
     console.error('Get meal plan error:', err);

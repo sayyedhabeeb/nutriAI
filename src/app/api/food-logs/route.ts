@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { getSessionFromRequest } from '@/lib/auth';
 import { scaleNutrition } from '@/lib/nutrition-engine';
+import { syncMealPlanWithLogs } from '@/lib/meal-plan-sync';
 import { success, created, unauthorized, serverError, error, notFound } from '@/lib/response';
 
 function getTodayStr(): string {
@@ -75,9 +76,8 @@ export async function POST(request: Request) {
     if (!session) return unauthorized();
 
     const body = await request.json();
-    const { mealId, servingGms, mealSlot } = body;
+    const { mealId, servingGms, mealSlot, name, calories, proteinG, carbsG, fatG, source } = body;
 
-    if (!mealId) return error('mealId is required');
     if (!servingGms || servingGms <= 0) return error('servingGms must be a positive number');
     if (!mealSlot) return error('mealSlot is required (breakfast/lunch/dinner/snack)');
 
@@ -86,26 +86,46 @@ export async function POST(request: Request) {
       return error(`mealSlot must be one of: ${validSlots.join(', ')}`);
     }
 
-    // Get meal with nutrition
-    const meal = await db.meal.findUnique({
-      where: { id: mealId },
-      include: { nutrition: true },
-    });
+    // Either a mealId (DB-backed nutrition) or an inline nutrition payload.
+    let itemName: string | null = null;
+    let itemMealId: string | null = null;
+    let scaled: ReturnType<typeof scaleNutrition>;
 
-    if (!meal || !meal.nutrition) {
-      return error('Meal or meal nutrition not found', 404, 'NOT_FOUND');
+    if (mealId) {
+      const meal = await db.meal.findUnique({
+        where: { id: mealId },
+        include: { nutrition: true },
+      });
+
+      if (!meal || !meal.nutrition) {
+        return error('Meal or meal nutrition not found', 404, 'NOT_FOUND');
+      }
+
+      itemMealId = meal.id;
+      itemName = meal.name;
+      scaled = scaleNutrition(
+        {
+          calories: meal.nutrition.calories,
+          proteinG: meal.nutrition.proteinG,
+          carbsG: meal.nutrition.carbsG,
+          fatG: meal.nutrition.fatG,
+        },
+        servingGms
+      );
+    } else {
+      if (!name) return error('name is required when mealId is absent');
+      if (!calories || calories <= 0) return error('calories must be a positive number');
+      itemName = name;
+      scaled = {
+        calories: Number(calories),
+        proteinG: Number(proteinG || 0),
+        carbsG: Number(carbsG || 0),
+        fatG: Number(fatG || 0),
+        fiberG: Number(body.fiberG || 0),
+        sugarG: Number(body.sugarG || 0),
+        sodiumMg: Number(body.sodiumMg || 0),
+      };
     }
-
-    // Scale nutrition by serving size
-    const scaled = scaleNutrition(
-      {
-        calories: meal.nutrition.calories,
-        proteinG: meal.nutrition.proteinG,
-        carbsG: meal.nutrition.carbsG,
-        fatG: meal.nutrition.fatG,
-      },
-      servingGms
-    );
 
     const today = getTodayStr();
 
@@ -128,13 +148,15 @@ export async function POST(request: Request) {
     const logItem = await db.foodLogItem.create({
       data: {
         foodLogId: foodLog.id,
-        mealId: meal.id,
+        mealId: itemMealId,
+        name: itemName,
         servingGms,
         calories: scaled.calories,
         proteinG: scaled.proteinG,
         carbsG: scaled.carbsG,
         fatG: scaled.fatG,
         mealSlot,
+        source: source || 'photo',
       },
       include: {
         meal: {
@@ -187,6 +209,14 @@ export async function POST(request: Request) {
       },
     });
 
+    // Reconcile today's meal plan: drop slots just eaten and re-scale the rest.
+    let planSync: Awaited<ReturnType<typeof syncMealPlanWithLogs>> | null = null;
+    try {
+      planSync = await syncMealPlanWithLogs(session.userId);
+    } catch (syncErr) {
+      console.warn('Meal plan sync failed:', syncErr);
+    }
+
     return created({
       logItem,
       foodLogTotals: {
@@ -195,6 +225,7 @@ export async function POST(request: Request) {
         totalCarbs: totals._sum.carbsG || 0,
         totalFat: totals._sum.fatG || 0,
       },
+      planSync,
     });
   } catch (err) {
     console.error('Log food error:', err);
@@ -260,7 +291,18 @@ export async function DELETE(request: Request) {
       },
     });
 
-    return success({ deleted: true });
+    // If a slot's last item was deleted, restore it to today's meal plan and
+    // re-scale the remaining slots back up to the now-larger remaining budget.
+    let planSync: Awaited<ReturnType<typeof syncMealPlanWithLogs>> | null = null;
+    if (logDate === getTodayStr()) {
+      try {
+        planSync = await syncMealPlanWithLogs(session.userId);
+      } catch (syncErr) {
+        console.warn('Meal plan sync failed:', syncErr);
+      }
+    }
+
+    return success({ deleted: true, planSync });
   } catch (err) {
     console.error('Delete food log item error:', err);
     return serverError();

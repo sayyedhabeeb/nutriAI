@@ -167,7 +167,7 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
       </div>
 
       {/* Account Info Card */}
-      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-gradient-to-r from-emerald-500/5 to-teal-500/5 p-5">
+      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-gradient-to-r from-emerald-500/5 to-teal-500/5 p-5">
         <div className="flex items-center gap-4">
           <div className="relative">
             <div className="w-14 h-14 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center shadow-md">
@@ -189,7 +189,7 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
       </Card>
 
       {/* Profile Completion Bar */}
-      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-4">
+      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900 p-4">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">Profile Completion</span>
           <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{completionPct}%</span>
@@ -204,7 +204,7 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
       </Card>
 
       {/* ═══ Appearance Section ═══ */}
-      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-5">
+      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900 p-5">
         <div className="flex items-center gap-2 mb-1">
           <Sun className="h-4 w-4 text-emerald-600" />
           <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Appearance</span>
@@ -246,7 +246,7 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
       </Card>
 
       {/* ═══ Profile Section ═══ */}
-      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-5">
+      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900 p-5">
         <div className="flex items-center gap-2 mb-1">
           <User className="h-4 w-4 text-emerald-600" />
           <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Personal Profile</span>
@@ -323,7 +323,7 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
       </Card>
 
       {/* ═══ Goals Section ═══ */}
-      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-5">
+      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900 p-5">
         <div className="flex items-center gap-2 mb-1">
           <Target className="h-4 w-4 text-emerald-600" />
           <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Fitness Goals</span>
@@ -356,7 +356,7 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
       </Card>
 
       {/* ═══ Preferences Section ═══ */}
-      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-5">
+      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900 p-5">
         <div className="flex items-center gap-2 mb-1">
           <Heart className="h-4 w-4 text-emerald-600" />
           <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Dietary Preferences</span>

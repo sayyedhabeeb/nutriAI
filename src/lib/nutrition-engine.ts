@@ -122,22 +122,53 @@ export const MEAL_SLOT_DISTRIBUTION = {
 
 export type MealSlot = keyof typeof MEAL_SLOT_DISTRIBUTION;
 
+// Macros already consumed today (used to compute remaining slot budgets).
+export interface ConsumedTargets {
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+}
+
+const EMPTY_CONSUMED: ConsumedTargets = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 };
+
+const ALL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+// Distributes the REMAINING daily macro budget (daily targets minus what was
+// already consumed) across meal slots by their fixed distribution weight.
+// Remaining values are clamped at 0 so targets never go negative.
+//
+// When `activeSlots` is provided (e.g. the meals still left to recommend after
+// some slots were already eaten), the budget is renormalized across only those
+// slots so the full remaining budget is allocated to the meals that remain.
+// Slots outside `activeSlots` get zero targets.
 export function getSlotTargets(
   dailyTargets: NutritionTargets,
-  consumedCalories: number = 0
+  consumed: ConsumedTargets = EMPTY_CONSUMED,
+  activeSlots: MealSlot[] = ALL_SLOTS
 ): Record<MealSlot, NutritionTargets> {
-  const remaining = dailyTargets.calories - consumedCalories;
-  const slots: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
-  
+  const clamp = (v: number) => Math.max(0, Math.round(v));
+  const remaining = {
+    calories: clamp(dailyTargets.calories - (consumed.calories || 0)),
+    proteinG: clamp(dailyTargets.proteinG - (consumed.proteinG || 0)),
+    carbsG: clamp(dailyTargets.carbsG - (consumed.carbsG || 0)),
+    fatG: clamp(dailyTargets.fatG - (consumed.fatG || 0)),
+  };
+  const slots = activeSlots.length > 0 ? activeSlots : ALL_SLOTS;
+  const weightSum = slots.reduce((s, slot) => s + MEAL_SLOT_DISTRIBUTION[slot], 0) || 1;
+
   const result = {} as Record<MealSlot, NutritionTargets>;
-  for (const slot of slots) {
-    const pct = MEAL_SLOT_DISTRIBUTION[slot];
-    const cal = Math.round(remaining * pct);
+  for (const slot of ALL_SLOTS) {
+    if (!slots.includes(slot)) {
+      result[slot] = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 };
+      continue;
+    }
+    const pct = MEAL_SLOT_DISTRIBUTION[slot] / weightSum;
     result[slot] = {
-      calories: cal,
-      proteinG: Math.round(dailyTargets.proteinG * pct),
-      carbsG: Math.round(dailyTargets.carbsG * pct),
-      fatG: Math.round(dailyTargets.fatG * pct),
+      calories: Math.round(remaining.calories * pct),
+      proteinG: Math.round(remaining.proteinG * pct),
+      carbsG: Math.round(remaining.carbsG * pct),
+      fatG: Math.round(remaining.fatG * pct),
     };
   }
   return result;

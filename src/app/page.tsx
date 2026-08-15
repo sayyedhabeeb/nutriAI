@@ -53,7 +53,7 @@ export default function NutriAIPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50/50 dark:bg-gray-950">
+    <div className="min-h-screen flex flex-col bg-backdrop dark:bg-gray-950">
       <main className="flex-1 pb-24">
         <AnimatePresence mode="wait">
           {view === 'auth' && <AuthView key="auth" onAuth={(v: ViewType) => { setView(v); if (v === 'dashboard') setActiveTab('dashboard'); }} />}

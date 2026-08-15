@@ -327,7 +327,7 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
         {/* Yearly Tab Content */}
         <TabsContent value="yearly">
           {yearlyHasData ? (
-            <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+            <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900">
               <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4">Yearly Overview</h3>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
@@ -367,7 +367,7 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
               </div>
             </Card>
           ) : (
-            <Card className="p-8 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+            <Card className="p-8 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900">
               <div className="flex flex-col items-center justify-center py-8">
                 <CalendarDays className="h-12 w-12 text-gray-400 dark:text-gray-500 mb-3" />
                 <p className="text-sm font-medium text-gray-400 dark:text-gray-500">Start tracking to see your yearly overview</p>
@@ -381,7 +381,7 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
       tab !== 'yearly' && (
         <>
           {/* Calorie Chart */}
-          <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+          <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900">
             <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3">Calorie Intake</h3>
             <div className="h-48 relative">
               {isSparse && !allCaloriesZero && (
@@ -442,7 +442,7 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
 
           {/* Macro Pie + Weight Trend */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+            <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900">
               <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-2">Macro Breakdown</h3>
               <div className="h-44 relative">
                 {allMacrosZero ? (
@@ -478,7 +478,7 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
                 </div>
               )}
             </Card>
-            <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+            <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900">
               <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-2">Weight Trend</h3>
               {noWeightData ? (
                 <div className="h-44 flex flex-col items-center justify-center py-8">
@@ -559,7 +559,7 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
 
           {/* Achievements Grid */}
           {achievements.length > 0 && (
-            <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+            <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900">
               <div className="flex items-center gap-2 mb-4">
                 <Trophy className="h-4 w-4 text-amber-500" />
                 <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">Achievements</h3>
@@ -600,7 +600,7 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <Card className="p-0 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 overflow-hidden">
+            <Card className="p-0 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900 overflow-hidden">
               {/* Table header */}
               <div className="bg-gray-50/80 px-5 py-3 border-b border-gray-100">
                 <h3 className="text-base font-semibold text-gray-800">Calorie Breakdown</h3>
@@ -689,7 +689,7 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
           </motion.div>
 
           {/* Water Tracking */}
-          <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+          <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                 <Droplets className="h-4 w-4 text-blue-500" /> Water Intake
@@ -758,7 +758,7 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
           </Card>
 
           {/* Weight Logging */}
-          <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+          <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900">
             <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
               <Scale className="h-4 w-4 text-purple-500" /> Log Weight
             </h3>
@@ -798,7 +798,7 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
           </Card>
 
           {/* Quick Log Water */}
-          <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60">
+          <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">

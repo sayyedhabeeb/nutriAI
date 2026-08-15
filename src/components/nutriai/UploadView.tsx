@@ -12,18 +12,61 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Camera, Loader2, Sparkles, UtensilsCrossed, Lightbulb, ImageIcon, Clock, ScanLine, Plus,
+  Camera, Loader2, Sparkles, UtensilsCrossed, Lightbulb, Clock, ScanLine, Plus,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { apiFetch } from './api';
-import { SLOTS, SLOT_LABELS, CUISINES, fadeIn } from './constants';
+import { SLOTS, SLOT_LABELS, fadeIn } from './constants';
 import type { RecognizedFood } from './types';
 
 interface RecentScan {
   id: string;
+  name?: string | null;
   meal?: { name: string };
   calories: number;
   createdAt: string;
+}
+
+interface PortionSel {
+  value: number;
+  unit: 'g' | 'pc' | 'ml';
+  custom: boolean;
+}
+
+const PORTION_LABEL: Record<string, string> = {
+  piece: 'Confirm pieces',
+  portion: 'Confirm portion',
+  bowl: 'Confirm bowl size',
+  drink: 'Confirm serving (ml)',
+  weight: 'Confirm amount',
+};
+
+const UNIT_LABEL: Record<string, string> = {
+  g: 'grams',
+  pc: 'pieces',
+  ml: 'ml',
+};
+
+const SOURCE_LABEL: Record<string, string> = {
+  meal: 'From DB',
+  stored: 'Reused',
+  ingredients: 'AI ingredients',
+  extracted: 'AI estimated',
+};
+
+const SOURCE_COLOR: Record<string, string> = {
+  meal: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+  stored: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
+  ingredients: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
+  extracted: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
+};
+
+function defaultSlot(): string {
+  const h = new Date().getHours();
+  if (h < 10) return 'breakfast';
+  if (h < 15) return 'lunch';
+  if (h < 18) return 'snack';
+  return 'dinner';
 }
 
 export function UploadView() {
@@ -31,11 +74,11 @@ export function UploadView() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [recognizing, setRecognizing] = useState(false);
   const [results, setResults] = useState<RecognizedFood[]>([]);
-  const [unknownForms, setUnknownForms] = useState<Record<number, {
-    confirmedName: string; confirmedPortion: number; caloriesPer100g: number;
-    proteinPer100g: number; carbsPer100g: number; fatPer100g: number;
-    mealType: string; cuisine: string;
-  }>>({});
+  const [tempImagePath, setTempImagePath] = useState<string | null>(null);
+  const [portions, setPortions] = useState<Record<number, PortionSel>>({});
+  const [slots, setSlots] = useState<Record<number, string>>({});
+  const [logging, setLogging] = useState<number | null>(null);
+  const [selectedVariants, setSelectedVariants] = useState<Record<number, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -75,14 +118,23 @@ export function UploadView() {
       const formData = new FormData();
       formData.append('image', imageFile);
       const data = await apiFetch('/api/food-recognize', { method: 'POST', body: formData });
-      setResults(data.foods || []);
-      const forms: typeof unknownForms = {};
-      (data.foods || []).forEach((f: RecognizedFood, idx: number) => {
-        if (f.unknown_food) {
-          forms[idx] = { confirmedName: f.name, confirmedPortion: f.servingWeightGrams || 200, caloriesPer100g: 0, proteinPer100g: 0, carbsPer100g: 0, fatPer100g: 0, mealType: 'lunch', cuisine: 'Mixed' };
-        }
+      const foods: RecognizedFood[] = data.foods || [];
+      setResults(foods);
+      setTempImagePath((data.tempImagePath as string | undefined) || null);
+      setSelectedVariants({});
+      const initialPortions: Record<number, PortionSel> = {};
+      const initialSlots: Record<number, string> = {};
+      foods.forEach((f, idx) => {
+        const def =
+          (f.portionOptions || []).find((o) => o.kind === 'preset' && o.default) ||
+          (f.portionOptions || []).find((o) => o.kind === 'preset' && o.value > 0);
+        initialPortions[idx] = def
+          ? { value: def.value, unit: def.unit, custom: false }
+          : { value: 200, unit: 'g', custom: false };
+        initialSlots[idx] = defaultSlot();
       });
-      setUnknownForms(forms);
+      setPortions(initialPortions);
+      setSlots(initialSlots);
     } catch (err) { toast.error((err as Error).message || 'Recognition failed'); }
     finally { setRecognizing(false); }
   };
@@ -93,21 +145,83 @@ export function UploadView() {
     return <Badge className={`${color} text-xs`}>{pct}%</Badge>;
   };
 
-  const handleLogRecognized = async (mealId: string, servingWeightGrams: number) => {
-    try {
-      await apiFetch('/api/food-logs', { method: 'POST', body: JSON.stringify({ mealId, servingGms: servingWeightGrams, mealSlot: 'lunch' }) });
-      toast.success('Food logged!');
-    } catch (err) { toast.error((err as Error).message); }
+  const selFor = (food: RecognizedFood, idx: number): PortionSel =>
+    portions[idx] ?? { value: 200, unit: 'g', custom: false };
+
+  const selectedGrams = (food: RecognizedFood, sel: PortionSel): number => {
+    if (sel.unit === 'ml') return sel.value;
+    if (sel.unit === 'pc') return sel.value * (food.gramsPerPiece || 80);
+    return sel.value;
   };
 
-  const handleSubmitUnknown = async (idx: number, aiName: string) => {
-    const form = unknownForms[idx];
-    if (!form || !form.confirmedName || !form.caloriesPer100g) { toast.error('Please fill in all required fields'); return; }
+  const previewFor = (food: RecognizedFood, idx: number) => {
+    const variant = selectedVariants[idx]
+      ? food.variants.find((v) => v.name === selectedVariants[idx])
+      : undefined;
+    const n = variant?.estimatedNutrition ?? food.estimatedNutrition;
+    if (!n) return null;
+    const g = selectedGrams(food, selFor(food, idx));
+    const ratio = g / (food.totalGrams || g);
+    const r1 = (v: number) => Math.round(v * 10) / 10;
+    return {
+      grams: g,
+      calories: Math.round(n.calories * ratio),
+      proteinG: r1(n.proteinG * ratio),
+      carbsG: r1(n.carbsG * ratio),
+      fatG: r1(n.fatG * ratio),
+    };
+  };
+
+  const handleConfirmAndLog = async (food: RecognizedFood, idx: number) => {
+    const sel = selFor(food, idx);
+    const variantName = selectedVariants[idx];
+    setLogging(idx);
     try {
-      const data = await apiFetch('/api/unknown-food/submit', { method: 'POST', body: JSON.stringify({ aiDetectedName: aiName, ...form }) });
-      toast.success('Food submitted and logged!');
-      if (data?.meal?.id) await handleLogRecognized(data.meal.id, form.confirmedPortion);
+      const confirm = await apiFetch('/api/food-recognize/confirm', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: variantName ?? food.name,
+          mealId: variantName ? undefined : food.mealId,
+          newFoodId: variantName ? undefined : food.newFoodId,
+          tempImagePath: tempImagePath ?? undefined,
+          ingredients: variantName ? [] : food.ingredients,
+          portionType: food.portionType,
+          gramsPerPiece: food.gramsPerPiece,
+          totalGrams: food.totalGrams,
+          portionValue: sel.value,
+          unit: sel.unit,
+        }),
+      });
+      const missingIngredients = (confirm.missingIngredients as string[] | undefined) ??
+        ((confirm.foods as Array<{ missingIngredients?: string[] }> | undefined) || [])
+          .flatMap((f) => f.missingIngredients || []);
+      if (missingIngredients.length) {
+        toast.warning(`Some ingredients weren't found in the nutrition database, so this estimate may be approximate: ${missingIngredients.join(', ')}`);
+      }
+      const mealSlot = slots[idx] ?? 'lunch';
+      const payload = confirm.mealId
+        ? {
+            mealId: confirm.mealId,
+            servingGms: confirm.grams,
+            mealSlot,
+          }
+        : {
+            name: food.name,
+            servingGms: confirm.grams,
+            calories: confirm.nutrition.calories,
+            proteinG: confirm.nutrition.proteinG,
+            carbsG: confirm.nutrition.carbsG,
+            fatG: confirm.nutrition.fatG,
+            fiberG: confirm.nutrition.fiberG,
+            sugarG: confirm.nutrition.sugarG,
+            sodiumMg: confirm.nutrition.sodiumMg,
+            mealSlot,
+            source: 'photo',
+          };
+      await apiFetch('/api/food-logs', { method: 'POST', body: JSON.stringify(payload) });
+      toast.success('Food logged!');
     } catch (err) { toast.error((err as Error).message); }
+    finally { setLogging(null); }
   };
 
   const formatTimeAgo = (dateStr: string) => {
@@ -140,7 +254,7 @@ export function UploadView() {
 
       {/* Image Preview (shown when image is selected) */}
       {imagePreview && (
-        <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 overflow-hidden p-3">
+        <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900 overflow-hidden p-3">
           <div className="text-center space-y-2">
             <img src={imagePreview} alt="Preview" className="max-h-40 mx-auto rounded-xl object-contain" />
             <p className="text-xs text-gray-400 dark:text-gray-500">Tap &quot;Scan Another&quot; to change image</p>
@@ -160,7 +274,7 @@ export function UploadView() {
           </motion.div>
           <div className="space-y-1">
             <p className="text-lg font-bold text-gray-900 dark:text-gray-100">Point your camera at your meal</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">AI will identify the food and estimate nutrition</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">AI will identify the food, you confirm the portion</p>
           </div>
         </div>
       )}
@@ -186,13 +300,13 @@ export function UploadView() {
       )}
 
       {/* How it works — Card Steps with Connecting Lines */}
-      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-gray-50/50 dark:bg-gray-800/30 p-5">
+      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-gray-50/50 dark:bg-gray-800/30 p-5">
         <h3 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">How it works</h3>
         <div className="space-y-0">
           {[
             { step: 1, icon: Camera, title: 'Upload Photo', desc: 'Take or select a food photo' },
-            { step: 2, icon: Sparkles, title: 'AI Analyzes', desc: 'Identifies food & nutrition' },
-            { step: 3, icon: UtensilsCrossed, title: 'Log Meal', desc: 'One-tap meal logging' },
+            { step: 2, icon: Sparkles, title: 'AI Identifies', desc: 'Recognizes food & portion' },
+            { step: 3, icon: UtensilsCrossed, title: 'Confirm & Log', desc: 'Confirm portion, one-tap logging' },
           ].map((item, idx) => (
             <div key={item.step}>
               <div className="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
@@ -242,7 +356,7 @@ export function UploadView() {
       </Card>
 
       {/* Recent Scans */}
-      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-4">
+      <Card className="rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900 p-4">
         <div className="flex items-center gap-2 mb-3">
           <ScanLine className="h-4 w-4 text-emerald-500" />
           <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Recent Scans</h3>
@@ -260,7 +374,7 @@ export function UploadView() {
             {recentScans.map((scan) => (
               <div key={scan.id} className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{scan.meal?.name || 'Unknown'}</p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{scan.name || scan.meal?.name || 'Unknown'}</p>
                   <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     {formatTimeAgo(scan.createdAt)}
@@ -271,13 +385,12 @@ export function UploadView() {
                   <span className="text-[10px] text-gray-400 dark:text-gray-500">kcal</span>
                   <button
                     onClick={async () => {
-                      // Find the meal ID from the scan data — quick re-log using food-logs/quick
                       setQuickRelogging(scan.id);
                       try {
                         await apiFetch('/api/food-logs/quick', {
                           method: 'POST',
                           body: JSON.stringify({
-                            name: scan.meal?.name || 'Food',
+                            name: scan.name || scan.meal?.name || 'Food',
                             calories: Math.round(scan.calories),
                             proteinG: 0,
                             carbsG: 0,
@@ -286,7 +399,7 @@ export function UploadView() {
                             servingGms: 100,
                           }),
                         });
-                        toast.success(`Re-logged ${scan.meal?.name || 'food'}!`);
+                        toast.success(`Re-logged ${scan.name || scan.meal?.name || 'food'}!`);
                       } catch (err) {
                         toast.error((err as Error).message || 'Failed to re-log');
                       } finally {
@@ -320,60 +433,146 @@ export function UploadView() {
       {results.length > 0 && (
         <div className="space-y-4">
           <h2 className="font-semibold text-gray-900 dark:text-gray-100">Recognized Foods</h2>
-          {results.map((food, idx) => (
-            <Card key={idx} className="p-5 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-800 bg-white dark:bg-gray-900">
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div>
-                  <p className="font-medium text-gray-900 dark:text-gray-100">{food.name}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{food.servingDescription}</p>
+          {results.map((food, idx) => {
+            const sel = selFor(food, idx);
+            const preview = previewFor(food, idx);
+            const isCustom = sel.custom;
+            return (
+              <Card key={idx} className="p-5 rounded-2xl shadow-sm border border-gray-100/80 dark:border-gray-800 bg-white dark:bg-gray-900">
+                <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-gray-100">{food.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{food.servingDescription}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {confidenceBadge(food.confidence)}
+                    <Badge className={`${SOURCE_COLOR[food.nutritionSource] || 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'} text-xs`}>
+                      {SOURCE_LABEL[food.nutritionSource] || food.nutritionSource}
+                    </Badge>
+                  </div>
                 </div>
-                {confidenceBadge(food.confidence)}
-              </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Est. serving: {food.servingWeightGrams}g</p>
-              {food.matched && food.meal && (
-                <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-3 space-y-1 border border-green-100 dark:border-green-800">
-                  <p className="text-sm text-green-800 dark:text-green-400 font-medium">&#10003; Found in database</p>
-                  {food.estimatedNutrition && (
-                    <p className="text-xs text-green-700 dark:text-green-400">
-                      {food.estimatedNutrition.calories} kcal, {food.estimatedNutrition.proteinG}g protein, {food.estimatedNutrition.carbsG}g carbs, {food.estimatedNutrition.fatG}g fat for ~{food.servingWeightGrams}g
-                    </p>
+
+                {food.variants.length > 0 && (
+                  <div className="mb-3">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">Which one exactly?</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedVariants((prev) => { const next = { ...prev }; delete next[idx]; return next; })}
+                        className={`px-3 h-8 rounded-full text-xs font-medium border transition-colors ${!selectedVariants[idx]
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-200 dark:shadow-emerald-900/30'
+                          : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700'
+                        }`}
+                      >
+                        Just {food.name}
+                      </button>
+                      {food.variants.map((v) => {
+                        const active = selectedVariants[idx] === v.name;
+                        return (
+                          <button
+                            key={v.name}
+                            type="button"
+                            onClick={() => setSelectedVariants((prev) => ({ ...prev, [idx]: v.name }))}
+                            className={`px-3 h-8 rounded-full text-xs font-medium border transition-colors ${active
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-200 dark:shadow-emerald-900/30'
+                              : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700'
+                            }`}
+                          >
+                            {v.name}
+                            {v.matched && <span className="ml-1.5 text-[10px] opacity-80">✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {food.ingredients.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {food.ingredients.map((ing, i) => (
+                      <span key={i} className={`text-[11px] px-2 py-0.5 rounded-full border ${ing.matched ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800' : 'bg-gray-100 text-gray-400 border-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:border-gray-700'}`}>
+                        {ing.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Portion confirmation */}
+                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 border border-gray-100 dark:border-gray-800">
+                  <Label className="text-xs text-gray-600 dark:text-gray-400">{PORTION_LABEL[food.portionType] || 'Confirm amount'}</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {(food.portionOptions || []).map((opt) => {
+                      const active = !sel.custom && sel.value === opt.value && sel.unit === opt.unit && opt.kind !== 'custom';
+                      return (
+                        <button
+                          key={`${opt.label}-${opt.value}`}
+                          type="button"
+                          onClick={() => setPortions({ ...portions, [idx]: { value: opt.value, unit: opt.unit, custom: opt.kind === 'custom' } })}
+                          className={`px-3 h-9 rounded-lg text-sm font-medium border transition-colors min-w-[44px] ${active
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-200 dark:shadow-emerald-900/30'
+                            : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700'
+                          }`}
+                        >
+                          {opt.kind === 'custom'
+                            ? 'More'
+                            : opt.unit === 'g'
+                              ? `${opt.label} · ${opt.value}g`
+                              : opt.unit === 'ml'
+                                ? `${opt.label} · ${opt.value}ml`
+                                : `${opt.label} pc`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {isCustom && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        className="h-9 w-28 rounded-lg bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                        value={sel.value || ''}
+                        onChange={(e) => setPortions({ ...portions, [idx]: { ...sel, value: Math.max(1, Number(e.target.value) || 1) } })}
+                      />
+                      <span className="text-sm text-gray-500 dark:text-gray-400">{UNIT_LABEL[sel.unit]}</span>
+                    </div>
                   )}
-                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white mt-2 rounded-lg" onClick={() => handleLogRecognized((food.meal as Record<string, unknown>).id as string, food.servingWeightGrams)}>Log This</Button>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    AI estimate: {food.portionType === 'piece' ? `${food.estimatedPieces} pc` : food.portionType === 'drink' ? `${food.estimatedMl} ml` : `${food.estimatedGrams || food.totalGrams} g`}
+                  </p>
                 </div>
-              )}
-              {food.unknown_food && unknownForms[idx] && (
-                <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-3 space-y-3 border border-orange-100 dark:border-orange-800">
-                  <p className="text-sm text-orange-800 dark:text-orange-400 font-medium">&#9888;&#65039; New Food — Please provide nutrition info</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1"><Label className="text-xs text-gray-700 dark:text-gray-300">Name</Label><Input className="h-9 rounded-lg bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" value={unknownForms[idx].confirmedName} onChange={(e) => setUnknownForms({ ...unknownForms, [idx]: { ...unknownForms[idx], confirmedName: e.target.value } })} /></div>
-                    <div className="space-y-1"><Label className="text-xs text-gray-700 dark:text-gray-300">Portion (g)</Label><Input type="number" className="h-9 rounded-lg bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" value={unknownForms[idx].confirmedPortion} onChange={(e) => setUnknownForms({ ...unknownForms, [idx]: { ...unknownForms[idx], confirmedPortion: Number(e.target.value) } })} /></div>
-                    <div className="space-y-1"><Label className="text-xs text-gray-700 dark:text-gray-300">Cal/100g</Label><Input type="number" className="h-9 rounded-lg bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" placeholder="e.g. 250" value={unknownForms[idx].caloriesPer100g || ''} onChange={(e) => setUnknownForms({ ...unknownForms, [idx]: { ...unknownForms[idx], caloriesPer100g: Number(e.target.value) } })} /></div>
-                    <div className="space-y-1"><Label className="text-xs text-gray-700 dark:text-gray-300">Protein/100g</Label><Input type="number" className="h-9 rounded-lg bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" placeholder="e.g. 15" value={unknownForms[idx].proteinPer100g || ''} onChange={(e) => setUnknownForms({ ...unknownForms, [idx]: { ...unknownForms[idx], proteinPer100g: Number(e.target.value) } })} /></div>
-                    <div className="space-y-1"><Label className="text-xs text-gray-700 dark:text-gray-300">Carbs/100g</Label><Input type="number" className="h-9 rounded-lg bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" placeholder="e.g. 30" value={unknownForms[idx].carbsPer100g || ''} onChange={(e) => setUnknownForms({ ...unknownForms, [idx]: { ...unknownForms[idx], carbsPer100g: Number(e.target.value) } })} /></div>
-                    <div className="space-y-1"><Label className="text-xs text-gray-700 dark:text-gray-300">Fat/100g</Label><Input type="number" className="h-9 rounded-lg bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" placeholder="e.g. 10" value={unknownForms[idx].fatPer100g || ''} onChange={(e) => setUnknownForms({ ...unknownForms, [idx]: { ...unknownForms[idx], fatPer100g: Number(e.target.value) } })} /></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs text-gray-700 dark:text-gray-300">Meal Type</Label>
-                      <Select value={unknownForms[idx].mealType} onValueChange={(v) => setUnknownForms({ ...unknownForms, [idx]: { ...unknownForms[idx], mealType: v } })}>
-                        <SelectTrigger className="h-9 rounded-lg bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"><SelectValue /></SelectTrigger>
-                        <SelectContent>{SLOTS.map((s) => <SelectItem key={s} value={s}>{SLOT_LABELS[s]}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-gray-700 dark:text-gray-300">Cuisine</Label>
-                      <Select value={unknownForms[idx].cuisine} onValueChange={(v) => setUnknownForms({ ...unknownForms, [idx]: { ...unknownForms[idx], cuisine: v } })}>
-                        <SelectTrigger className="h-9 rounded-lg bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"><SelectValue /></SelectTrigger>
-                        <SelectContent>{CUISINES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white w-full rounded-lg" onClick={() => handleSubmitUnknown(idx, food.name)}>Submit & Log</Button>
+
+                {/* Computed nutrition for the selected portion */}
+                {preview ? (
+                  <p className="text-xs text-gray-700 dark:text-gray-300 mt-3 font-medium">
+                    {preview.calories} kcal · {preview.proteinG}g protein · {preview.carbsG}g carbs · {preview.fatG}g fat for {preview.grams}g
+                  </p>
+                ) : (
+                  <p className="text-xs text-orange-500 dark:text-orange-400 mt-3">Could not estimate nutrition for this food.</p>
+                )}
+
+                {/* Slot + Log */}
+                <div className="flex items-center gap-2 mt-3">
+                  <Select value={slots[idx] ?? 'lunch'} onValueChange={(v) => setSlots({ ...slots, [idx]: v })}>
+                    <SelectTrigger className="h-9 w-32 rounded-lg bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SLOTS.map((s) => <SelectItem key={s} value={s}>{SLOT_LABELS[s]}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg h-9 flex-1"
+                    disabled={!preview || logging === idx}
+                    onClick={() => handleConfirmAndLog(food, idx)}
+                  >
+                    {logging === idx ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Logging...</> : 'Confirm & Log'}
+                  </Button>
                 </div>
-              )}
-            </Card>
-          ))}
-          <Button variant="outline" className="w-full rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300" onClick={() => { setResults([]); setImagePreview(null); setImageFile(null); }}>Scan Another Photo</Button>
+              </Card>
+            );
+          })}
+          <Button variant="outline" className="w-full rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300" onClick={() => { setResults([]); setImagePreview(null); setImageFile(null); setTempImagePath(null); setPortions({}); setSlots({}); setSelectedVariants({}); }}>Scan Another Photo</Button>
         </div>
       )}
     </motion.div>

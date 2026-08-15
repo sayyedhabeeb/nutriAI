@@ -19,7 +19,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange={false} storageKey="nutriai-theme">
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange={false} storageKey="nutriai-theme">
           {children}
         </ThemeProvider>
         <Toaster richColors position="top-right" />

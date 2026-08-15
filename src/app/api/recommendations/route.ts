@@ -1,4 +1,4 @@
-﻿import { db } from '@/lib/db';
+import { db } from '@/lib/db';
 import { getSessionFromRequest } from '@/lib/auth';
 import {
   getSlotTargets,
@@ -7,65 +7,26 @@ import {
 } from '@/lib/nutrition-engine';
 import { success, unauthorized, serverError, error } from '@/lib/response';
 import { getRecommendationClient, logAiCall } from '@/lib/ai/client';
+import {
+  TOP_N,
+  computeScore,
+  filterCandidates,
+  getDateDaysAgo,
+  getTodayStr,
+  loadCandidateMeals,
+  scaleServingToSlot,
+  type MealCandidate,
+} from '@/lib/recommendation-engine';
 
-function getTodayStr(): string {
-  return new Date().toISOString().split('T')[0];
-}
-
-function getDateDaysAgo(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString().split('T')[0];
-}
-
-// Number of recommendations returned
-const TOP_N = 4;
-
-// Deterministic macro-fit score (used for pre-ranking candidates and fallback)
-function computeScore(
-  meal: {
-    nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number } | null;
-    cuisine: string;
-  },
-  slotTargets: { calories: number; proteinG: number; carbsG: number; fatG: number },
-  cuisinePreference?: string | null
-): number {
-  if (!meal.nutrition) return 0;
-
-  const totalSlotCal =
-    slotTargets.proteinG * 4 + slotTargets.carbsG * 4 + slotTargets.fatG * 9;
-  const targetProtPct = totalSlotCal > 0 ? (slotTargets.proteinG * 4) / totalSlotCal : 0.3;
-  const targetCarbsPct = totalSlotCal > 0 ? (slotTargets.carbsG * 4) / totalSlotCal : 0.4;
-  const targetFatPct = totalSlotCal > 0 ? (slotTargets.fatG * 9) / totalSlotCal : 0.3;
-
-  const mealCal = meal.nutrition.calories || 1;
-  const mealProtPct = (meal.nutrition.proteinG * 4) / mealCal;
-  const mealCarbsPct = (meal.nutrition.carbsG * 4) / mealCal;
-  const mealFatPct = (meal.nutrition.fatG * 9) / mealCal;
-
-  const macroDiff =
-    Math.abs(mealProtPct - targetProtPct) +
-    Math.abs(mealCarbsPct - targetCarbsPct) +
-    Math.abs(mealFatPct - targetFatPct);
-  const macroFit = Math.max(0, 100 - macroDiff * 200);
-
-  let prefScore = 50;
-  if (
-    cuisinePreference &&
-    cuisinePreference.toLowerCase().includes(meal.cuisine.toLowerCase())
-  ) {
-    prefScore = 100;
-  }
-
-  return macroFit * 0.5 + 100 * 0.3 + prefScore * 0.2;
-}
-
-// Validate + parse an array of food names into MealAlia/name search terms
 interface RankingEntry {
   meal_id: string;
   rank: number;
   reason?: string;
 }
+
+// Cap how long we wait for the AI ranking before the existing
+// deterministic fallback takes over (keeps Home loads fast).
+const RECOMMENDATION_AI_TIMEOUT_MS = 2000;
 
 export async function GET(request: Request) {
   const startedAt = Date.now();
@@ -117,8 +78,13 @@ export async function GET(request: Request) {
         }
       : { calories: 500, proteinG: 30, carbsG: 60, fatG: 15 };
 
-    const consumedCal = dailyNutrition?.consumedCalories || 0;
-    const slotTargets = getSlotTargets(dailyTargets, consumedCal)[slot];
+    const consumed = {
+      calories: dailyNutrition?.consumedCalories || 0,
+      proteinG: dailyNutrition?.consumedProtein || 0,
+      carbsG: dailyNutrition?.consumedCarbs || 0,
+      fatG: dailyNutrition?.consumedFat || 0,
+    };
+    const slotTargets = getSlotTargets(dailyTargets, consumed)[slot];
 
     // Get recent meal IDs (last 7 days) for variety
     const sevenDaysAgo = getDateDaysAgo(7);
@@ -146,96 +112,30 @@ export async function GET(request: Request) {
     );
 
     // Get all meals with nutrition
-    const allMeals = await db.meal.findMany({
-      where: { isActive: true },
-      include: {
-        nutrition: true,
-        servings: true,
-        ingredients: { select: { ingredientName: true, containsAllergen: true } },
-        aliases: { select: { aliasName: true } },
-      },
+    const allMeals = await loadCandidateMeals();
+
+    let candidates = filterCandidates(allMeals, {
+      slot,
+      userAllergenNames,
+      cuisinePreference,
+      dietPreference,
+      recentMealIds,
+      slotTargets,
+      strictCuisine: true,
     });
-
-    // â”€â”€ Stage 1-7: deterministic candidate filtering (allergies, cuisine,
-    //    meal type, variety, calorie cap, protein floor, dietary preference)
-    function filterCandidates(meals: typeof allMeals, strictCuisine: boolean) {
-      let filtered = [...meals];
-
-      // Stage 1: Allergy removal
-      if (userAllergenNames.length > 0) {
-        filtered = filtered.filter(
-          (meal) =>
-            !meal.ingredients.some(
-              (ing) =>
-                ing.containsAllergen &&
-                userAllergenNames.some((a) =>
-                  ing.ingredientName.toLowerCase().includes(a)
-                )
-            )
-        );
-      }
-
-      // Stage 2: Cuisine filter (only if strict mode)
-      if (strictCuisine && cuisinePreference) {
-        const preferredCuisines = cuisinePreference
-          .split(',')
-          .map((c) => c.trim().toLowerCase());
-        filtered = filtered.filter((meal) =>
-          preferredCuisines.includes(meal.cuisine.toLowerCase())
-        );
-      }
-
-      // Stage 3: Meal type filter
-      filtered = filtered.filter((meal) =>
-        meal.mealType.toLowerCase().includes(slot)
-      );
-
-      // Stage 4: Recent removal (last 7 days) - avoid repetition
-      filtered = filtered.filter((meal) => !recentMealIds.has(meal.id));
-
-      // Stage 5: Calorie cap (within remaining budget + 15%)
-      const calCap = slotTargets.calories * 1.15;
-      filtered = filtered.filter((meal) => {
-        if (!meal.nutrition) return true;
-        return meal.nutrition.calories <= calCap;
-      });
-
-      // Stage 6: Protein floor
-      const proteinFloor = slot === 'breakfast' || slot === 'snack' ? 2 : 5;
-      filtered = filtered.filter((meal) => {
-        if (!meal.nutrition) return true;
-        return meal.nutrition.proteinG >= proteinFloor;
-      });
-
-      // Stage 7: Dietary filter
-      const dietType = dietPreference;
-      if (dietType) {
-        filtered = filtered.filter((meal) => {
-          switch (dietType) {
-            case 'veg':
-            case 'vegetarian':
-              return meal.isVeg || meal.isVegan;
-            case 'vegan':
-              return meal.isVegan;
-            case 'non-veg':
-              return true;
-            case 'eggetarian':
-              return meal.isVeg || meal.isEggetarian || meal.isVegan;
-            default:
-              return true;
-          }
-        });
-      }
-
-      return filtered;
-    }
-
-    let candidates = filterCandidates(allMeals, true);
     if (candidates.length < TOP_N) {
-      candidates = filterCandidates(allMeals, false);
+      candidates = filterCandidates(allMeals, {
+        slot,
+        userAllergenNames,
+        cuisinePreference,
+        dietPreference,
+        recentMealIds,
+        slotTargets,
+        strictCuisine: false,
+      });
     }
 
-    // â”€â”€ Stage 8: AI ranking (Gemma via LM Studio), with deterministic fallback
+    // --- Stage 8: AI ranking (Gemma via LM Studio), with deterministic fallback
     const aiReasons = new Map<string, string>();
     let topMeals = candidates;
 
@@ -288,7 +188,11 @@ ${candidateLines}
 Return the JSON ranking.`;
 
       const ai = getRecommendationClient();
-      const aiRaw = await ai.chat({ system: systemPrompt, user: userPrompt });
+      const aiRaw = await ai.chat({
+        system: systemPrompt,
+        user: userPrompt,
+        timeoutMs: RECOMMENDATION_AI_TIMEOUT_MS,
+      });
 
       interface AIRanking {
         rankings?: RankingEntry[];
@@ -307,7 +211,7 @@ Return the JSON ranking.`;
         const idToMeal = new Map(aiPool.map((m) => [m.id, m]));
         topMeals = validRankings
           .map((r) => idToMeal.get(r.meal_id))
-          .filter((m): m is (typeof allMeals)[number] => !!m);
+          .filter((m): m is MealCandidate => !!m);
         for (const r of validRankings) {
           if (r.reason) aiReasons.set(r.meal_id, r.reason);
         }
@@ -316,7 +220,7 @@ Return the JSON ranking.`;
       console.warn('AI ranking unavailable, using deterministic fallback:', err);
     }
 
-    // â”€â”€ Stage 9: fallback + final ordering
+    // --- Stage 9: fallback + final ordering
     if (topMeals.length === 0 || topMeals.length < TOP_N) {
       const fallback = [...allMeals]
         .sort(
@@ -329,14 +233,7 @@ Return the JSON ranking.`;
     }
 
     const recommendations = topMeals.slice(0, TOP_N).map((meal) => {
-      let recommendedServingGms = meal.baseServingGms;
-      if (meal.nutrition && meal.nutrition.calories > 0) {
-        const idealServing =
-          (slotTargets.calories / meal.nutrition.calories) * 100;
-        recommendedServingGms = Math.round(
-          Math.min(500, Math.max(50, idealServing))
-        );
-      }
+      const recommendedServingGms = scaleServingToSlot(meal, slotTargets);
 
       const scaledNutrition = meal.nutrition
         ? scaleNutrition(

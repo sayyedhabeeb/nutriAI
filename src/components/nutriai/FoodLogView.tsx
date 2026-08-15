@@ -68,12 +68,12 @@ export function FoodLogView() {
   // Fetch recent meals for quick re-add chips
   useEffect(() => {
     apiFetch('/api/food-logs?limit=20').then((data: Record<string, unknown>) => {
-      const allItems = (data.itemsBySlot as Record<string, { id: string; mealId: string | null; servingGms: number; calories: number; meal: { name: string } | null }[]> | undefined) || {};
+      const allItems = (data.itemsBySlot as Record<string, { id: string; mealId: string | null; name: string | null; servingGms: number; calories: number; meal: { name: string } | null }[]> | undefined) || {};
       const flat: { id: string; name: string; mealId: string | null; calories: number; servingGms: number }[] = [];
       const seen = new Set<string>();
       for (const slot of Object.keys(allItems)) {
         for (const item of allItems[slot]) {
-          const name = item.meal?.name || 'Food';
+          const name = item.name || item.meal?.name || 'Food';
           if (!seen.has(name) && item.mealId) {
             seen.add(name);
             flat.push({ id: item.id, name, mealId: item.mealId, calories: item.calories, servingGms: item.servingGms });
@@ -127,10 +127,18 @@ export function FoodLogView() {
       } else {
         await apiFetch('/api/food-logs', {
           method: 'POST',
-          body: JSON.stringify({ customName: item.meal?.name || 'Food', servingGms: item.servingGms, mealSlot: relogSlot, caloriesPer100g: Math.round(item.calories / item.servingGms * 100), proteinPer100g: Math.round(item.proteinG / item.servingGms * 100) }),
+          body: JSON.stringify({
+            name: item.name || item.meal?.name || 'Food',
+            servingGms: item.servingGms,
+            mealSlot: relogSlot,
+            calories: item.calories,
+            proteinG: item.proteinG,
+            carbsG: item.carbsG,
+            fatG: item.fatG,
+          }),
         });
       }
-      toast.success(`Re-logged ${item.meal?.name || 'meal'}!`);
+      toast.success(`Re-logged ${item.name || item.meal?.name || 'meal'}!`);
       setRelogDialog({ open: false });
       fetchLog();
     } catch (err) { toast.error((err as Error).message); }
@@ -228,6 +236,7 @@ export function FoodLogView() {
                     carbsG: 0,
                     fatG: 0,
                     mealSlot: 'lunch',
+                    name: meal.name,
                     meal: { name: meal.name, nutrition: null },
                   };
                   setRelogDialog({ open: true, item: fakeItem });
@@ -301,7 +310,7 @@ export function FoodLogView() {
       </div>
 
       {/* Summary */}
-      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 backdrop-blur-sm">
+      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900 backdrop-blur-sm">
         <div className="grid grid-cols-4 gap-2 text-center">
           {[
             { label: 'Calories', val: foodLog?.totalCalories || 0, unit: 'kcal', color: 'text-orange-600 dark:text-orange-400', iconBg: 'bg-orange-100 dark:bg-orange-900/30', Icon: Flame },
@@ -344,7 +353,7 @@ export function FoodLogView() {
 
       {/* Empty state */}
       {!loading && !hasItems && (
-        <Card className="p-8 text-center rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white dark:bg-gray-900">
+        <Card className="p-8 text-center rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900">
           <div className="bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce [animation-duration:3s]">
             <UtensilsCrossed className="h-10 w-10 text-emerald-500 dark:text-emerald-400" />
           </div>
@@ -359,7 +368,7 @@ export function FoodLogView() {
         const items = itemsBySlot[slot] || [];
         if (items.length === 0) return null;
         return (
-          <Card key={slot} className={`p-0 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden bg-white dark:bg-gray-900`}>
+          <Card key={slot} className={`p-0 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden bg-white dark:bg-gray-900`}>
             <div className="p-4 pb-2">
               <div className="flex items-center gap-2">
                 <span className="text-base">{SLOT_ICONS[slot]}</span>
@@ -371,7 +380,7 @@ export function FoodLogView() {
               {items.map((item) => (
                 <div key={item.id} className={`flex items-center justify-between p-3 rounded-xl bg-gray-50/80 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 border-l-3 ${SLOT_BORDER_COLORS[slot]} group shadow-sm hover:shadow-md hover:bg-gray-50/100 dark:hover:bg-gray-800/80 hover:border-gray-200/80 dark:hover:border-gray-700 transition-all`}>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{item.meal?.name || 'Unknown'}</p>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{item.name || item.meal?.name || 'Unknown'}</p>
                     <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{item.servingGms}g</p>
                   </div>
                   <div className="text-right shrink-0 mr-2">
@@ -616,7 +625,7 @@ export function FoodLogView() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Log Again</DialogTitle>
-            <DialogDescription>{relogDialog.open ? relogDialog.item.meal?.name || 'This meal' : ''} ({relogDialog.open ? relogDialog.item.servingGms : 0}g)</DialogDescription>
+            <DialogDescription>{relogDialog.open ? relogDialog.item.name || relogDialog.item.meal?.name || 'This meal' : ''} ({relogDialog.open ? relogDialog.item.servingGms : 0}g)</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-2">

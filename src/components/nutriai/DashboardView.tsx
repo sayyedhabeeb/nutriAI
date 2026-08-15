@@ -24,7 +24,7 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
-  User, Search, Droplets, Camera, Clock, Zap, ChevronRight, Lightbulb, Sparkles, ChevronDown, Loader2, Trophy, Lock, Plus,
+  User, Search, Droplets, Camera, Clock, Zap, ChevronRight, Lightbulb, Sparkles, ChevronDown, Loader2, Trophy, Lock, Plus, RefreshCw, CheckCircle2,
 } from 'lucide-react';
 import { apiFetch } from './api';
 import {
@@ -34,14 +34,42 @@ import {
 import { CalorieRing, NutritionFactsLabel } from './shared';
 import type { ViewType, NutritionData, MealRecommendation, SearchMeal, MealPlanItemData } from './types';
 
+function per100g(n: { calories: number; proteinG: number; carbsG: number; fatG: number }, servingGms: number) {
+  return {
+    calories: Math.round((n.calories / servingGms) * 100),
+    proteinG: Math.round((n.proteinG / servingGms) * 1000) / 10,
+    carbsG: Math.round((n.carbsG / servingGms) * 1000) / 10,
+    fatG: Math.round((n.fatG / servingGms) * 1000) / 10,
+  };
+}
+
+function toRec(item: MealPlanItemData): MealRecommendation {
+  return {
+    meal: {
+      id: item.meal.id,
+      name: item.meal.name,
+      mealType: item.mealSlot,
+      cuisine: item.meal.cuisine,
+      imageUrl: item.meal.imageUrl,
+      prepTimeMin: item.meal.prepTimeMin,
+      isVeg: item.meal.isVeg,
+      isVegan: item.meal.isVegan,
+    },
+    score: item.rankScore,
+    recommendedServingGms: item.servingGms,
+    estimatedNutrition: item.nutrition,
+    baseNutritionPer100g: item.nutrition ? per100g(item.nutrition, item.servingGms) : null,
+  };
+}
+
 export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => void }) {
   const [user, setUser] = useState<Record<string, unknown> | null>(null);
   const [nutrition, setNutrition] = useState<NutritionData | null>(null);
-  const [recommendations, setRecommendations] = useState<Record<string, MealRecommendation[]>>({});
   const [loading, setLoading] = useState(true);
   const [streak, setStreak] = useState(0);
   const [waterCount, setWaterCount] = useState(0);
   const [mealsLoggedToday, setMealsLoggedToday] = useState(0);
+  const [loggedSlots, setLoggedSlots] = useState<Set<string>>(new Set());
 
   // Log meal dialog state
   const [logDialog, setLogDialog] = useState<{
@@ -74,85 +102,28 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
   // Achievements state
   const [achievements, setAchievements] = useState<{ id: string; name: string; description: string; icon: string; earned: boolean; earnedDate?: string }[]>([]);
 
-  // Meal plan state (Feature 2)
+  // Meal plan state (3 ranked picks per slot)
   const [mealPlan, setMealPlan] = useState<{
     exists: boolean;
     items: MealPlanItemData[];
   } | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
+  const [refreshingSlot, setRefreshingSlot] = useState<string | null>(null);
   const [calPulse, setCalPulse] = useState(false);
   const prevConsumedRef = useRef(0);
   const [planExpanded, setPlanExpanded] = useState<Record<string, boolean>>({});
 
-  const fetchData = useCallback(async () => {
+  const fetchDashboard = useCallback(async () => {
     try {
-      const [me, nut, summaryData] = await Promise.all([
-        apiFetch('/api/auth/me'),
-        apiFetch('/api/nutrition/daily'),
-        apiFetch('/api/progress/summary?period=week').catch(() => ({ summary: { totalDays: 0 } })),
-      ]);
-      setUser(me);
-      setNutrition(nut);
-
-      // Calculate streak from weekly data
-      const weeklyData = await apiFetch('/api/progress/weekly').catch(() => [] as Record<string, unknown>[]);
-      let streakCount = 0;
-      for (let i = (weeklyData as Record<string, unknown>[]).length - 1; i >= 0; i--) {
-        const day = weeklyData[i];
-        const consumed = (day.consumed as Record<string, number>)?.calories || 0;
-        if (consumed > 0) streakCount++;
-        else break;
-      }
-      setStreak(streakCount);
-
-      // Fetch water log for today
-      try {
-        const waterData = await apiFetch('/api/water-log');
-        setWaterCount(waterData.glassesConsumed || 0);
-      } catch {
-        // Silent fail
-      }
-
-      // Fetch meals logged today
-      try {
-        const foodLogData = await apiFetch('/api/food-logs');
-        const itemsBySlot = (foodLogData.itemsBySlot || {}) as Record<string, unknown[]>;
-        let totalCount = 0;
-        for (const slot of Object.keys(itemsBySlot)) {
-          totalCount += itemsBySlot[slot].length;
-        }
-        setMealsLoggedToday(totalCount);
-      } catch {
-        // Silent fail
-      }
-
-      const recs = await Promise.all(
-        SLOTS.map(async (slot) => {
-          try {
-            const r = await apiFetch(`/api/recommendations?slot=${slot}`);
-            return { slot, recs: r.recommendations || [] };
-          } catch { return { slot, recs: [] }; }
-        })
-      );
-      const recMap: Record<string, MealRecommendation[]> = {};
-      for (const r of recs) recMap[r.slot] = r.recs;
-      setRecommendations(recMap);
-
-      // Fetch meal plan (Feature 2)
-      try {
-        const plan = await apiFetch('/api/meal-plan');
-        setMealPlan({ exists: plan.exists, items: plan.items || [] });
-      } catch {
-        setMealPlan(null);
-      }
-
-      // Fetch achievements
-      try {
-        const ach = await apiFetch('/api/achievements');
-        setAchievements(ach.achievements || []);
-      } catch {
-        // Silent fail
-      }
+      const data = await apiFetch('/api/dashboard');
+      setUser(data.user || null);
+      setNutrition(data.nutrition || null);
+      setWaterCount(data.waterCount || 0);
+      setMealsLoggedToday(data.mealsLoggedToday || 0);
+      setLoggedSlots(new Set(data.loggedSlots || []));
+      setStreak(data.streak || 0);
+      setMealPlan({ exists: data.mealPlan?.exists, items: data.mealPlan?.items || [] });
+      setAchievements(data.achievements || []);
     } catch {
       toast.error('Failed to load dashboard');
     } finally {
@@ -160,7 +131,16 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
     }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  const fetchPlan = useCallback(async () => {
+    try {
+      const plan = await apiFetch('/api/meal-plan');
+      setMealPlan({ exists: plan.exists, items: plan.items || [] });
+    } catch {
+      // Silent fail
+    }
+  }, []);
+
+  useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
 
   const handleLogMeal = async () => {
     if (!logDialog.open) return;
@@ -171,7 +151,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
       });
       toast.success(`Logged ${logDialog.mealName}!`);
       setLogDialog({ open: false });
-      fetchData();
+      fetchDashboard();
     } catch (err) { toast.error((err as Error).message); }
   };
 
@@ -197,7 +177,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
     setLogDialog({
       open: true,
       meal: {
-        meal: { id: meal.id, name: meal.name, mealType: meal.mealType, cuisine: meal.cuisine, imageUrl: null, prepTimeMin: meal.prepTimeMin, isVeg: meal.isVeg, isVegan: meal.isVegan },
+        meal: { id: meal.id, name: meal.name, mealType: meal.mealType, cuisine: meal.cuisine, imageUrl: meal.imageUrl, prepTimeMin: meal.prepTimeMin, isVeg: meal.isVeg, isVegan: meal.isVegan },
         score: 0, recommendedServingGms: meal.baseServingGms || 100, estimatedNutrition: meal.nutrition ? { calories: meal.nutrition.calories, proteinG: meal.nutrition.proteinG, carbsG: meal.nutrition.carbsG, fatG: meal.nutrition.fatG } : null,
         baseNutritionPer100g: meal.nutrition ? { calories: meal.nutrition.calories, proteinG: meal.nutrition.proteinG, carbsG: meal.nutrition.carbsG, fatG: meal.nutrition.fatG } : null,
       },
@@ -222,17 +202,31 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
     } catch { toast.error('Failed to log water'); }
   };
 
-  // Generate meal plan (Feature 2)
+  // Generate meal plan
   const handleGeneratePlan = async () => {
     setPlanLoading(true);
     try {
       const result = await apiFetch('/api/meal-plan/generate');
       toast.success(result.status === 'existing' ? 'Plan already exists for today!' : "Today's meal plan generated!");
-      // Fetch the plan
-      const plan = await apiFetch('/api/meal-plan');
-      setMealPlan({ exists: plan.exists, items: plan.items || [] });
+      fetchPlan();
     } catch (err) { toast.error((err as Error).message); }
     finally { setPlanLoading(false); }
+  };
+
+  // Refresh a single slot's meal from the already-ranked pool (3 new picks)
+  const handleRefreshSlot = async (slot: string) => {
+    if (refreshingSlot) return;
+    setRefreshingSlot(slot);
+    try {
+      const result = await apiFetch(`/api/meal-plan/generate?refresh=${slot}`);
+      if (result.status === 'refreshed') {
+        toast.success(`Refreshed ${SLOT_LABELS[slot]} to ${result.name}!`);
+      } else {
+        toast.success('Meal refreshed!');
+      }
+      fetchPlan();
+    } catch (err) { toast.error((err as Error).message); }
+    finally { setRefreshingSlot(null); }
   };
 
   const firstName = (user?.profile as Record<string, unknown> | null)?.firstName || (user?.name as string) || '';
@@ -240,7 +234,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
   const displayName = firstName || 'there';
   const todayStr = format(new Date(), 'EEEE, MMMM d');
 
-  // Insights logic (Feature 3)
+  // Insights logic
   const targetCal = nutrition?.targets?.calories || 0;
   const consumedCal = nutrition?.consumed?.calories || 0;
 
@@ -323,7 +317,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
           <p className="text-[11px] text-gray-600 dark:text-gray-400 font-semibold">Meals Logged</p>
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-2xl p-3 ring-1 ring-inset ring-gray-200/60 dark:ring-gray-700/40 shadow-sm text-center">
-          <p className="text-2xl font-extrabold tracking-tight text-cyan-600 dark:text-cyan-400 tabular-nums mb-1"> 💧{waterCount}</p>
+          <p className="text-2xl font-extrabold tracking-tight text-cyan-600 dark:text-cyan-400 tabular-nums mb-1">💧{waterCount}</p>
           <p className="text-[11px] text-gray-600 dark:text-gray-400 font-semibold">Water</p>
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-2xl p-3 ring-1 ring-inset ring-gray-200/60 dark:ring-gray-700/40 shadow-sm text-center">
@@ -333,7 +327,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
       </div>
 
       {/* ═══ Calorie Ring Card ═══ */}
-      <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60">
+      <Card className="p-5 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70">
         <div className="flex justify-center">
           <CalorieRing consumed={consumedCal} target={targetCal} pulse={calPulse} />
         </div>
@@ -352,7 +346,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
       </Card>
 
       {/* ═══ Macro Progress Bars ═══ */}
-      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm space-y-3 mb-5">
+      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm space-y-3 mb-5">
         <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">Today&apos;s Macros</h3>
         {[
           { label: 'Protein', val: consumedProtein, target: targetProtein, from: '#3b82f6', to: '#60a5fa', unit: 'g' },
@@ -381,7 +375,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
       </Card>
 
       {/* ═══ Hydration Widget ═══ */}
-      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60">
+      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Droplets className="h-4 w-4 text-cyan-500" />
@@ -409,13 +403,13 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">{waterCount} of 8 glasses today</p>
       </Card>
 
-      {/* ═══ Feature 3: Today's Insights Card ═══ */}
+      {/* ═══ Today's Insights Card ═══ */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
       >
-        <Card className={`p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 backdrop-blur-sm ${pctConsumed > 1 ? 'bg-amber-50/50 dark:bg-amber-900/10' : pctConsumed >= 0.75 ? 'bg-emerald-50/50 dark:bg-emerald-900/10' : 'bg-blue-50/50 dark:bg-blue-900/10'}`}>
+        <Card className={`p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 backdrop-blur-sm ${pctConsumed > 1 ? 'bg-amber-50/50 dark:bg-amber-900/10' : pctConsumed >= 0.75 ? 'bg-emerald-50/50 dark:bg-emerald-900/10' : 'bg-blue-50/50 dark:bg-blue-900/10'}`}>
           <div className="flex items-start gap-3">
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${pctConsumed > 1 ? 'bg-amber-100/80 dark:bg-amber-900/30' : pctConsumed >= 0.75 ? 'bg-emerald-100/80 dark:bg-emerald-900/30' : 'bg-blue-100/80 dark:bg-blue-900/30'}`}>
               <Lightbulb className={`h-4.5 w-4.5 ${pctConsumed > 1 ? 'text-amber-500' : pctConsumed >= 0.75 ? 'text-emerald-500' : 'text-blue-500'}`} />
@@ -423,7 +417,6 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
             <div className="flex-1 min-w-0 space-y-2">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Today&apos;s Insights</h3>
 
-              {/* Calorie status message */}
               {pctConsumed > 1 && (
                 <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
                   You&apos;ve exceeded your calorie goal by <span className="font-bold">{Math.round(consumedCal - targetCal)} kcal</span>. Consider lighter meals for the rest of the day.
@@ -445,27 +438,25 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                 </p>
               )}
 
-              {/* Protein status */}
               {consumedProtein > 0 && pctProtein >= 0.8 && (
                 <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
                   Protein goal almost reached! {'\uD83C\uDF89'} ({Math.round(consumedProtein)}/{Math.round(targetProtein)}g)
                 </p>
               )}
 
-              {/* Time-of-day tip */}
               <p className="text-xs text-gray-500 dark:text-gray-400 italic">{'\uD83D\uDCAC'} {timeOfDayTip}</p>
             </div>
           </div>
         </Card>
       </motion.div>
 
-      {/* ═══ Feature 2: Meal Plan Generator Banner ═══ */}
+      {/* ═══ Meal Plan Generator (3 ranked picks per slot) ═══ */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
       >
-        <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60 bg-gradient-to-r from-emerald-500/5 to-teal-500/5">
+        <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-gradient-to-r from-emerald-500/5 to-teal-500/5">
           {planLoading && !mealPlan?.exists ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -480,7 +471,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                 </div>
                 <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
               </div>
-              {SLOTS.map((slot, i) => (
+              {SLOTS.map((slot) => (
                 <div key={slot} className={`flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-800 border-l-3 ${SLOT_BORDER_COLORS[slot]} bg-gray-50/50 dark:bg-gray-800/30`}>
                   <Skeleton className="h-5 w-5 rounded-full" />
                   <div className="flex-1 space-y-1.5">
@@ -520,16 +511,34 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Today&apos;s Meal Plan</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">AI-generated for your goals</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">AI-ranked picks for your goals</p>
                   </div>
                 </div>
-                <Badge className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 text-xs">Active</Badge>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Badge className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 text-xs">Active</Badge>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    title="Regenerate today's plan"
+                    className={`p-1.5 rounded-lg transition-colors ${planLoading ? 'cursor-wait opacity-50' : 'text-gray-400 dark:text-gray-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'}`}
+                    onClick={() => !planLoading && handleGeneratePlan()}
+                    onKeyDown={(e) => {
+                      if ((e.key === 'Enter' || e.key === ' ') && !planLoading) {
+                        e.stopPropagation();
+                        handleGeneratePlan();
+                      }
+                    }}
+                  >
+                    {planLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                  </span>
+                </div>
               </div>
 
-              {/* Plan items by slot */}
+              {/* Plan slots (logged slots stay visible with a completed tick) */}
               {SLOTS.map((slot) => {
+                const isLogged = loggedSlots.has(slot);
                 const slotItems = (mealPlan?.items || []).filter((i) => i.mealSlot === slot);
-                if (slotItems.length === 0) return null;
+                if (!isLogged && slotItems.length === 0) return null;
                 const isExpanded = planExpanded[slot] || false;
                 return (
                   <Collapsible
@@ -541,8 +550,54 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                       <button className={`w-full flex items-center gap-2 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-white/80 dark:hover:bg-gray-800/50 transition-colors text-left ${SLOT_GRADIENT_COLORS[slot].from} ${SLOT_GRADIENT_COLORS[slot].to}`}>
                         <span>{SLOT_ICONS[slot]}</span>
                         <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">{SLOT_LABELS[slot]}</span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 truncate flex-1">{slotItems[0]?.meal.name}</span>
-                        <ChevronDown className={`h-3.5 w-3.5 text-gray-400 dark:text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                        <span className="text-xs text-gray-500 dark:text-gray-400 truncate flex-1">{slotItems[0]?.meal.name ?? (isLogged ? 'Meal logged' : '')}</span>
+                        {isLogged ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                        ) : (
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              title="Search a meal for this slot"
+                              className="p-1.5 rounded-lg transition-colors text-gray-400 dark:text-gray-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSearchQuery('');
+                                setSearchResults([]);
+                                setSlotSearchDialog({ open: true, slot });
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.stopPropagation();
+                                  setSearchQuery('');
+                                  setSearchResults([]);
+                                  setSlotSearchDialog({ open: true, slot });
+                                }
+                              }}
+                            >
+                              <Search className="h-3.5 w-3.5" />
+                            </span>
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              title="Refresh this slot's picks"
+                              className={`p-1.5 rounded-lg transition-colors ${refreshingSlot === slot ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 cursor-wait' : 'text-gray-400 dark:text-gray-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRefreshSlot(slot);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.stopPropagation();
+                                  handleRefreshSlot(slot);
+                                }
+                              }}
+                            >
+                              {refreshingSlot === slot ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                            </span>
+                            <ChevronDown className={`h-3.5 w-3.5 text-gray-400 dark:text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                          </div>
+                        )}
                       </button>
                     </CollapsibleTrigger>
                     <AnimatePresence>
@@ -556,52 +611,68 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                             className="overflow-hidden"
                           >
                             <div className="pl-4 pr-1 pt-1 space-y-1.5">
-                              {slotItems.map((item) => (
-                                <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">{item.meal.name}</p>
-                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                      <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 font-medium border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">{item.meal.cuisine}</Badge>
-                                      <span className="text-xs text-gray-400 dark:text-gray-500">{item.servingGms}g</span>
-                                    </div>
-                                    {item.nutrition && (
-                                      <div className="flex gap-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                                        <span className="text-orange-600 dark:text-orange-400 font-medium">{item.nutrition.calories} kcal</span>
-                                        <span>P: {item.nutrition.proteinG}g</span>
-                                        <span>C: {item.nutrition.carbsG}g</span>
-                                        <span>F: {item.nutrition.fatG}g</span>
+                              {slotItems.map((item) => {
+                                const rec = toRec(item);
+                                return (
+                                  <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
+                                    <button
+                                      className="flex items-center gap-2 min-w-0 flex-1 text-left"
+                                      onClick={() => setDetailSheet({ open: true, rec })}
+                                    >
+                                      {item.meal.imageUrl && (
+                                        <img
+                                          src={item.meal.imageUrl}
+                                          alt={item.meal.name}
+                                          className="w-9 h-9 rounded-lg object-cover shrink-0 ring-1 ring-inset ring-gray-200 dark:ring-gray-700"
+                                          loading="lazy"
+                                        />
+                                      )}
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-1.5">
+                                          <p className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">{item.meal.name}</p>
+                                          <span className="shrink-0 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold px-1.5 py-0.5">#{item.rankPosition}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                          <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 font-medium border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">{item.meal.cuisine}</Badge>
+                                          <span className="text-xs text-gray-400 dark:text-gray-500">{item.servingGms}g</span>
+                                        </div>
+                                        {item.nutrition && (
+                                          <div className="flex gap-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                            <span className="text-orange-600 dark:text-orange-400 font-medium">{item.nutrition.calories} kcal</span>
+                                            <span>P: {item.nutrition.proteinG}g</span>
+                                            <span>C: {item.nutrition.carbsG}g</span>
+                                            <span>F: {item.nutrition.fatG}g</span>
+                                          </div>
+                                        )}
                                       </div>
+                                    </button>
+                                    {isLogged ? (
+                                      <Badge className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 text-xs px-2.5 shrink-0 font-medium">Logged</Badge>
+                                    ) : (
+                                      <Button
+                                        size="sm"
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold min-h-[30px] rounded-lg px-2.5 shrink-0"
+                                        onClick={() => {
+                                          setServingGms(item.servingGms);
+                                          setLogDialog({
+                                            open: true,
+                                            meal: rec,
+                                            slot: item.mealSlot,
+                                            baseNutritionPer100g: rec.baseNutritionPer100g,
+                                            mealName: item.meal.name,
+                                            cuisine: item.meal.cuisine,
+                                            mealType: item.mealSlot,
+                                            isVeg: item.meal.isVeg,
+                                            isVegan: item.meal.isVegan,
+                                          });
+                                        }}
+                                      >
+                                        Log
+                                      </Button>
                                     )}
                                   </div>
-                                  <Button
-                                    size="sm"
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold min-h-[30px] rounded-lg px-2.5 shrink-0"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setServingGms(item.servingGms);
-                                      setLogDialog({
-                                        open: true,
-                                        meal: {
-                                          meal: { id: item.meal.id, name: item.meal.name, mealType: item.mealSlot, cuisine: item.meal.cuisine, imageUrl: null, prepTimeMin: item.meal.prepTimeMin, isVeg: item.meal.isVeg, isVegan: item.meal.isVegan },
-                                          score: 0,
-                                          recommendedServingGms: item.servingGms,
-                                          estimatedNutrition: item.nutrition,
-                                          baseNutritionPer100g: item.nutrition ? { calories: Math.round(item.nutrition.calories / item.servingGms * 100), proteinG: Math.round(item.nutrition.proteinG / item.servingGms * 1000) / 10, carbsG: Math.round(item.nutrition.carbsG / item.servingGms * 1000) / 10, fatG: Math.round(item.nutrition.fatG / item.servingGms * 1000) / 10 } : null,
-                                        },
-                                        slot: item.mealSlot,
-                                        baseNutritionPer100g: item.nutrition ? { calories: Math.round(item.nutrition.calories / item.servingGms * 100), proteinG: Math.round(item.nutrition.proteinG / item.servingGms * 1000) / 10, carbsG: Math.round(item.nutrition.carbsG / item.servingGms * 1000) / 10, fatG: Math.round(item.nutrition.fatG / item.servingGms * 1000) / 10 } : null,
-                                        mealName: item.meal.name,
-                                        cuisine: item.meal.cuisine,
-                                        mealType: item.mealSlot,
-                                        isVeg: item.meal.isVeg,
-                                        isVegan: item.meal.isVegan,
-                                      });
-                                    }}
-                                  >
-                                    Log
-                                  </Button>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </motion.div>
                         </CollapsibleContent>
@@ -617,7 +688,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
 
       {/* ═══ Achievements Row ═══ */}
       {achievements.length > 0 && (
-        <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100/60 dark:border-gray-800/60">
+        <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Trophy className="h-4 w-4 text-amber-500" />
@@ -656,89 +727,6 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
           )}
         </Card>
       )}
-
-      {/* ═══ Meal Slots with gradient headers & search buttons ═══ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {SLOTS.map((slot) => {
-          const recs = recommendations[slot] || [];
-          const grad = SLOT_GRADIENT_COLORS[slot];
-          return (
-            <Card key={slot} className={`p-0 rounded-xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border-l-4 ${SLOT_BORDER_COLORS[slot]} overflow-hidden`}>
-              <div className={`bg-gradient-to-r ${grad.from} ${grad.to} px-4 py-3`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">{SLOT_ICONS[slot]}</span>
-                    <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100">{SLOT_LABELS[slot]}</h3>
-                  </div>
-                  <Button
-                    variant="ghost" size="icon"
-                    className="h-8 w-8 text-gray-400 dark:text-gray-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                    onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot }); }}
-                  >
-                    <Search className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div className="px-4 pb-3 pt-2 space-y-2 max-h-64 overflow-y-auto">
-                {recs.length === 0 && (
-                  <div className="text-center py-3">
-                    <p className="text-xs text-gray-400 dark:text-gray-500">No recommendations</p>
-                    <Button variant="ghost" size="sm" className="text-emerald-600 dark:text-emerald-400 text-xs mt-1 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" onClick={() => { setSearchQuery(''); setSearchResults([]); setSlotSearchDialog({ open: true, slot }); }}>
-                      <Search className="h-3 w-3 mr-1" />Search for meals
-                    </Button>
-                  </div>
-                )}
-                {recs.map((rec) => (
-                  <div
-                    key={rec.meal.id}
-                    className="p-2.5 rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 space-y-1.5 hover:shadow-sm hover:border-emerald-100 dark:hover:border-emerald-800 transition-all cursor-pointer"
-                    onClick={() => setDetailSheet({ open: true, rec })}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200 leading-tight line-clamp-1">{rec.meal.name}</p>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {rec.meal.isVeg && <span className="text-green-600 text-xs font-bold border border-green-300 dark:border-green-700 rounded px-1">V</span>}
-                        {rec.meal.isVegan && <span className="text-green-700 text-xs font-bold border border-green-400 dark:border-green-600 rounded px-1">VG</span>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 font-medium border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">{rec.meal.cuisine}</Badge>
-                      {rec.meal.prepTimeMin && (
-                        <span className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-0.5"><Clock className="h-3 w-3" />{rec.meal.prepTimeMin}m</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                      <span className="font-medium text-gray-700 dark:text-gray-300">{rec.baseNutritionPer100g?.calories || 0} kcal/100g</span>
-                      <span>&middot;</span>
-                      <span>P: {rec.baseNutritionPer100g?.proteinG || 0}g</span>
-                      {rec.estimatedNutrition && (
-                        <span>&middot; <span className="text-emerald-600 dark:text-emerald-400">~{rec.estimatedNutrition.calories} kcal ({rec.recommendedServingGms}g)</span></span>
-                      )}
-                    </div>
-                    <Button
-                      size="sm"
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold min-h-[32px] rounded-lg mt-1"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setServingGms(rec.recommendedServingGms);
-                        setLogDialog({
-                          open: true, meal: rec, slot,
-                          baseNutritionPer100g: rec.baseNutritionPer100g,
-                          mealName: rec.meal.name, cuisine: rec.meal.cuisine,
-                          mealType: rec.meal.mealType, description: rec.meal.description,
-                          isVeg: rec.meal.isVeg, isVegan: rec.meal.isVegan,
-                        });
-                      }}
-                    >
-                      I Ate This
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          );
-        })}
-      </div>
 
       {/* ═══ Log Meal Dialog ═══ */}
       <Dialog open={logDialog.open} onOpenChange={(open) => setLogDialog(open ? logDialog : { open: false })}>
@@ -825,15 +813,25 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                     className="flex items-center justify-between p-3 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 hover:border-emerald-100 dark:hover:border-emerald-800 transition-colors cursor-pointer"
                     onClick={() => handleLogFromSearch(meal)}
                   >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{meal.name}</p>
-                        <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 font-medium border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 shrink-0">{meal.cuisine}</Badge>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        <span>{meal.nutrition?.calories || 0} kcal/100g</span>
-                        <span>&middot;</span>
-                        <span className="text-blue-600 font-medium">P: {meal.nutrition?.proteinG || 0}g</span>
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      {meal.imageUrl && (
+                        <img
+                          src={meal.imageUrl}
+                          alt={meal.name}
+                          className="w-10 h-10 rounded-lg object-cover shrink-0 ring-1 ring-inset ring-gray-200 dark:ring-gray-700"
+                          loading="lazy"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{meal.name}</p>
+                          <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 font-medium border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 shrink-0">{meal.cuisine}</Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          <span>{meal.nutrition?.calories || 0} kcal/100g</span>
+                          <span>&middot;</span>
+                          <span className="text-blue-600 font-medium">P: {meal.nutrition?.proteinG || 0}g</span>
+                        </div>
                       </div>
                     </div>
                     <ChevronRight className="h-4 w-4 text-gray-300 dark:text-gray-600 shrink-0" />
@@ -866,6 +864,16 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
               </SheetHeader>
               <ScrollArea className="flex-1 px-4 pb-4">
                 <div className="space-y-4">
+                  {detailSheet.rec.meal.imageUrl && (
+                    <div className="-mx-4">
+                      <img
+                        src={detailSheet.rec.meal.imageUrl}
+                        alt={detailSheet.rec.meal.name}
+                        className="w-full max-h-56 object-cover"
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
                   {detailSheet.rec.meal.description && (
                     <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{detailSheet.rec.meal.description}</p>
                   )}

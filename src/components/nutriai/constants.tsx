@@ -12,29 +12,29 @@ export const SLOT_ICONS: Record<string, string> = {
 };
 
 export const SLOT_BORDER_COLORS: Record<string, string> = {
-  breakfast: 'border-l-amber-400',
-  lunch: 'border-l-orange-400',
-  dinner: 'border-l-indigo-400',
-  snack: 'border-l-purple-400',
+  breakfast: 'border-l-[#00b070]',
+  lunch: 'border-l-[#00a070]',
+  dinner: 'border-l-[#009060]',
+  snack: 'border-l-[#00c080]',
 };
 
 export const SLOT_BADGE_COLORS: Record<string, string> = {
-  breakfast: 'bg-amber-50 text-amber-700 border-amber-200',
-  lunch: 'bg-orange-50 text-orange-700 border-orange-200',
-  dinner: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  snack: 'bg-purple-50 text-purple-700 border-purple-200',
+  breakfast: 'bg-[#e0f0f0] text-[#008555] border-[#c4e0e0]',
+  lunch: 'bg-[#e0f0f0] text-[#00704a] border-[#c4e0e0]',
+  dinner: 'bg-[#e0f0f0] text-[#00623f] border-[#c4e0e0]',
+  snack: 'bg-[#e0f0f0] text-[#0a7d3a] border-[#c4e0e0]',
 };
 
 export const SLOT_GRADIENT_COLORS: Record<string, { from: string; to: string }> = {
-  breakfast: { from: 'from-amber-400/20', to: 'to-orange-400/5' },
-  lunch: { from: 'from-orange-400/20', to: 'to-red-400/5' },
-  dinner: { from: 'from-indigo-400/20', to: 'to-purple-400/5' },
-  snack: { from: 'from-purple-400/20', to: 'to-pink-400/5' },
+  breakfast: { from: 'from-[#00b070]/15', to: 'to-[#00a070]/5' },
+  lunch: { from: 'from-[#00a070]/15', to: 'to-[#00b070]/5' },
+  dinner: { from: 'from-[#009060]/15', to: 'to-[#00a070]/5' },
+  snack: { from: 'from-[#00c080]/15', to: 'to-[#00b070]/5' },
 };
 
 export const ALLERGENS = ['Peanuts', 'Tree Nuts', 'Dairy', 'Eggs', 'Gluten', 'Shellfish', 'Soy', 'Fish'];
 
-export const PIE_COLORS = ['#3b82f6', '#f59e0b', '#f43f5e'];
+export const PIE_COLORS = ['#009060', '#00a070', '#00b070'];
 
 export const CUISINES = ['Indian', 'Chinese', 'Italian', 'American', 'Mexican', 'Mediterranean', 'Japanese', 'Thai', 'Mixed'];
 

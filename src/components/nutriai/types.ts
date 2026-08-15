@@ -23,6 +23,7 @@ export interface MealRecommendation {
 export interface FoodLogItem {
   id: string;
   mealId: string | null;
+  name: string | null;
   servingGms: number;
   calories: number;
   proteinG: number;
@@ -32,15 +33,39 @@ export interface FoodLogItem {
   meal: { name: string; nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number } | null } | null;
 }
 
+export type NutritionSource = 'meal' | 'ingredients' | 'extracted' | 'stored';
+
+export type PortionType = 'piece' | 'portion' | 'bowl' | 'drink' | 'weight';
+
+export interface PortionOption {
+  label: string;
+  value: number;
+  unit: 'g' | 'pc' | 'ml';
+  kind: 'preset' | 'custom';
+  default?: boolean;
+}
+
 export interface RecognizedFood {
   name: string;
   servingDescription: string;
-  servingWeightGrams: number;
+  portionType: PortionType;
+  estimatedGrams: number | null;
+  estimatedMl: number | null;
+  estimatedPieces: number | null;
+  gramsPerPiece: number | null;
+  totalGrams: number;
   confidence: number;
-  matched: boolean;
-  unknown_food?: boolean;
+  needsConfirmation: boolean;
+  nutritionSource: NutritionSource;
+  portionOptions: PortionOption[];
   estimatedNutrition: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; sugarG: number; sodiumMg: number } | null;
+  ingredients: { name: string; grams: number; matched: boolean }[];
+  variants: { name: string; matched: boolean; estimatedNutrition: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; sugarG: number; sodiumMg: number } | null }[];
+  matched: boolean;
+  unknown_food: boolean;
   meal: Record<string, unknown> | null;
+  mealId: string | null;
+  newFoodId: string | null;
 }
 
 export interface SearchMeal {
@@ -48,6 +73,7 @@ export interface SearchMeal {
   name: string;
   mealType: string;
   cuisine: string;
+  imageUrl: string | null;
   baseServingGms: number;
   nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; sugarG: number; sodiumMg: number } | null;
   isVeg: boolean;
@@ -62,11 +88,13 @@ export interface MealPlanItemData {
   servingGms: number;
   recommendedCalories: number;
   rankScore: number;
+  rankPosition: number;
   meal: {
     id: string;
     name: string;
     mealType: string;
     cuisine: string;
+    imageUrl: string | null;
     isVeg: boolean;
     isVegan: boolean;
     prepTimeMin: number | null;

@@ -79,22 +79,43 @@ model UserPreference {
 }
 
 // ═══ Food Database ═══
+model Ingredient {
+  id               String   @id @default(cuid())
+  name             String   @unique
+  isVeg            Boolean  @default(true)
+  isVegan          Boolean  @default(true)
+  containsAllergen Boolean  @default(false)
+  caloriesPer100g  Float
+  proteinPer100g   Float
+  carbsPer100g     Float
+  fatPer100g       Float
+  fiberPer100g     Float?
+  sugarPer100g     Float?
+  sodiumMgPer100g  Float?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  mealIngredients  MealIngredient[]
+}
+
 model Meal {
-  id             String          @id @default(cuid())
-  name           String
-  description    String?
-  mealType       String
-  cuisine        String
-  isVeg          Boolean         @default(false)
-  isVegan        Boolean         @default(false)
-  isEggetarian   Boolean         @default(false)
-  baseServingGms Int             @default(100)
-  prepTimeMin    Int?
-  imageUrl       String?
-  isActive       Boolean         @default(true)
-  source         String          @default("admin")
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  id              String          @id @default(cuid())
+  name            String
+  description     String?
+  mealType        String
+  cuisine         String
+  isVeg           Boolean         @default(false)
+  isVegan         Boolean         @default(false)
+  isEggetarian    Boolean         @default(false)
+  baseServingGms  Int             @default(100)
+  prepTimeMin     Int?
+  imageUrl        String?
+  isActive        Boolean         @default(true)
+  source          String          @default("admin")
+  externalId      String?
+  imageSearchName String?
+  nutritionStatus String          @default("verified")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
   nutrition      MealNutrition?
   servings       MealServing[]
   aliases        MealAlias[]
@@ -145,11 +166,14 @@ model MealTag {
 }
 
 model MealIngredient {
-  id              String  @id @default(cuid())
+  id              String      @id @default(cuid())
   mealId          String
   ingredientName  String
-  containsAllergen Boolean @default(false)
-  meal            Meal    @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  containsAllergen Boolean     @default(false)
+  amountGrams     Float?
+  ingredientId    String?
+  meal            Meal        @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  ingredient      Ingredient? @relation(fields: [ingredientId], references: [id])
 }
 
 // ═══ Daily Tracking ═══
@@ -172,6 +196,7 @@ model FoodLogItem {
   id          String   @id @default(cuid())
   foodLogId   String
   mealId      String?
+  name        String?
   servingGms  Int
   calories    Float
   proteinG    Float
@@ -246,6 +271,7 @@ model MealPlanItem {
   servingGms        Int      @default(0)
   recommendedCalories Float
   rankScore         Float?
+  rankPosition      Int?
   createdAt         DateTime @default(now())
   planDay           MealPlanDay @relation(fields: [planDayId], references: [id], onDelete: Cascade)
   meal              Meal       @relation(fields: [mealId], references: [id])
@@ -264,21 +290,24 @@ model AiLog {
   createdAt       DateTime @default(now())
 }
 
-// ═══ Unknown Food Submissions ═══
+// ═══ Unknown / New Food Submissions ═══
 model UnknownFoodSubmission {
-  id               String   @id @default(cuid())
-  userId           String
-  imageFilePath    String?
-  aiDetectedName   String
-  confirmedName    String
-  confirmedPortion Int
-  caloriesPer100g  Float
-  proteinPer100g   Float
-  carbsPer100g     Float
-  fatPer100g       Float
-  status           String   @default("pending")
-  createdAt        DateTime @default(now())
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                    String   @id @default(cuid())
+  userId                String
+  imageFilePath         String?
+  aiDetectedName        String
+  confirmedName         String
+  confirmedPortion      Int
+  caloriesPer100g       Float
+  proteinPer100g        Float
+  carbsPer100g          Float
+  fatPer100g            Float
+  status                String   @default("pending")
+  ingredientsJson       String?
+  computedNutritionJson String?
+  baseServingGms        Int?
+  createdAt             DateTime @default(now())
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // ═══ Session Store (persistent) ═══

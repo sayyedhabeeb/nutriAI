@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { getSessionFromRequest } from '@/lib/auth';
 import { created, unauthorized, serverError, error } from '@/lib/response';
+import { assertSingleFoodName } from '@/lib/food-names';
 
 export async function POST(request: Request) {
   try {
@@ -21,6 +22,8 @@ export async function POST(request: Request) {
     } = body;
 
     if (!confirmedName) return error('confirmedName is required');
+    const compoundMessage = assertSingleFoodName(confirmedName);
+    if (compoundMessage) return error(compoundMessage);
     if (!caloriesPer100g || caloriesPer100g <= 0) return error('Valid caloriesPer100g is required');
     if (!mealType) return error('mealType is required');
     if (!cuisine) return error('cuisine is required');
