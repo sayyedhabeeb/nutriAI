@@ -24,7 +24,7 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
-  User, Search, Droplets, Camera, Clock, Zap, ChevronRight, Lightbulb, Sparkles, ChevronDown, Loader2, Trophy, Lock, Plus, RefreshCw, CheckCircle2,
+  User, Search, Droplets, Camera, Clock, Zap, ChevronRight, Lightbulb, Sparkles, ChevronDown, Loader2, Trophy, Lock, Plus, RefreshCw, CheckCircle2, Calendar,
 } from 'lucide-react';
 import { apiFetch } from './api';
 import {
@@ -229,7 +229,8 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
     finally { setRefreshingSlot(null); }
   };
 
-  const firstName = (user?.profile as Record<string, unknown> | null)?.firstName || (user?.name as string) || '';
+  const rawFirstName = (user?.profile as Record<string, unknown> | null)?.firstName || user?.name;
+  const firstName = typeof rawFirstName === 'string' ? rawFirstName : '';
   const initial = firstName ? firstName.charAt(0).toUpperCase() : '';
   const displayName = firstName || 'there';
   const todayStr = format(new Date(), 'EEEE, MMMM d');
@@ -287,7 +288,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{timeGreeting.text}, {displayName}! {timeGreeting.emoji}</h1>
             <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-500 dark:text-gray-400">
-              <CalendarIcon className="h-3.5 w-3.5" />
+              <Calendar className="h-3.5 w-3.5" />
               <span>{todayStr}</span>
             </div>
           </div>

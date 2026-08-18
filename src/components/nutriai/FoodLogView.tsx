@@ -313,19 +313,20 @@ export function FoodLogView() {
       <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white dark:bg-gray-900 backdrop-blur-sm">
         <div className="grid grid-cols-4 gap-2 text-center">
           {[
-            { label: 'Calories', val: foodLog?.totalCalories || 0, unit: 'kcal', color: 'text-orange-600 dark:text-orange-400', iconBg: 'bg-orange-100 dark:bg-orange-900/30', Icon: Flame },
-            { label: 'Protein', val: foodLog?.totalProtein || 0, unit: 'g', color: 'text-blue-600 dark:text-blue-400', iconBg: 'bg-blue-100 dark:bg-blue-900/30', Icon: Dumbbell },
-            { label: 'Carbs', val: foodLog?.totalCarbs || 0, unit: 'g', color: 'text-amber-600 dark:text-amber-400', iconBg: 'bg-amber-100 dark:bg-amber-900/30', Icon: Wheat },
-            { label: 'Fat', val: foodLog?.totalFat || 0, unit: 'g', color: 'text-rose-600 dark:text-rose-400', iconBg: 'bg-rose-100 dark:bg-rose-900/30', Icon: Droplets },
+            { label: 'Calories', val: Number(foodLog?.totalCalories) || 0, unit: 'kcal', color: 'text-orange-600 dark:text-orange-400', iconBg: 'bg-orange-100 dark:bg-orange-900/30', Icon: Flame },
+            { label: 'Protein', val: Number(foodLog?.totalProtein) || 0, unit: 'g', color: 'text-blue-600 dark:text-blue-400', iconBg: 'bg-blue-100 dark:bg-blue-900/30', Icon: Dumbbell },
+            { label: 'Carbs', val: Number(foodLog?.totalCarbs) || 0, unit: 'g', color: 'text-amber-600 dark:text-amber-400', iconBg: 'bg-amber-100 dark:bg-amber-900/30', Icon: Wheat },
+            { label: 'Fat', val: Number(foodLog?.totalFat) || 0, unit: 'g', color: 'text-rose-600 dark:text-rose-400', iconBg: 'bg-rose-100 dark:bg-rose-900/30', Icon: Droplets },
           ].map((s) => {
             const targetKey = s.unit === 'kcal' ? 'calories' : s.label === 'Protein' ? 'proteinG' : s.label === 'Carbs' ? 'carbsG' : 'fatG';
-            const targetVal = nutritionTargets[targetKey] || 0;
+            const targetVal = Number(nutritionTargets[targetKey]) || 0;
+            const numVal = Number(s.val) || 0;
             return (
               <div key={s.label} className="flex flex-col items-center gap-0.5 border border-gray-100 dark:border-gray-800 rounded-xl p-2 shadow-sm">
                 <div className={`w-7 h-7 rounded-full ${s.iconBg} flex items-center justify-center`}>
                   <s.Icon className={`h-3.5 w-3.5 ${s.color}`} />
                 </div>
-                <p className={`text-base font-bold ${s.color} tabular-nums leading-tight`}>{Math.round(s.val)}</p>
+                <p className={`text-base font-bold ${s.color} tabular-nums leading-tight`}>{Math.round(numVal)}</p>
                 <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">{s.label}</p>
                 {targetVal > 0 && (
                   <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -333,7 +334,7 @@ export function FoodLogView() {
                       className={`h-full rounded-full transition-all duration-500 ${
                         s.label === 'Calories' ? 'bg-emerald-500' : s.label === 'Protein' ? 'bg-blue-500' : s.label === 'Carbs' ? 'bg-amber-500' : 'bg-rose-500'
                       }`}
-                      style={{ width: `${Math.min(100, Math.round(s.val / targetVal * 100))}%` }}
+                      style={{ width: `${Math.min(100, Math.round(numVal / targetVal * 100))}%` }}
                     />
                   </div>
                 )}

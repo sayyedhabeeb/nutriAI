@@ -138,6 +138,7 @@ async function main() {
         continue;
       }
       const nut = meal.nutrition;
+      if (!nut) continue;
       const scale = item.servingGms / 100;
       const cal = Math.round(nut.calories * scale);
       const pro = Math.round(nut.proteinG * scale * 10) / 10;

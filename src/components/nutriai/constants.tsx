@@ -59,9 +59,8 @@ export const fadeIn: Variants = {
   initial: { opacity: 0, y: 12 },
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -12 },
-  transition: { duration: 0.25 },
 };
 
 export function FadeInDiv({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <motion.div {...fadeIn} className={className}>{children}</motion.div>;
+  return <motion.div {...fadeIn} transition={{ duration: 0.25 }} className={className}>{children}</motion.div>;
 }

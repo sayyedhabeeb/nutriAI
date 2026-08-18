@@ -280,14 +280,19 @@ export async function DELETE(request: Request) {
       },
     });
 
-    // Update DailyNutrition consumed (decrement)
+    // Update DailyNutrition consumed values using remaining aggregated totals
+    const remainingCalories = Math.max(0, totals._sum.calories || 0);
+    const remainingProtein = Math.max(0, totals._sum.proteinG || 0);
+    const remainingCarbs = Math.max(0, totals._sum.carbsG || 0);
+    const remainingFat = Math.max(0, totals._sum.fatG || 0);
+
     await db.dailyNutrition.updateMany({
       where: { userId: session.userId, date: logDate },
       data: {
-        consumedCalories: { decrement: item.calories },
-        consumedProtein: { decrement: item.proteinG },
-        consumedCarbs: { decrement: item.carbsG },
-        consumedFat: { decrement: item.fatG },
+        consumedCalories: remainingCalories,
+        consumedProtein: remainingProtein,
+        consumedCarbs: remainingCarbs,
+        consumedFat: remainingFat,
       },
     });
 

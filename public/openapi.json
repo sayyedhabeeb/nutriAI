@@ -1,0 +1,730 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "NutriAI API - SwappFit Integration Service",
+    "description": "Production-ready OpenAPI 3.0 REST API specification for NutriAI microservice backend integrated with SwappFit.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "NutriAI Engineering",
+      "email": "dev@swappfit.ai"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local Development Server"
+    }
+  ],
+  "tags": [
+    { "name": "Auth", "description": "User registration, authentication, login, logout, and session management" },
+    { "name": "Nutrition", "description": "User profile, onboarding, physical metrics, fitness goals, and daily calorie/macronutrient budgets" },
+    { "name": "Meals", "description": "AI meal recommendations, dynamic meal plan generation, ingredient & dish master database search" },
+    { "name": "Food Recognition", "description": "AI photo food recognition, vision detection, portion estimation, and custom food submission" },
+    { "name": "Chat", "description": "NutriAI conversational assistant & contextual meal suggestions" },
+    { "name": "Food Log", "description": "Daily food logging, history retrieval, quick macro logging, and item deletion" },
+    { "name": "Hydration", "description": "Water logging and daily hydration tracking" },
+    { "name": "Progress", "description": "Dashboard analytics, progress insights, weekly trend charts, logging streaks, weight tracking, and data export" }
+  ],
+  "security": [
+    { "bearerAuth": [] },
+    { "cookieAuth": [] }
+  ],
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register a new user account",
+        "description": "Creates a new user with hashed password and returns an active session token.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email", "example": "user@swappfit.com" },
+                  "password": { "type": "string", "minLength": 8, "example": "SecurePass123!" },
+                  "name": { "type": "string", "example": "Alex Smith" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User registered successfully",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "user": { "id": "usr_123", "email": "user@swappfit.com", "name": "Alex Smith", "role": "user" },
+                    "token": "sess_abc123xyz"
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation error or existing email conflict" }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Authenticate user & create session",
+        "description": "Verifies email and password credentials, returning a session token for SwappFit client authentication.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email", "example": "user@swappfit.com" },
+                  "password": { "type": "string", "example": "SecurePass123!" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication successful",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "user": { "id": "usr_123", "email": "user@swappfit.com", "name": "Alex Smith", "role": "user" },
+                    "token": "sess_abc123xyz"
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Invalid email or password" }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Logout & invalidate active session",
+        "responses": {
+          "200": {
+            "description": "Logged out successfully",
+            "content": {
+              "application/json": {
+                "example": { "success": true, "data": { "message": "Logged out successfully" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Get current session user details",
+        "description": "Returns full user account info including profile, goal, preferences, and allergies.",
+        "responses": {
+          "200": {
+            "description": "Current active session profile",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "usr_123",
+                    "email": "user@swappfit.com",
+                    "name": "Alex Smith",
+                    "role": "user",
+                    "profile": { "age": 25, "gender": "male", "heightCm": 178, "weightKg": 75 },
+                    "goal": { "goalType": "muscle_gain", "activityLevel": "moderately_active" },
+                    "allergies": ["peanut"]
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/onboarding/complete": {
+      "post": {
+        "tags": ["Nutrition"],
+        "summary": "Complete onboarding & calculate daily target budget",
+        "description": "Calculates BMR (Mifflin-St Jeor) and TDEE based on physical metrics, activity level, and fitness goals (muscle_gain, lose_fat, maintain, etc.), then initializes today's target calories and macro splits.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/OnboardingRequest" },
+              "example": {
+                "goalType": "muscle_gain",
+                "activityLevel": "moderately_active",
+                "workoutFrequency": "4-5 times/week",
+                "cuisinePreference": "indian",
+                "dietType": "high_protein",
+                "allergies": ["peanut", "shellfish"],
+                "budgetLevel": "medium"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Onboarding completed and daily targets calculated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OnboardingResponse" },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "goal": { "id": "goal_123", "goalType": "muscle_gain", "activityLevel": "moderately_active" },
+                    "preference": { "cuisinePreference": "indian", "dietType": "high_protein" },
+                    "nutritionTargets": { "calories": 2650, "proteinG": 198, "carbsG": 298, "fatG": 73 }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/nutrition/daily": {
+      "get": {
+        "tags": ["Nutrition"],
+        "summary": "Get daily nutrition target budget vs consumed totals",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "description": "Target date in YYYY-MM-DD format (defaults to today)",
+            "schema": { "type": "string", "example": "2026-08-18" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily target and consumed macro metrics",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "date": "2026-08-18",
+                    "targetCalories": 2650,
+                    "targetProtein": 198,
+                    "targetCarbs": 298,
+                    "targetFat": 73,
+                    "consumedCalories": 1420,
+                    "consumedProtein": 115,
+                    "consumedCarbs": 150,
+                    "consumedFat": 38,
+                    "remainingCalories": 1230
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/users/profile": {
+      "get": {
+        "tags": ["Nutrition"],
+        "summary": "Fetch user physical profile metrics",
+        "responses": {
+          "200": {
+            "description": "User profile parameters",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": { "id": "prof_123", "age": 25, "gender": "male", "heightCm": 178, "weightKg": 75 }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Nutrition"],
+        "summary": "Update user physical profile metrics",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UserProfileUpdate" },
+              "example": { "age": 26, "heightCm": 178, "weightKg": 74 }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Profile updated successfully" }
+        }
+      }
+    },
+    "/api/users/goals": {
+      "put": {
+        "tags": ["Nutrition"],
+        "summary": "Update user fitness goal & activity level",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": { "goalType": "lose_fat", "activityLevel": "very_active", "workoutFrequency": "5 times/week" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Fitness goals updated and daily target recalculation completed" }
+        }
+      }
+    },
+    "/api/recommendations": {
+      "get": {
+        "tags": ["Meals"],
+        "summary": "Get AI-ranked & portion-scaled meal recommendations",
+        "description": "Filters database meals against user allergies, scores candidate meals against remaining slot macro target, and invokes Gemma LLM to select and portion-scale the top 4 meals.",
+        "parameters": [
+          {
+            "name": "mealSlot",
+            "in": "query",
+            "required": true,
+            "description": "Target meal slot",
+            "schema": { "type": "string", "enum": ["breakfast", "lunch", "dinner", "snack"] }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "description": "Target date (YYYY-MM-DD)",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "4 AI-recommended meals with custom portion sizes",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": [
+                    {
+                      "mealId": "meal_456",
+                      "name": "Chicken Tikka Bowl",
+                      "cuisine": "indian",
+                      "mealType": "lunch",
+                      "recommendedServingGms": 350,
+                      "calories": 520,
+                      "proteinG": 45,
+                      "carbsG": 50,
+                      "fatG": 14,
+                      "aiRationale": "High protein meal tailored for your muscle gain target."
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/meal-plan/generate": {
+      "get": {
+        "tags": ["Meals"],
+        "summary": "Generate dynamic daily meal plan",
+        "description": "Generates a full daily meal plan distributed across meal slots based on remaining macro targets.",
+        "responses": {
+          "200": { "description": "Meal plan generated successfully" }
+        }
+      }
+    },
+    "/api/meal-plan": {
+      "get": {
+        "tags": ["Meals"],
+        "summary": "Fetch active daily meal plan",
+        "responses": {
+          "200": { "description": "Active meal plan returned" }
+        }
+      }
+    },
+    "/api/meals/search": {
+      "get": {
+        "tags": ["Meals"],
+        "summary": "Search 318k ingredient & 6.5k dish master database",
+        "parameters": [
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string" }, "example": "chicken" }
+        ],
+        "responses": {
+          "200": { "description": "Matching meals and raw ingredients returned" }
+        }
+      }
+    },
+    "/api/meals/{id}": {
+      "get": {
+        "tags": ["Meals"],
+        "summary": "Get detailed meal composition by ID",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Detailed meal nutrition, servings, tags, and allergens" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/food-recognize": {
+      "post": {
+        "tags": ["Food Recognition"],
+        "summary": "Recognize food from uploaded photo",
+        "description": "Performs strict food presence pre-validation and runs Gemma Vision AI model + 3-tier ingredient/meal DB matching.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image": { "type": "string", "format": "binary", "description": "Food image file (JPEG, PNG, WebP < 10MB)" }
+                },
+                "required": ["image"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recognized food item with portion and macro estimates",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "foodName": "Grilled Chicken Salad",
+                    "confidence": 0.94,
+                    "estimatedGrams": 250,
+                    "nutrition": { "calories": 380, "proteinG": 42, "carbsG": 12, "fatG": 18 },
+                    "matchedMealId": "meal_789"
+                  }
+                }
+              }
+            }
+          },
+          "422": { "description": "No valid food item detected in image" }
+        }
+      }
+    },
+    "/api/food-recognize/confirm": {
+      "post": {
+        "tags": ["Food Recognition"],
+        "summary": "Confirm recognized portion & log to slot",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": { "mealId": "meal_789", "servingGms": 250, "mealSlot": "lunch" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Recognized food confirmed and logged" }
+        }
+      }
+    },
+    "/api/food-logs/photo": {
+      "post": {
+        "tags": ["Food Recognition"],
+        "summary": "Recognize photo and instantly log to slot",
+        "responses": {
+          "201": { "description": "Photo food logged instantly" }
+        }
+      }
+    },
+    "/api/unknown-food/submit": {
+      "post": {
+        "tags": ["Food Recognition"],
+        "summary": "Submit custom user food recipe to database",
+        "responses": { "201": { "description": "Unknown food submission created" } }
+      }
+    },
+    "/api/unknown-food/pending": {
+      "get": {
+        "tags": ["Food Recognition"],
+        "summary": "Fetch pending unknown food submissions",
+        "responses": { "200": { "description": "Pending unknown food items" } }
+      }
+    },
+    "/api/chat": {
+      "post": {
+        "tags": ["Chat"],
+        "summary": "Send prompt to NutriAI conversational assistant",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": { "type": "string", "example": "What should I eat post-workout for fast recovery?" }
+                },
+                "required": ["message"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI response reply",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": { "reply": "A meal rich in fast-digesting protein and complex carbs is ideal. Consider 300g of Grilled Chicken with Quinoa." }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/suggest-meals": {
+      "get": {
+        "tags": ["Chat"],
+        "summary": "Get AI meal suggestions from chat context",
+        "responses": { "200": { "description": "Suggested meals array" } }
+      }
+    },
+    "/api/food-logs": {
+      "get": {
+        "tags": ["Food Log"],
+        "summary": "Get daily food log history",
+        "parameters": [
+          { "name": "date", "in": "query", "required": false, "schema": { "type": "string" }, "example": "2026-08-18" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily food log items grouped by meal slot",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "totalCalories": 1420,
+                    "itemsBySlot": {
+                      "breakfast": [{ "id": "log_1", "name": "Oatmeal", "calories": 350, "proteinG": 12 }],
+                      "lunch": [{ "id": "log_2", "name": "Chicken Tikka", "calories": 520, "proteinG": 45 }]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Food Log"],
+        "summary": "Log a food item",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": { "mealId": "meal_456", "servingGms": 300, "mealSlot": "lunch" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Food item logged and daily totals updated" }
+        }
+      },
+      "delete": {
+        "tags": ["Food Log"],
+        "summary": "Delete food log item",
+        "parameters": [
+          { "name": "id", "in": "query", "required": true, "description": "FoodLogItem ID", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Food item deleted and remaining macros recalculated safely" }
+        }
+      }
+    },
+    "/api/food-logs/quick": {
+      "post": {
+        "tags": ["Food Log"],
+        "summary": "Quick natural-language or direct macro log",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "name": "Protein Shake",
+                "calories": 250,
+                "proteinG": 30,
+                "carbsG": 10,
+                "fatG": 3,
+                "mealSlot": "snack"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Quick meal logged successfully" }
+        }
+      }
+    },
+    "/api/water-log": {
+      "get": {
+        "tags": ["Hydration"],
+        "summary": "Get water consumption log",
+        "parameters": [{ "name": "date", "in": "query", "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Water log data" } }
+      },
+      "post": {
+        "tags": ["Hydration"],
+        "summary": "Log water intake",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "example": { "glassesConsumed": 8, "logDate": "2026-08-18" } } }
+        },
+        "responses": { "200": { "description": "Water log updated" } }
+      }
+    },
+    "/api/dashboard": {
+      "get": {
+        "tags": ["Progress"],
+        "summary": "Fetch dashboard overview stats",
+        "responses": { "200": { "description": "Dashboard analytics metrics" } }
+      }
+    },
+    "/api/progress/summary": {
+      "get": {
+        "tags": ["Progress"],
+        "summary": "Fetch overall progress insights",
+        "responses": { "200": { "description": "Progress insights summary" } }
+      }
+    },
+    "/api/progress/weekly": {
+      "get": {
+        "tags": ["Progress"],
+        "summary": "Fetch weekly trend graphs (calories, macros, weight)",
+        "responses": { "200": { "description": "Weekly trend data" } }
+      }
+    },
+    "/api/achievements": {
+      "get": {
+        "tags": ["Progress"],
+        "summary": "Fetch user logging streaks and unlocked achievement badges",
+        "description": "Calculates active consecutive logging streaks with a 1-day morning grace period and checks criteria for 12+ badges.",
+        "responses": {
+          "200": {
+            "description": "Achievements and streak count",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": [
+                    { "id": "week_warrior", "name": "Week Warrior", "earned": true },
+                    { "id": "protein_champion", "name": "Protein Champion", "earned": false }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/weight-log": {
+      "get": {
+        "tags": ["Progress"],
+        "summary": "Get weight log history",
+        "responses": { "200": { "description": "Weight log history" } }
+      },
+      "post": {
+        "tags": ["Progress"],
+        "summary": "Log user weight",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "example": { "weightKg": 74.5, "logDate": "2026-08-18" } } }
+        },
+        "responses": { "200": { "description": "Weight log saved" } }
+      }
+    },
+    "/api/export": {
+      "get": {
+        "tags": ["Progress"],
+        "summary": "Export complete user nutrition history",
+        "responses": { "200": { "description": "Exported user nutrition JSON dataset" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "UUID Session Token"
+      },
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "session"
+      }
+    },
+    "schemas": {
+      "OnboardingRequest": {
+        "type": "object",
+        "required": ["goalType", "activityLevel"],
+        "properties": {
+          "goalType": { "type": "string", "enum": ["muscle_gain", "lose_fat", "maintain", "recomp", "weight_gain", "athlete"] },
+          "activityLevel": { "type": "string", "enum": ["sedentary", "lightly_active", "moderately_active", "very_active", "extra_active"] },
+          "workoutFrequency": { "type": "string" },
+          "cuisinePreference": { "type": "string" },
+          "dietType": { "type": "string" },
+          "allergies": { "type": "array", "items": { "type": "string" } },
+          "budgetLevel": { "type": "string" }
+        }
+      },
+      "OnboardingResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": { "type": "object" }
+        }
+      },
+      "UserProfileUpdate": {
+        "type": "object",
+        "properties": {
+          "age": { "type": "integer" },
+          "gender": { "type": "string" },
+          "heightCm": { "type": "number" },
+          "weightKg": { "type": "number" }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid input parameters",
+        "content": { "application/json": { "example": { "success": false, "error": "Invalid request parameter" } } }
+      },
+      "Unauthorized": {
+        "description": "Authentication token missing or invalid",
+        "content": { "application/json": { "example": { "success": false, "error": "Unauthorized" } } }
+      },
+      "NotFound": {
+        "description": "Requested resource not found",
+        "content": { "application/json": { "example": { "success": false, "error": "Resource not found" } } }
+      }
+    }
+  }
+}
