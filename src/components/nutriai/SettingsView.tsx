@@ -53,7 +53,7 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
       const g = me.goal as Record<string, unknown> | null;
       if (g) setGoals({ goalType: (g.goalType as string) || 'maintain', activityLevel: (g.activityLevel as string) || 'moderately_active', targetWeightKg: g.targetWeightKg ? String(g.targetWeightKg) : '' });
       const pr = me.preference as Record<string, unknown> | null;
-      if (pr) setPrefs({ cuisinePreference: (pr.cuisinePreference as string) || 'Mixed', dietType: (pr.dietType as string) || 'non-veg', allergies: (me.allergies as string[]) || [] });
+      if (pr) setPrefs({ cuisinePreference: (pr.cuisinePreference as string) || 'Mixed', dietType: (pr.dietType as string) || 'non-veg', allergies: Array.isArray(me.allergies) ? (me.allergies as string[]) : [] });
     } catch { toast.error('Failed to load settings'); }
     finally { setLoading(false); }
   }, []);
@@ -182,7 +182,7 @@ export function SettingsView({ onLogout }: { onLogout: () => void }) {
             <p className="text-sm text-gray-500 dark:text-gray-300">{user?.email as string || ''}</p>
             <div className="flex items-center gap-2 mt-1">
               <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400">Free Plan</Badge>
-              {user?.createdAt && <span className="text-[10px] text-gray-400 dark:text-gray-500">Joined {new Date(user.createdAt as string).toLocaleDateString()}</span>}
+              {typeof user?.createdAt === 'string' && <span className="text-[10px] text-gray-400 dark:text-gray-500">Joined {new Date(user.createdAt).toLocaleDateString()}</span>}
             </div>
           </div>
         </div>

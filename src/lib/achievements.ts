@@ -47,7 +47,8 @@ export async function computeLogStreak(userId: string): Promise<LogStreak> {
   });
   const logDates = new Set(foodLogs.map((f) => f.logDate));
   let streak = 0;
-  for (let i = 0; i < 60; i++) {
+  const startOffset = logDates.has(getDateString(0)) ? 0 : 1;
+  for (let i = startOffset; i < 60; i++) {
     const dateStr = getDateString(i);
     if (logDates.has(dateStr)) streak++;
     else break;
@@ -124,7 +125,9 @@ export async function computeAchievements(userId: string): Promise<AchievementRe
     select: { meal: { select: { cuisine: true } } },
     distinct: ['mealId'],
   });
-  const uniqueCuisines = new Set(cuisines.map((c) => c.meal?.cuisine).filter(Boolean));
+  const uniqueCuisines = new Set(
+    cuisines.map((c) => c.meal?.cuisine).filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
+  );
   results['explorer'] = { earned: uniqueCuisines.size >= 5 };
 
   // 9. World Traveler - meals from 3+ different cuisines

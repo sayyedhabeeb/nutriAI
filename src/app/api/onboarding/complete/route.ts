@@ -73,7 +73,10 @@ export async function POST(request: Request) {
       },
     });
 
-    // Create allergies
+    // Create allergies (delete old ones first to prevent duplicates)
+    await db.userAllergy.deleteMany({
+      where: { userId: session.userId },
+    });
     if (Array.isArray(allergies) && allergies.length > 0) {
       await db.userAllergy.createMany({
         data: allergies.map((name: string) => ({

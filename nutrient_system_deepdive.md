@@ -212,6 +212,7 @@ graph TD
     ```
     The daily `FoodLog` is updated with these new totals.
 4.  **Update Progress Analytics:** A `DailyNutrition` row is upserted, incrementing `consumedCalories`, `consumedProtein`, `consumedCarbs`, and `consumedFat` values. This is used to render daily progress bar percentages.
+5.  **Safe Item Deletion Recalculation:** Upon deleting a `FoodLogItem`, the backend recalculates remaining totals directly via `db.foodLogItem.aggregate({ where: { foodLogId } })` and updates `DailyNutrition` using clamped non-negative values (`Math.max(0, ...)`), preventing negative consumption values caused by floating-point rounding.
 
 ---
 
@@ -227,3 +228,17 @@ The following table summarizes what data is written to the database vs. what is 
 | **Logged Meals** | **`FoodLogItem`** (`name`, `servingGms`, `calories`, `proteinG`, `carbsG`, `fatG`, `mealSlot`, `loggedAt`, `source: "photo" or "tap"`) | Daily logged foods feed (broken down by Breakfast, Lunch, Dinner, Snack), timestamps. |
 | **Nutrition Tracker** | **`FoodLog`** (`totalCalories`, `totalProtein`, `totalCarbs`, `totalFat`) <br>**`DailyNutrition`** (`targetCalories`, `consumedCalories`, `targetProtein`, `consumedProtein`, etc.) | Circular daily progress charts, remaining calories indicator, macro targets vs. actuals graph. |
 | **Recommendations** | **`MealPlanItem`** (`mealId`, `servingGms`, `recommendedCalories`, `rankScore`) | 4 recommended options for the slot, AI rationale text (e.g., "Good high-protein option"), preparation times. |
+
+---
+
+## 7. System Hardening & Maintenance Rules
+
+1. **Streak Calculation Grace Period (`src/lib/achievements.ts`):**
+   - Streak evaluation incorporates a 1-day morning grace period. If today (`getDateString(0)`) has no logged meals yet, the streak engine checks yesterday (`getDateString(1)`) to ensure active streaks are preserved overnight before breakfast is logged.
+2. **Idempotent Allergy Management (`src/app/api/onboarding/complete/route.ts`):**
+   - Onboarding completions or preference updates execute `await db.userAllergy.deleteMany({ where: { userId } })` prior to `createMany`, preventing duplicate allergy records.
+3. **Database Population Metrics (`nutriai` MySQL):**
+   - **`Ingredient` table:** ~218,700 raw ingredient rows derived from OpenNutrition (`grocery`/`everyday`).
+   - **`Meal` table:** ~6,500 prepared dish rows with structured `MealNutrition` and relation records.
+
+

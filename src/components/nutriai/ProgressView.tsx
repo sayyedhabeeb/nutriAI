@@ -184,9 +184,9 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
   const isSparse = weeklyData.length > 0 && nonZeroDays <= 1;
 
   const macroData = [
-    { name: 'Protein', value: summary?.avgProtein || 0, color: PIE_COLORS[0] },
-    { name: 'Carbs', value: summary?.avgCarbs || 0, color: PIE_COLORS[1] },
-    { name: 'Fat', value: summary?.avgFat || 0, color: PIE_COLORS[2] },
+    { name: 'Protein', value: Number(summary?.avgProtein) || 0, color: PIE_COLORS[0] },
+    { name: 'Carbs', value: Number(summary?.avgCarbs) || 0, color: PIE_COLORS[1] },
+    { name: 'Fat', value: Number(summary?.avgFat) || 0, color: PIE_COLORS[2] },
   ];
   const allMacrosZero = macroData.every((m) => m.value === 0);
 
@@ -221,8 +221,8 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
   const weeklyTotalDiff = weeklyTotalConsumed - weeklyTotalTarget;
 
   // Yearly summary data
-  const yearlyDaysLogged = summary?.totalDays || 0;
-  const yearlyAvgCalories = Math.round(summary?.avgCalories || 0);
+  const yearlyDaysLogged = Number(summary?.totalDays) || 0;
+  const yearlyAvgCalories = Math.round(Number(summary?.avgCalories) || 0);
   const yearlyHasData = yearlyDaysLogged > 0 || yearlyAvgCalories > 0;
 
   const yearlyBestDay = weeklyData.reduce((best: Record<string, unknown> | null, d) => {
@@ -242,9 +242,9 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
   const weightDiff = currentWeight && startWeight ? (currentWeight - startWeight).toFixed(1) : null;
 
   const statCards = [
-    { label: 'Avg Daily Calories', value: `${Math.round(summary?.avgCalories || 0)}`, icon: Flame, iconBg: 'bg-orange-100 dark:bg-orange-900/30', iconColor: 'text-orange-600 dark:text-orange-400' },
-    { label: 'Avg Protein', value: `${Math.round(summary?.avgProtein || 0)}g`, icon: Dumbbell, iconBg: 'bg-blue-100 dark:bg-blue-900/30', iconColor: 'text-blue-600 dark:text-blue-400' },
-    { label: 'Total Days', value: `${summary?.totalDays || 0}`, icon: CalendarDays, iconBg: 'bg-emerald-100 dark:bg-emerald-900/30', iconColor: 'text-emerald-600 dark:text-emerald-400' },
+    { label: 'Avg Daily Calories', value: `${Math.round(Number(summary?.avgCalories) || 0)}`, icon: Flame, iconBg: 'bg-orange-100 dark:bg-orange-900/30', iconColor: 'text-orange-600 dark:text-orange-400' },
+    { label: 'Avg Protein', value: `${Math.round(Number(summary?.avgProtein) || 0)}g`, icon: Dumbbell, iconBg: 'bg-blue-100 dark:bg-blue-900/30', iconColor: 'text-blue-600 dark:text-blue-400' },
+    { label: 'Total Days', value: `${Number(summary?.totalDays) || 0}`, icon: CalendarDays, iconBg: 'bg-emerald-100 dark:bg-emerald-900/30', iconColor: 'text-emerald-600 dark:text-emerald-400' },
     { label: 'Current Weight', value: currentWeight ? `${currentWeight}kg` : 'N/A', icon: Scale, iconBg: 'bg-purple-100 dark:bg-purple-900/30', iconColor: 'text-purple-600 dark:text-purple-400' },
   ];
 
@@ -461,7 +461,7 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-lg font-bold text-gray-800 dark:text-gray-100 tabular-nums">{Math.round(summary?.avgCalories || 0)}</span>
+                      <span className="text-lg font-bold text-gray-800 dark:text-gray-100 tabular-nums">{Math.round(Number(summary?.avgCalories) || 0)}</span>
                       <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium">avg kcal</span>
                     </div>
                   </>
@@ -517,9 +517,9 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
                   <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">{tab === 'monthly' ? 'Monthly' : 'Weekly'} Insight</h3>
                   <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 leading-relaxed">
                     {(() => {
-                      const avgCal = Math.round(summary?.avgCalories || 0);
+                      const avgCal = Math.round(Number(summary?.avgCalories) || 0);
                       const targetCal = chartData[0]?.target || 0;
-                      const avgProtein = Math.round(summary?.avgProtein || 0);
+                      const avgProtein = Math.round(Number(summary?.avgProtein) || 0);
                       const targetProtein = summary?.targetProtein ? Math.round(summary.targetProtein as number) : 0;
                       const proteinPct = targetProtein > 0 ? Math.round((avgProtein / targetProtein) * 100) : 0;
                       const bestDay = weeklyData.reduce((best: Record<string, unknown> | null, d) => {
