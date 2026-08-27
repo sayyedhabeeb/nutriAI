@@ -1,6 +1,6 @@
 import { getSessionFromRequest } from '@/lib/auth';
 import { success, unauthorized, serverError, error } from '@/lib/response';
-import { generateMealPlan, GenerationError } from '@/lib/meal-plan-generation';
+import { generateMealPlan, GenerationError, SLOTS } from '@/lib/meal-plan-generation';
 
 export async function GET(request: Request) {
   const startedAt = Date.now();
