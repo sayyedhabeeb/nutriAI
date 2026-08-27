@@ -226,17 +226,73 @@
                     "targetProtein": 198,
                     "targetCarbs": 298,
                     "targetFat": 73,
+                    "targetFiberG": 30,
+                    "targetCalciumMg": 1000,
+                    "targetIronMg": 18,
+                    "targetZincMg": 11,
+                    "targetMagnesiumMg": 420,
+                    "targetCholesterolMg": 300,
                     "consumedCalories": 1420,
                     "consumedProtein": 115,
                     "consumedCarbs": 150,
                     "consumedFat": 38,
-                    "remainingCalories": 1230
+                    "consumedFiberG": 12,
+                    "consumedCalciumMg": 450,
+                    "consumedIronMg": 8,
+                    "consumedZincMg": 5,
+                    "consumedMagnesiumMg": 180,
+                    "consumedCholesterolMg": 120,
+                    "remainingCalories": 1230,
+                    "remainingFiberG": 18,
+                    "remainingCalciumMg": 550,
+                    "remainingIronMg": 10,
+                    "remainingZincMg": 6,
+                    "remainingMagnesiumMg": 240,
+                    "remainingCholesterolMg": 180,
+                    "percentFiberG": 40,
+                    "percentCalciumMg": 45,
+                    "percentIronMg": 44,
+                    "percentZincMg": 45,
+                    "percentMagnesiumMg": 43,
+                    "percentCholesterolMg": 40,
+                    "hydration": {
+                      "glassesConsumed": 3,
+                      "targetGlasses": 8,
+                      "mlConsumed": 750,
+                      "targetMl": 2000,
+                      "percentage": 37
+                    }
                   }
                 }
               }
             }
           },
           "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/nutrition/hydration-analysis": {
+      "get": {
+        "tags": ["Nutrition", "Hydration"],
+        "summary": "Get AI-powered hydration assessment",
+        "description": "Returns a brief AI-generated analysis of the user's current hydration status based on today's water intake. Falls back to a rule-based assessment if the AI service is unavailable.",
+        "responses": {
+          "200": {
+            "description": "Hydration analysis text",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "analysis": "You're at 3 glasses (750ml) — about 37% of your daily goal. Try sipping a glass with each meal to stay on track."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
         }
       }
     },
@@ -347,7 +403,62 @@
         "summary": "Generate dynamic daily meal plan",
         "description": "Generates a full daily meal plan distributed across meal slots based on remaining macro targets.",
         "responses": {
-          "200": { "description": "Meal plan generated successfully" }
+          "200": {
+            "description": "Meal plan generated successfully",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "meals": [
+                      {
+                        "mealSlot": "breakfast",
+                        "mealId": "meal_101",
+                        "name": "Protein Oatmeal Bowl",
+                        "calories": 420,
+                        "proteinG": 35,
+                        "carbsG": 48,
+                        "fatG": 12,
+                        "fiberG": 8,
+                        "calciumMg": 150,
+                        "ironMg": 4,
+                        "zincMg": 3,
+                        "magnesiumMg": 85,
+                        "cholesterolMg": 45
+                      },
+                      {
+                        "mealSlot": "lunch",
+                        "mealId": "meal_202",
+                        "name": "Chicken Tikka Bowl",
+                        "calories": 520,
+                        "proteinG": 45,
+                        "carbsG": 50,
+                        "fatG": 14,
+                        "fiberG": 6,
+                        "calciumMg": 120,
+                        "ironMg": 3,
+                        "zincMg": 2,
+                        "magnesiumMg": 65,
+                        "cholesterolMg": 95
+                      }
+                    ],
+                    "totalNutrition": {
+                      "calories": 2650,
+                      "proteinG": 198,
+                      "carbsG": 298,
+                      "fatG": 73,
+                      "fiberG": 30,
+                      "calciumMg": 1000,
+                      "ironMg": 18,
+                      "zincMg": 11,
+                      "magnesiumMg": 420,
+                      "cholesterolMg": 300
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -415,7 +526,18 @@
                     "foodName": "Grilled Chicken Salad",
                     "confidence": 0.94,
                     "estimatedGrams": 250,
-                    "nutrition": { "calories": 380, "proteinG": 42, "carbsG": 12, "fatG": 18 },
+                    "nutrition": {
+                      "calories": 380,
+                      "proteinG": 42,
+                      "carbsG": 12,
+                      "fatG": 18,
+                      "fiberG": 5,
+                      "calciumMg": 95,
+                      "ironMg": 2.5,
+                      "zincMg": 1.8,
+                      "magnesiumMg": 55,
+                      "cholesterolMg": 85
+                    },
                     "matchedMealId": "meal_789"
                   }
                 }
@@ -439,7 +561,30 @@
           }
         },
         "responses": {
-          "201": { "description": "Recognized food confirmed and logged" }
+          "201": {
+            "description": "Recognized food confirmed and logged",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "log_2",
+                    "name": "Grilled Chicken Salad",
+                    "calories": 380,
+                    "proteinG": 42,
+                    "carbsG": 12,
+                    "fatG": 18,
+                    "fiberG": 5,
+                    "calciumMg": 95,
+                    "ironMg": 2.5,
+                    "zincMg": 1.8,
+                    "magnesiumMg": 55,
+                    "cholesterolMg": 85
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -545,7 +690,30 @@
           }
         },
         "responses": {
-          "201": { "description": "Food item logged and daily totals updated" }
+          "201": {
+            "description": "Food item logged and daily totals updated",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "log_1",
+                    "name": "Chicken Tikka Bowl",
+                    "calories": 520,
+                    "proteinG": 45,
+                    "carbsG": 50,
+                    "fatG": 14,
+                    "fiberG": 6,
+                    "calciumMg": 120,
+                    "ironMg": 3,
+                    "zincMg": 2,
+                    "magnesiumMg": 65,
+                    "cholesterolMg": 95
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "delete": {
@@ -588,23 +756,139 @@
         "tags": ["Hydration"],
         "summary": "Get water consumption log",
         "parameters": [{ "name": "date", "in": "query", "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Water log data" } }
+        "responses": {
+          "200": {
+            "description": "Water log data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "logDate": "2026-08-26",
+                    "glassesConsumed": 3,
+                    "targetGlasses": 8,
+                    "percentage": 37,
+                    "mlConsumed": 750,
+                    "targetMl": 2000
+                  }
+                }
+              }
+            }
+          }
+        }
       },
       "post": {
         "tags": ["Hydration"],
         "summary": "Log water intake",
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "example": { "glassesConsumed": 8, "logDate": "2026-08-18" } } }
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "glasses": { "type": "number", "description": "Number of glasses to add", "example": 1 },
+                  "date": { "type": "string", "description": "Optional date (YYYY-MM-DD)", "example": "2026-08-26" }
+                },
+                "required": ["glasses"]
+              }
+            }
+          }
         },
-        "responses": { "200": { "description": "Water log updated" } }
+        "responses": {
+          "200": {
+            "description": "Water log updated",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "glassesConsumed": 4,
+                    "targetGlasses": 8,
+                    "percentage": 50,
+                    "mlConsumed": 1000,
+                    "targetMl": 2000
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/dashboard": {
       "get": {
         "tags": ["Progress"],
         "summary": "Fetch dashboard overview stats",
-        "responses": { "200": { "description": "Dashboard analytics metrics" } }
+        "responses": {
+          "200": {
+            "description": "Dashboard analytics metrics",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "targets": {
+                      "calories": 2650,
+                      "proteinG": 198,
+                      "carbsG": 298,
+                      "fatG": 73,
+                      "fiberG": 30,
+                      "calciumMg": 1000,
+                      "ironMg": 18,
+                      "zincMg": 11,
+                      "magnesiumMg": 420,
+                      "cholesterolMg": 300
+                    },
+                    "consumed": {
+                      "calories": 1420,
+                      "proteinG": 115,
+                      "carbsG": 150,
+                      "fatG": 38,
+                      "fiberG": 12,
+                      "calciumMg": 450,
+                      "ironMg": 8,
+                      "zincMg": 5,
+                      "magnesiumMg": 180,
+                      "cholesterolMg": 120
+                    },
+                    "remaining": {
+                      "calories": 1230,
+                      "proteinG": 83,
+                      "carbsG": 148,
+                      "fatG": 35,
+                      "fiberG": 18,
+                      "calciumMg": 550,
+                      "ironMg": 10,
+                      "zincMg": 6,
+                      "magnesiumMg": 240,
+                      "cholesterolMg": 180
+                    },
+                    "percentages": {
+                      "calories": 54,
+                      "proteinG": 58,
+                      "carbsG": 50,
+                      "fatG": 52,
+                      "fiberG": 40,
+                      "calciumMg": 45,
+                      "ironMg": 44,
+                      "zincMg": 45,
+                      "magnesiumMg": 43,
+                      "cholesterolMg": 40
+                    },
+                    "hydration": {
+                      "glassesConsumed": 3,
+                      "targetGlasses": 8,
+                      "mlConsumed": 750,
+                      "targetMl": 2000,
+                      "percentage": 37
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/progress/summary": {
@@ -618,7 +902,49 @@
       "get": {
         "tags": ["Progress"],
         "summary": "Fetch weekly trend graphs (calories, macros, weight)",
-        "responses": { "200": { "description": "Weekly trend data" } }
+        "responses": {
+          "200": {
+            "description": "Weekly trend data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "dailyData": [
+                      {
+                        "date": "2026-08-18",
+                        "consumed": {
+                          "calories": 1420,
+                          "proteinG": 115,
+                          "carbsG": 150,
+                          "fatG": 38,
+                          "fiberG": 12,
+                          "calciumMg": 450,
+                          "ironMg": 8,
+                          "zincMg": 5,
+                          "magnesiumMg": 180,
+                          "cholesterolMg": 120
+                        },
+                        "targets": {
+                          "calories": 2650,
+                          "proteinG": 198,
+                          "carbsG": 298,
+                          "fatG": 73,
+                          "fiberG": 30,
+                          "calciumMg": 1000,
+                          "ironMg": 18,
+                          "zincMg": 11,
+                          "magnesiumMg": 420,
+                          "cholesterolMg": 300
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/achievements": {

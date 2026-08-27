@@ -32,7 +32,7 @@ import {
   SLOT_GRADIENT_COLORS, fadeIn,
 } from './constants';
 import { CalorieRing, NutritionFactsLabel } from './shared';
-import type { ViewType, NutritionData, MealRecommendation, SearchMeal, MealPlanItemData } from './types';
+import type { ViewType, NutritionData, MealRecommendation, SearchMeal, MealPlanItemData, HydrationData } from './types';
 
 function per100g(n: { calories: number; proteinG: number; carbsG: number; fatG: number }, servingGms: number) {
   return {
@@ -68,6 +68,8 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
   const [loading, setLoading] = useState(true);
   const [streak, setStreak] = useState(0);
   const [waterCount, setWaterCount] = useState(0);
+  const [hydration, setHydration] = useState<HydrationData | null>(null);
+  const [hydrationAnalysis, setHydrationAnalysis] = useState('');
   const [mealsLoggedToday, setMealsLoggedToday] = useState(0);
   const [loggedSlots, setLoggedSlots] = useState<Set<string>>(new Set());
 
@@ -119,6 +121,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
       setUser(data.user || null);
       setNutrition(data.nutrition || null);
       setWaterCount(data.waterCount || 0);
+      setHydration(data.hydration || null);
       setMealsLoggedToday(data.mealsLoggedToday || 0);
       setLoggedSlots(new Set(data.loggedSlots || []));
       setStreak(data.streak || 0);
@@ -141,6 +144,16 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
   }, []);
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
+
+  useEffect(() => {
+    const fetchHydrationAnalysis = async () => {
+      try {
+        const result = await apiFetch('/api/nutrition/hydration-analysis');
+        setHydrationAnalysis(result.analysis || '');
+      } catch { /* silent fail */ }
+    };
+    fetchHydrationAnalysis();
+  }, [waterCount]);
 
   const handleLogMeal = async () => {
     if (!logDialog.open) return;
@@ -198,6 +211,12 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
     try {
       const result = await apiFetch('/api/water-log', { method: 'POST', body: JSON.stringify({ glasses: 1 }) });
       setWaterCount(result.glassesConsumed || waterCount + 1);
+      setHydration(prev => prev ? {
+        ...prev,
+        glassesConsumed: prev.glassesConsumed + 1,
+        mlConsumed: (prev.glassesConsumed + 1) * 250,
+        percentage: Math.round(((prev.glassesConsumed + 1) / prev.targetGlasses) * 100),
+      } : null);
       toast.success('\uD83D\uDCA7 +1 glass of water');
     } catch { toast.error('Failed to log water'); }
   };
@@ -353,6 +372,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
           { label: 'Protein', val: consumedProtein, target: targetProtein, from: '#3b82f6', to: '#60a5fa', unit: 'g' },
           { label: 'Carbs', val: nutrition?.consumed?.carbsG || 0, target: nutrition?.targets?.carbsG || 0, from: '#f59e0b', to: '#fbbf24', unit: 'g' },
           { label: 'Fat', val: nutrition?.consumed?.fatG || 0, target: nutrition?.targets?.fatG || 0, from: '#f43f5e', to: '#fb7185', unit: 'g' },
+          { label: 'Fiber', val: nutrition?.consumed?.fiberG || 0, target: nutrition?.targets?.fiberG || 0, from: '#22c55e', to: '#4ade80', unit: 'g' },
         ].map((m) => {
           const pct = Math.min(Math.round((m.val / (m.target || 1)) * 100), 100);
           return (
@@ -365,6 +385,37 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                 <motion.div
                   className="h-full rounded-full"
                   style={{ background: `linear-gradient(90deg, ${m.from}, ${m.to})`, minWidth: pct > 0 ? '4px' : '0px' }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.max(pct, 0)}%` }}
+                  transition={{ duration: 0.8 }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+
+      {/* ═══ Micronutrient Analysis ═══ */}
+      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm space-y-3 mb-5">
+        <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">Micronutrient Analysis</h3>
+        {[
+          { label: 'Calcium', val: nutrition?.consumed?.calciumMg || 0, target: nutrition?.targets?.calciumMg || 1000, unit: 'mg', color: '#8b5cf6', colorTo: '#a78bfa' },
+          { label: 'Iron', val: nutrition?.consumed?.ironMg || 0, target: nutrition?.targets?.ironMg || 19, unit: 'mg', color: '#ef4444', colorTo: '#f87171' },
+          { label: 'Zinc', val: nutrition?.consumed?.zincMg || 0, target: nutrition?.targets?.zincMg || 17, unit: 'mg', color: '#06b6d4', colorTo: '#22d3ee' },
+          { label: 'Magnesium', val: nutrition?.consumed?.magnesiumMg || 0, target: nutrition?.targets?.magnesiumMg || 440, unit: 'mg', color: '#f59e0b', colorTo: '#fbbf24' },
+          { label: 'Cholesterol', val: nutrition?.consumed?.cholesterolMg || 0, target: nutrition?.targets?.cholesterolMg || 300, unit: 'mg', color: '#ec4899', colorTo: '#f472b6', isLimit: true },
+        ].map((m) => {
+          const pct = Math.min(Math.round((m.val / (m.target || 1)) * 100), 100);
+          return (
+            <div key={m.label}>
+              <div className="flex justify-between mb-1.5">
+                <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">{m.label}</span>
+                <span className="text-xs text-gray-600 dark:text-gray-400 font-medium text-right tabular-nums">{m.val.toFixed(1)}{m.unit} / {m.target}{m.unit} &middot; {pct}%</span>
+              </div>
+              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden ring-1 ring-inset ring-gray-300/50 dark:ring-gray-600/50">
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: `linear-gradient(90deg, ${m.color}, ${m.colorTo})`, minWidth: pct > 0 ? '4px' : '0px' }}
                   initial={{ width: 0 }}
                   animate={{ width: `${Math.max(pct, 0)}%` }}
                   transition={{ duration: 0.8 }}
@@ -401,7 +452,21 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
             <Plus className="h-4 w-4" />
           </Button>
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">{waterCount} of 8 glasses today</p>
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {waterCount} of {hydration?.targetGlasses || 8} glasses ({hydration?.mlConsumed || 0}ml / {hydration?.targetMl || 2000}ml)
+          </p>
+          {hydration && hydration.percentage > 0 && (
+            <span className={`text-xs font-medium ${hydration.percentage >= 80 ? 'text-emerald-500' : hydration.percentage >= 50 ? 'text-amber-500' : 'text-cyan-500'}`}>
+              {hydration.percentage}%
+            </span>
+          )}
+        </div>
+        {hydrationAnalysis && (
+          <p className="text-xs text-cyan-600 dark:text-cyan-400 mt-2 italic leading-relaxed">
+            {hydrationAnalysis}
+          </p>
+        )}
       </Card>
 
       {/* ═══ Today's Insights Card ═══ */}
@@ -445,11 +510,67 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
                 </p>
               )}
 
+              {consumedCal > 0 && (() => {
+                const nutrients = [
+                  { name: 'fiber', val: nutrition?.consumed?.fiberG || 0, target: nutrition?.targets?.fiberG || 30, pct: nutrition?.percentages?.fiberG || 0, tip: 'Fiber aids digestion and keeps you full longer. Add whole grains, fruits, and vegetables.' },
+                  { name: 'calcium', val: nutrition?.consumed?.calciumMg || 0, target: nutrition?.targets?.calciumMg || 1000, pct: nutrition?.percentages?.calciumMg || 0, tip: 'Calcium keeps your bones strong. Try milk, curd, or leafy greens.' },
+                  { name: 'iron', val: nutrition?.consumed?.ironMg || 0, target: nutrition?.targets?.ironMg || 19, pct: nutrition?.percentages?.ironMg || 0, tip: 'Iron carries oxygen in your blood. Include dal, spinach, or eggs.' },
+                  { name: 'zinc', val: nutrition?.consumed?.zincMg || 0, target: nutrition?.targets?.zincMg || 17, pct: nutrition?.percentages?.zincMg || 0, tip: 'Zinc supports immunity and healing. Try nuts, seeds, and whole grains.' },
+                  { name: 'magnesium', val: nutrition?.consumed?.magnesiumMg || 0, target: nutrition?.targets?.magnesiumMg || 440, pct: nutrition?.percentages?.magnesiumMg || 0, tip: 'Magnesium supports muscle and nerve function. Eat nuts, seeds, and leafy greens.' },
+                ];
+                const weakest = nutrients.filter(n => n.pct < 50).sort((a, b) => a.pct - b.pct)[0];
+                if (weakest) {
+                  return (
+                    <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                      {weakest.tip}
+                    </p>
+                  );
+                }
+                return null;
+              })()}
+
               <p className="text-xs text-gray-500 dark:text-gray-400 italic">{'\uD83D\uDCAC'} {timeOfDayTip}</p>
             </div>
           </div>
         </Card>
       </motion.div>
+
+      {/* ═══ Detailed Nutrient Analysis ═══ */}
+      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-gradient-to-r from-violet-500/5 to-purple-500/5 mb-5">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-8 h-8 bg-violet-100 dark:bg-violet-900/30 rounded-xl flex items-center justify-center">
+            <Sparkles className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+          </div>
+          <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">Nutrient Gap Analysis</h3>
+        </div>
+        <div className="space-y-2">
+          {[
+            { name: 'Fiber', consumed: nutrition?.consumed?.fiberG || 0, target: nutrition?.targets?.fiberG || 30, unit: 'g' },
+            { name: 'Calcium', consumed: nutrition?.consumed?.calciumMg || 0, target: nutrition?.targets?.calciumMg || 1000, unit: 'mg' },
+            { name: 'Iron', consumed: nutrition?.consumed?.ironMg || 0, target: nutrition?.targets?.ironMg || 19, unit: 'mg' },
+            { name: 'Zinc', consumed: nutrition?.consumed?.zincMg || 0, target: nutrition?.targets?.zincMg || 17, unit: 'mg' },
+            { name: 'Magnesium', consumed: nutrition?.consumed?.magnesiumMg || 0, target: nutrition?.targets?.magnesiumMg || 440, unit: 'mg' },
+          ].filter(n => n.consumed > 0 || (nutrition?.consumed?.calories || 0) > 0).map(n => {
+            const pct = Math.round((n.consumed / (n.target || 1)) * 100);
+            const remaining = Math.max(0, n.target - n.consumed);
+            const status = pct >= 80 ? 'good' : pct >= 50 ? 'moderate' : 'low';
+            const statusColor = status === 'good' ? 'text-emerald-600 dark:text-emerald-400' : status === 'moderate' ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400';
+            const statusLabel = status === 'good' ? 'On Track' : status === 'moderate' ? 'Needs Attention' : 'Low Intake';
+            return (
+              <div key={n.name} className="flex items-center justify-between py-1.5 border-b border-gray-100 dark:border-gray-800 last:border-0">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">{n.name}</span>
+                    <span className={`text-[10px] font-medium ${statusColor}`}>{statusLabel}</span>
+                  </div>
+                  <span className="text-[11px] text-gray-500 dark:text-gray-400">{n.consumed.toFixed(1)} / {n.target}{n.unit} ({pct}%)</span>
+                </div>
+                <span className="text-[11px] text-gray-500 dark:text-gray-400">{remaining.toFixed(0)}{n.unit} left</span>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
 
       {/* ═══ Meal Plan Generator (3 ranked picks per slot) ═══ */}
       <motion.div

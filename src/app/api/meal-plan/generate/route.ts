@@ -247,6 +247,14 @@ function toItemsForSlot(
         proteinG: rc.meal.nutrition?.proteinG ?? 0,
         carbsG: rc.meal.nutrition?.carbsG ?? 0,
         fatG: rc.meal.nutrition?.fatG ?? 0,
+        fiberG: rc.meal.nutrition?.fiberG ?? 0,
+        sugarG: rc.meal.nutrition?.sugarG ?? 0,
+        sodiumMg: rc.meal.nutrition?.sodiumMg ?? 0,
+        calciumMg: rc.meal.nutrition?.calciumMg ?? 0,
+        ironMg: rc.meal.nutrition?.ironMg ?? 0,
+        zincMg: rc.meal.nutrition?.zincMg ?? 0,
+        magnesiumMg: rc.meal.nutrition?.magnesiumMg ?? 0,
+        cholesterolMg: rc.meal.nutrition?.cholesterolMg ?? 0,
       },
       servingGms
     );

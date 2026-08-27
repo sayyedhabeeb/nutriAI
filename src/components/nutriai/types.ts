@@ -2,10 +2,10 @@ export type ViewType = 'auth' | 'onboarding' | 'dashboard' | 'foodlog' | 'upload
 export type TabType = 'dashboard' | 'foodlog' | 'upload' | 'chat' | 'progress' | 'settings';
 
 export interface NutritionData {
-  targets: { calories: number; proteinG: number; carbsG: number; fatG: number };
-  consumed: { calories: number; proteinG: number; carbsG: number; fatG: number };
-  remaining: { calories: number; proteinG: number; carbsG: number; fatG: number };
-  percentages: { calories: number; proteinG: number; carbsG: number; fatG: number };
+  targets: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; calciumMg: number; ironMg: number; zincMg: number; magnesiumMg: number; cholesterolMg: number };
+  consumed: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; calciumMg: number; ironMg: number; zincMg: number; magnesiumMg: number; cholesterolMg: number };
+  remaining: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; calciumMg: number; ironMg: number; zincMg: number; magnesiumMg: number; cholesterolMg: number };
+  percentages: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; calciumMg: number; ironMg: number; zincMg: number; magnesiumMg: number; cholesterolMg: number };
 }
 
 export interface MealRecommendation {
@@ -29,8 +29,22 @@ export interface FoodLogItem {
   proteinG: number;
   carbsG: number;
   fatG: number;
+  fiberG: number;
+  calciumMg: number;
+  ironMg: number;
+  zincMg: number;
+  magnesiumMg: number;
+  cholesterolMg: number;
   mealSlot: string;
   meal: { name: string; nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number } | null } | null;
+}
+
+export interface HydrationData {
+  glassesConsumed: number;
+  targetGlasses: number;
+  mlConsumed: number;
+  targetMl: number;
+  percentage: number;
 }
 
 export type NutritionSource = 'meal' | 'ingredients' | 'extracted' | 'stored';
@@ -58,9 +72,9 @@ export interface RecognizedFood {
   needsConfirmation: boolean;
   nutritionSource: NutritionSource;
   portionOptions: PortionOption[];
-  estimatedNutrition: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; sugarG: number; sodiumMg: number } | null;
+  estimatedNutrition: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; sugarG: number; sodiumMg: number; calciumMg: number; ironMg: number; zincMg: number; magnesiumMg: number; cholesterolMg: number } | null;
   ingredients: { name: string; grams: number; matched: boolean }[];
-  variants: { name: string; matched: boolean; estimatedNutrition: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; sugarG: number; sodiumMg: number } | null }[];
+  variants: { name: string; matched: boolean; estimatedNutrition: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; sugarG: number; sodiumMg: number; calciumMg: number; ironMg: number; zincMg: number; magnesiumMg: number; cholesterolMg: number } | null }[];
   matched: boolean;
   unknown_food: boolean;
   meal: Record<string, unknown> | null;
@@ -75,7 +89,7 @@ export interface SearchMeal {
   cuisine: string;
   imageUrl: string | null;
   baseServingGms: number;
-  nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; sugarG: number; sodiumMg: number } | null;
+  nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; sugarG: number; sodiumMg: number; calciumMg: number; ironMg: number; zincMg: number; magnesiumMg: number; cholesterolMg: number } | null;
   isVeg: boolean;
   isVegan: boolean;
   prepTimeMin: number | null;
@@ -99,5 +113,5 @@ export interface MealPlanItemData {
     isVegan: boolean;
     prepTimeMin: number | null;
   };
-  nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number } | null;
+  nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; calciumMg: number; ironMg: number; zincMg: number; magnesiumMg: number; cholesterolMg: number } | null;
 }

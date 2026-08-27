@@ -191,6 +191,11 @@ async function resolveFood(item: ConfirmBody, userId: string): Promise<ResolvedF
         fiberG: meal.nutrition.fiberG ?? undefined,
         sugarG: meal.nutrition.sugarG ?? undefined,
         sodiumMg: meal.nutrition.sodiumMg ?? undefined,
+        calciumMg: meal.nutrition.calciumMg ?? undefined,
+        ironMg: meal.nutrition.ironMg ?? undefined,
+        zincMg: meal.nutrition.zincMg ?? undefined,
+        magnesiumMg: meal.nutrition.magnesiumMg ?? undefined,
+        cholesterolMg: meal.nutrition.cholesterolMg ?? undefined,
       },
       grams
     );
@@ -212,6 +217,11 @@ async function resolveFood(item: ConfirmBody, userId: string): Promise<ResolvedF
       fiberG: (parsed.fiberG / baseGms) * 100,
       sugarG: (parsed.sugarG / baseGms) * 100,
       sodiumMg: (parsed.sodiumMg / baseGms) * 100,
+      calciumMg: (parsed.calciumMg / baseGms) * 100,
+      ironMg: (parsed.ironMg / baseGms) * 100,
+      zincMg: (parsed.zincMg / baseGms) * 100,
+      magnesiumMg: (parsed.magnesiumMg / baseGms) * 100,
+      cholesterolMg: (parsed.cholesterolMg / baseGms) * 100,
     };
     nutrition = scaleNutrition(per100, grams);
   } else {
@@ -228,6 +238,11 @@ async function resolveFood(item: ConfirmBody, userId: string): Promise<ResolvedF
           fiberG: namedMeal.nutrition.fiberG ?? undefined,
           sugarG: namedMeal.nutrition.sugarG ?? undefined,
           sodiumMg: namedMeal.nutrition.sodiumMg ?? undefined,
+          calciumMg: namedMeal.nutrition.calciumMg ?? undefined,
+          ironMg: namedMeal.nutrition.ironMg ?? undefined,
+          zincMg: namedMeal.nutrition.zincMg ?? undefined,
+          magnesiumMg: namedMeal.nutrition.magnesiumMg ?? undefined,
+          cholesterolMg: namedMeal.nutrition.cholesterolMg ?? undefined,
         },
         grams
       );
@@ -285,6 +300,11 @@ async function resolveFood(item: ConfirmBody, userId: string): Promise<ResolvedF
         fiberG: Math.round(composed.nutrition.fiberG * ratio * 10) / 10,
         sugarG: Math.round(composed.nutrition.sugarG * ratio * 10) / 10,
         sodiumMg: Math.round(composed.nutrition.sodiumMg * ratio),
+        calciumMg: Math.round(composed.nutrition.calciumMg * ratio * 10) / 10,
+        ironMg: Math.round(composed.nutrition.ironMg * ratio * 10) / 10,
+        zincMg: Math.round(composed.nutrition.zincMg * ratio * 10) / 10,
+        magnesiumMg: Math.round(composed.nutrition.magnesiumMg * ratio * 10) / 10,
+        cholesterolMg: Math.round(composed.nutrition.cholesterolMg * ratio * 10) / 10,
       };
 
       // Save as a new cooked meal so it is recognized in the future.
@@ -309,6 +329,11 @@ async function resolveFood(item: ConfirmBody, userId: string): Promise<ResolvedF
               fiberG: per100(nutrition.fiberG),
               sugarG: per100(nutrition.sugarG),
               sodiumMg: per100(nutrition.sodiumMg),
+              calciumMg: per100(nutrition.calciumMg),
+              ironMg: per100(nutrition.ironMg),
+              zincMg: per100(nutrition.zincMg),
+              magnesiumMg: per100(nutrition.magnesiumMg),
+              cholesterolMg: per100(nutrition.cholesterolMg),
               perServingGms: 100,
             },
           },
@@ -458,8 +483,13 @@ export async function POST(request: Request) {
         fiberG: Math.round((acc.fiberG + f.nutrition.fiberG) * 10) / 10,
         sugarG: Math.round((acc.sugarG + f.nutrition.sugarG) * 10) / 10,
         sodiumMg: acc.sodiumMg + f.nutrition.sodiumMg,
+        calciumMg: Math.round((acc.calciumMg + f.nutrition.calciumMg) * 10) / 10,
+        ironMg: Math.round((acc.ironMg + f.nutrition.ironMg) * 10) / 10,
+        zincMg: Math.round((acc.zincMg + f.nutrition.zincMg) * 10) / 10,
+        magnesiumMg: Math.round((acc.magnesiumMg + f.nutrition.magnesiumMg) * 10) / 10,
+        cholesterolMg: Math.round((acc.cholesterolMg + f.nutrition.cholesterolMg) * 10) / 10,
       }),
-      { calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0, sodiumMg: 0 }
+      { calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0, sodiumMg: 0, calciumMg: 0, ironMg: 0, zincMg: 0, magnesiumMg: 0, cholesterolMg: 0 }
     );
 
     const imageUrl = await persistScanImage(foods);

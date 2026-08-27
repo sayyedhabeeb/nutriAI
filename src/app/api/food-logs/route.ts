@@ -109,6 +109,14 @@ export async function POST(request: Request) {
           proteinG: meal.nutrition.proteinG,
           carbsG: meal.nutrition.carbsG,
           fatG: meal.nutrition.fatG,
+          fiberG: meal.nutrition.fiberG,
+          sugarG: meal.nutrition.sugarG,
+          sodiumMg: meal.nutrition.sodiumMg,
+          calciumMg: meal.nutrition.calciumMg,
+          ironMg: meal.nutrition.ironMg,
+          zincMg: meal.nutrition.zincMg,
+          magnesiumMg: meal.nutrition.magnesiumMg,
+          cholesterolMg: meal.nutrition.cholesterolMg,
         },
         servingGms
       );
@@ -124,6 +132,11 @@ export async function POST(request: Request) {
         fiberG: Number(body.fiberG || 0),
         sugarG: Number(body.sugarG || 0),
         sodiumMg: Number(body.sodiumMg || 0),
+        calciumMg: Number(body.calciumMg || 0),
+        ironMg: Number(body.ironMg || 0),
+        zincMg: Number(body.zincMg || 0),
+        magnesiumMg: Number(body.magnesiumMg || 0),
+        cholesterolMg: Number(body.cholesterolMg || 0),
       };
     }
 
@@ -155,6 +168,12 @@ export async function POST(request: Request) {
         proteinG: scaled.proteinG,
         carbsG: scaled.carbsG,
         fatG: scaled.fatG,
+        fiberG: scaled.fiberG,
+        calciumMg: scaled.calciumMg,
+        ironMg: scaled.ironMg,
+        zincMg: scaled.zincMg,
+        magnesiumMg: scaled.magnesiumMg,
+        cholesterolMg: scaled.cholesterolMg,
         mealSlot,
         source: source || 'photo',
       },
@@ -173,6 +192,12 @@ export async function POST(request: Request) {
         proteinG: true,
         carbsG: true,
         fatG: true,
+        fiberG: true,
+        calciumMg: true,
+        ironMg: true,
+        zincMg: true,
+        magnesiumMg: true,
+        cholesterolMg: true,
       },
     });
 
@@ -183,6 +208,12 @@ export async function POST(request: Request) {
         totalProtein: totals._sum.proteinG || 0,
         totalCarbs: totals._sum.carbsG || 0,
         totalFat: totals._sum.fatG || 0,
+        totalFiber: totals._sum.fiberG || 0,
+        totalCalciumMg: totals._sum.calciumMg || 0,
+        totalIronMg: totals._sum.ironMg || 0,
+        totalZincMg: totals._sum.zincMg || 0,
+        totalMagnesiumMg: totals._sum.magnesiumMg || 0,
+        totalCholesterolMg: totals._sum.cholesterolMg || 0,
       },
     });
 
@@ -194,6 +225,12 @@ export async function POST(request: Request) {
         consumedProtein: { increment: scaled.proteinG },
         consumedCarbs: { increment: scaled.carbsG },
         consumedFat: { increment: scaled.fatG },
+        consumedFiber: { increment: scaled.fiberG },
+        consumedCalciumMg: { increment: scaled.calciumMg },
+        consumedIronMg: { increment: scaled.ironMg },
+        consumedZincMg: { increment: scaled.zincMg },
+        consumedMagnesiumMg: { increment: scaled.magnesiumMg },
+        consumedCholesterolMg: { increment: scaled.cholesterolMg },
       },
       create: {
         userId: session.userId,
@@ -206,6 +243,12 @@ export async function POST(request: Request) {
         consumedProtein: scaled.proteinG,
         consumedCarbs: scaled.carbsG,
         consumedFat: scaled.fatG,
+        consumedFiber: scaled.fiberG,
+        consumedCalciumMg: scaled.calciumMg,
+        consumedIronMg: scaled.ironMg,
+        consumedZincMg: scaled.zincMg,
+        consumedMagnesiumMg: scaled.magnesiumMg,
+        consumedCholesterolMg: scaled.cholesterolMg,
       },
     });
 
@@ -267,6 +310,12 @@ export async function DELETE(request: Request) {
         proteinG: true,
         carbsG: true,
         fatG: true,
+        fiberG: true,
+        calciumMg: true,
+        ironMg: true,
+        zincMg: true,
+        magnesiumMg: true,
+        cholesterolMg: true,
       },
     });
 
@@ -277,6 +326,12 @@ export async function DELETE(request: Request) {
         totalProtein: totals._sum.proteinG || 0,
         totalCarbs: totals._sum.carbsG || 0,
         totalFat: totals._sum.fatG || 0,
+        totalFiber: totals._sum.fiberG || 0,
+        totalCalciumMg: totals._sum.calciumMg || 0,
+        totalIronMg: totals._sum.ironMg || 0,
+        totalZincMg: totals._sum.zincMg || 0,
+        totalMagnesiumMg: totals._sum.magnesiumMg || 0,
+        totalCholesterolMg: totals._sum.cholesterolMg || 0,
       },
     });
 
@@ -285,6 +340,12 @@ export async function DELETE(request: Request) {
     const remainingProtein = Math.max(0, totals._sum.proteinG || 0);
     const remainingCarbs = Math.max(0, totals._sum.carbsG || 0);
     const remainingFat = Math.max(0, totals._sum.fatG || 0);
+    const remainingFiber = Math.max(0, totals._sum.fiberG || 0);
+    const remainingCalciumMg = Math.max(0, totals._sum.calciumMg || 0);
+    const remainingIronMg = Math.max(0, totals._sum.ironMg || 0);
+    const remainingZincMg = Math.max(0, totals._sum.zincMg || 0);
+    const remainingMagnesiumMg = Math.max(0, totals._sum.magnesiumMg || 0);
+    const remainingCholesterolMg = Math.max(0, totals._sum.cholesterolMg || 0);
 
     await db.dailyNutrition.updateMany({
       where: { userId: session.userId, date: logDate },
@@ -293,6 +354,12 @@ export async function DELETE(request: Request) {
         consumedProtein: remainingProtein,
         consumedCarbs: remainingCarbs,
         consumedFat: remainingFat,
+        consumedFiber: remainingFiber,
+        consumedCalciumMg: remainingCalciumMg,
+        consumedIronMg: remainingIronMg,
+        consumedZincMg: remainingZincMg,
+        consumedMagnesiumMg: remainingMagnesiumMg,
+        consumedCholesterolMg: remainingCholesterolMg,
       },
     });
 

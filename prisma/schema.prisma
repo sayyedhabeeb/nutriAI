@@ -80,21 +80,26 @@ model UserPreference {
 
 // ═══ Food Database ═══
 model Ingredient {
-  id               String   @id @default(cuid())
-  name             String   @unique
-  isVeg            Boolean  @default(true)
-  isVegan          Boolean  @default(true)
-  containsAllergen Boolean  @default(false)
-  caloriesPer100g  Float
-  proteinPer100g   Float
-  carbsPer100g     Float
-  fatPer100g       Float
-  fiberPer100g     Float?
-  sugarPer100g     Float?
-  sodiumMgPer100g  Float?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  mealIngredients  MealIngredient[]
+  id                   String   @id @default(cuid())
+  name                 String   @unique
+  isVeg                Boolean  @default(true)
+  isVegan              Boolean  @default(true)
+  containsAllergen     Boolean  @default(false)
+  caloriesPer100g      Float
+  proteinPer100g       Float
+  carbsPer100g         Float
+  fatPer100g           Float
+  fiberPer100g         Float?
+  sugarPer100g         Float?
+  sodiumMgPer100g      Float?
+  calciumMgPer100g     Float?
+  ironMgPer100g        Float?
+  zincMgPer100g        Float?
+  magnesiumMgPer100g   Float?
+  cholesterolMgPer100g Float?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  mealIngredients      MealIngredient[]
 }
 
 model Meal {
@@ -135,6 +140,11 @@ model MealNutrition {
   fiberG        Float?
   sugarG        Float?
   sodiumMg      Float?
+  calciumMg     Float?
+  ironMg        Float?
+  zincMg        Float?
+  magnesiumMg   Float?
+  cholesterolMg Float?
   perServingGms Int      @default(100)
   createdAt     DateTime @default(now())
   meal          Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
@@ -178,51 +188,75 @@ model MealIngredient {
 
 // ═══ Daily Tracking ═══
 model FoodLog {
-  id            String   @id @default(cuid())
-  userId        String
-  logDate       String
-  totalCalories Float?
-  totalProtein  Float?
-  totalCarbs    Float?
-  totalFat      Float?
-  status        String   @default("active")
-  createdAt     DateTime @default(now())
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items         FoodLogItem[]
+  id               String   @id @default(cuid())
+  userId           String
+  logDate          String
+  totalCalories    Float?
+  totalProtein     Float?
+  totalCarbs       Float?
+  totalFat         Float?
+  totalFiber       Float   @default(0)
+  totalCalciumMg   Float   @default(0)
+  totalIronMg      Float   @default(0)
+  totalZincMg      Float   @default(0)
+  totalMagnesiumMg Float   @default(0)
+  totalCholesterolMg Float @default(0)
+  status           String   @default("active")
+  createdAt        DateTime @default(now())
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items            FoodLogItem[]
   @@unique([userId, logDate])
 }
 
 model FoodLogItem {
-  id          String   @id @default(cuid())
-  foodLogId   String
-  mealId      String?
-  name        String?
-  servingGms  Int
-  calories    Float
-  proteinG    Float
-  carbsG      Float
-  fatG        Float
-  mealSlot    String
-  loggedAt    DateTime @default(now())
-  source      String   @default("tap")
-  foodLog     FoodLog  @relation(fields: [foodLogId], references: [id], onDelete: Cascade)
-  meal        Meal?    @relation(fields: [mealId], references: [id])
+  id            String   @id @default(cuid())
+  foodLogId     String
+  mealId        String?
+  name          String?
+  servingGms    Int
+  calories      Float
+  proteinG      Float
+  carbsG        Float
+  fatG          Float
+  fiberG        Float   @default(0)
+  calciumMg     Float   @default(0)
+  ironMg        Float   @default(0)
+  zincMg        Float   @default(0)
+  magnesiumMg   Float   @default(0)
+  cholesterolMg Float   @default(0)
+  mealSlot      String
+  loggedAt      DateTime @default(now())
+  source        String   @default("tap")
+  foodLog       FoodLog  @relation(fields: [foodLogId], references: [id], onDelete: Cascade)
+  meal          Meal?    @relation(fields: [mealId], references: [id])
 }
 
 model DailyNutrition {
-  id               String   @id @default(cuid())
-  userId           String
-  date             String
-  targetCalories   Float
-  consumedCalories Float    @default(0)
-  targetProtein    Float
-  consumedProtein  Float    @default(0)
-  targetCarbs      Float
-  consumedCarbs    Float    @default(0)
-  targetFat        Float
-  consumedFat      Float    @default(0)
-  createdAt        DateTime @default(now())
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String   @id @default(cuid())
+  userId             String
+  date               String
+  targetCalories     Float
+  consumedCalories   Float    @default(0)
+  targetProtein      Float
+  consumedProtein    Float    @default(0)
+  targetCarbs        Float
+  consumedCarbs      Float    @default(0)
+  targetFat          Float
+  consumedFat        Float    @default(0)
+  targetFiber        Float   @default(30)
+  consumedFiber      Float   @default(0)
+  targetCalciumMg    Float   @default(1000)
+  consumedCalciumMg  Float   @default(0)
+  targetIronMg       Float   @default(19)
+  consumedIronMg     Float   @default(0)
+  targetZincMg       Float   @default(17)
+  consumedZincMg     Float   @default(0)
+  targetMagnesiumMg  Float   @default(440)
+  consumedMagnesiumMg Float  @default(0)
+  targetCholesterolMg Float  @default(300)
+  consumedCholesterolMg Float @default(0)
+  createdAt          DateTime @default(now())
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([userId, date])
 }
 
@@ -249,17 +283,23 @@ model WeightLog {
 
 // ═══ Recommendations & Plans ═══
 model MealPlanDay {
-  id              String   @id @default(cuid())
-  userId          String
-  planDate        String
-  targetCalories  Float
-  targetProtein   Float
-  targetCarbs     Float
-  targetFat       Float
-  status          String   @default("active")
-  createdAt       DateTime @default(now())
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items           MealPlanItem[]
+  id                 String   @id @default(cuid())
+  userId             String
+  planDate           String
+  targetCalories     Float
+  targetProtein      Float
+  targetCarbs        Float
+  targetFat          Float
+  targetFiber        Float   @default(30)
+  targetCalciumMg    Float   @default(1000)
+  targetIronMg       Float   @default(19)
+  targetZincMg       Float   @default(17)
+  targetMagnesiumMg  Float   @default(440)
+  targetCholesterolMg Float  @default(300)
+  status             String   @default("active")
+  createdAt          DateTime @default(now())
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items              MealPlanItem[]
   @@unique([userId, planDate])
 }
 
