@@ -15,6 +15,7 @@ model User {
   name         String?
   role         String   @default("user")
   isActive     Boolean  @default(true)
+  swappUserId  String?  @unique
   lastLoginAt  DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -28,6 +29,7 @@ model User {
   weightLogs   WeightLog[]
   mealPlanDays MealPlanDay[]
   unknownFoodSubmissions UnknownFoodSubmission[]
+  aiConversations AiConversation[]
 }
 
 model UserProfile {
@@ -73,6 +75,12 @@ model UserPreference {
   dietType         String?
   budgetLevel      String?
   macroOverrideJson String?
+  skipDays         String?
+  meals            String?
+  allergies        String?
+  cuisines         String?
+  avoidedFoods     String?
+  otherInfo        String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -328,6 +336,29 @@ model AiLog {
   tokensUsed      Int?
   costUsd         Float?
   createdAt       DateTime @default(now())
+}
+
+model AiConversation {
+  id        String      @id @default(cuid())
+  userId    String
+  title     String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  AiMessage[]
+  
+  @@index([userId])
+}
+
+model AiMessage {
+  id             String         @id @default(cuid())
+  conversationId String
+  role           String         // "user" or "assistant"
+  content        String         @db.Text
+  createdAt      DateTime       @default(now())
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  @@index([conversationId])
 }
 
 // ═══ Unknown / New Food Submissions ═══

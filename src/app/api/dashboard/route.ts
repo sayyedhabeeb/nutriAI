@@ -3,6 +3,7 @@ import { getSessionFromRequest } from '@/lib/auth';
 import { success, unauthorized, serverError } from '@/lib/response';
 import { buildPlanItems } from '@/lib/meal-plan-view';
 import { computeAchievements, computeLogStreak, getTodayStr } from '@/lib/achievements';
+import { getHydrationSummary } from '@/lib/hydration-service';
 
 export async function GET(request: Request) {
   try {
@@ -11,7 +12,7 @@ export async function GET(request: Request) {
 
     const today = getTodayStr();
 
-    const [user, dailyNutrition, waterLog, foodLog, planDay, logStreak, achievements] =
+    const [user, dailyNutrition, foodLog, planDay, logStreak, achievements, hydration] =
       await Promise.all([
         db.user.findUnique({
           where: { id: session.userId },
@@ -24,9 +25,6 @@ export async function GET(request: Request) {
         }),
         db.dailyNutrition.findUnique({
           where: { userId_date: { userId: session.userId, date: today } },
-        }),
-        db.waterLog.findUnique({
-          where: { userId_logDate: { userId: session.userId, logDate: today } },
         }),
         db.foodLog.findUnique({
           where: { userId_logDate: { userId: session.userId, logDate: today } },
@@ -45,6 +43,7 @@ export async function GET(request: Request) {
         }),
         computeLogStreak(session.userId),
         computeAchievements(session.userId),
+        getHydrationSummary(session.userId),
       ]);
 
     if (!user) return unauthorized('User not found');
@@ -101,14 +100,6 @@ export async function GET(request: Request) {
     const loggedSlots = Array.from(
       new Set(foodLog?.items.map((i) => i.mealSlot).filter(Boolean) ?? [])
     ) as string[];
-
-    const hydration = {
-      glassesConsumed: waterLog?.glassesConsumed ?? 0,
-      targetGlasses: waterLog?.targetGlasses ?? 8,
-      mlConsumed: (waterLog?.glassesConsumed ?? 0) * 250,
-      targetMl: (waterLog?.targetGlasses ?? 8) * 250,
-      percentage: waterLog ? Math.round((waterLog.glassesConsumed / waterLog.targetGlasses) * 100) : 0,
-    };
 
     return success({
       user: {

@@ -45,6 +45,7 @@ export interface HydrationData {
   mlConsumed: number;
   targetMl: number;
   percentage: number;
+  status?: 'under' | 'on-track' | 'well-hydrated' | 'none';
 }
 
 export type NutritionSource = 'meal' | 'ingredients' | 'extracted' | 'stored';

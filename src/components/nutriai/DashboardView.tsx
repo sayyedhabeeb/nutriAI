@@ -143,6 +143,16 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
     }
   }, []);
 
+  const fetchHydration = useCallback(async () => {
+    try {
+      const result = await apiFetch('/api/hydration');
+      if (result?.hydration) {
+        setHydration(result.hydration);
+        setWaterCount(result.hydration.glassesConsumed ?? 0);
+      }
+    } catch { /* silent fail */ }
+  }, []);
+
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
 
   useEffect(() => {
@@ -218,6 +228,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
         percentage: Math.round(((prev.glassesConsumed + 1) / prev.targetGlasses) * 100),
       } : null);
       toast.success('\uD83D\uDCA7 +1 glass of water');
+      fetchHydration();
     } catch { toast.error('Failed to log water'); }
   };
 
@@ -534,43 +545,6 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
           </div>
         </Card>
       </motion.div>
-
-      {/* ═══ Detailed Nutrient Analysis ═══ */}
-      <Card className="p-4 rounded-2xl shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-200/80 dark:border-gray-800/70 bg-gradient-to-r from-violet-500/5 to-purple-500/5 mb-5">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-8 h-8 bg-violet-100 dark:bg-violet-900/30 rounded-xl flex items-center justify-center">
-            <Sparkles className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-          </div>
-          <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">Nutrient Gap Analysis</h3>
-        </div>
-        <div className="space-y-2">
-          {[
-            { name: 'Fiber', consumed: nutrition?.consumed?.fiberG || 0, target: nutrition?.targets?.fiberG || 30, unit: 'g' },
-            { name: 'Calcium', consumed: nutrition?.consumed?.calciumMg || 0, target: nutrition?.targets?.calciumMg || 1000, unit: 'mg' },
-            { name: 'Iron', consumed: nutrition?.consumed?.ironMg || 0, target: nutrition?.targets?.ironMg || 19, unit: 'mg' },
-            { name: 'Zinc', consumed: nutrition?.consumed?.zincMg || 0, target: nutrition?.targets?.zincMg || 17, unit: 'mg' },
-            { name: 'Magnesium', consumed: nutrition?.consumed?.magnesiumMg || 0, target: nutrition?.targets?.magnesiumMg || 440, unit: 'mg' },
-          ].filter(n => n.consumed > 0 || (nutrition?.consumed?.calories || 0) > 0).map(n => {
-            const pct = Math.round((n.consumed / (n.target || 1)) * 100);
-            const remaining = Math.max(0, n.target - n.consumed);
-            const status = pct >= 80 ? 'good' : pct >= 50 ? 'moderate' : 'low';
-            const statusColor = status === 'good' ? 'text-emerald-600 dark:text-emerald-400' : status === 'moderate' ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400';
-            const statusLabel = status === 'good' ? 'On Track' : status === 'moderate' ? 'Needs Attention' : 'Low Intake';
-            return (
-              <div key={n.name} className="flex items-center justify-between py-1.5 border-b border-gray-100 dark:border-gray-800 last:border-0">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">{n.name}</span>
-                    <span className={`text-[10px] font-medium ${statusColor}`}>{statusLabel}</span>
-                  </div>
-                  <span className="text-[11px] text-gray-500 dark:text-gray-400">{n.consumed.toFixed(1)} / {n.target}{n.unit} ({pct}%)</span>
-                </div>
-                <span className="text-[11px] text-gray-500 dark:text-gray-400">{remaining.toFixed(0)}{n.unit} left</span>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
 
       {/* ═══ Meal Plan Generator (3 ranked picks per slot) ═══ */}
       <motion.div

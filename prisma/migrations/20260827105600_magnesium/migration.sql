@@ -36,11 +36,6 @@ ALTER TABLE `ingredient` ADD COLUMN `calciumMgPer100g` DOUBLE NULL,
     ADD COLUMN `zincMgPer100g` DOUBLE NULL;
 
 -- AlterTable
-ALTER TABLE `meal` ADD COLUMN `externalId` VARCHAR(191) NULL,
-    ADD COLUMN `imageSearchName` VARCHAR(191) NULL,
-    ADD COLUMN `nutritionStatus` VARCHAR(191) NOT NULL DEFAULT 'verified';
-
--- AlterTable
 ALTER TABLE `mealnutrition` ADD COLUMN `calciumMg` DOUBLE NULL,
     ADD COLUMN `cholesterolMg` DOUBLE NULL,
     ADD COLUMN `ironMg` DOUBLE NULL,
@@ -54,6 +49,3 @@ ALTER TABLE `mealplanday` ADD COLUMN `targetCalciumMg` DOUBLE NOT NULL DEFAULT 1
     ADD COLUMN `targetIronMg` DOUBLE NOT NULL DEFAULT 19,
     ADD COLUMN `targetMagnesiumMg` DOUBLE NOT NULL DEFAULT 440,
     ADD COLUMN `targetZincMg` DOUBLE NOT NULL DEFAULT 17;
-
--- AlterTable
-ALTER TABLE `mealplanitem` ADD COLUMN `rankPosition` INTEGER NULL;

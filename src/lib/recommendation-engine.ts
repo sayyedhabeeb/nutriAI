@@ -100,6 +100,7 @@ export function filterCandidates(
     cuisinePreference,
     dietPreference,
     recentMealIds,
+    slotTargets,
     strictCuisine,
     strictRecent = true,
   } = opts;
