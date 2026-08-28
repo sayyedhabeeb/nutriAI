@@ -1,5 +1,5 @@
 -- AlterTable
-ALTER TABLE `mealingredient` ADD COLUMN `amountGrams` DOUBLE NULL,
+ALTER TABLE `MealIngredient` ADD COLUMN `amountGrams` DOUBLE NULL,
     ADD COLUMN `ingredientId` VARCHAR(191) NULL;
 
 -- AlterTable
