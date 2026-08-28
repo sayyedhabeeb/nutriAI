@@ -5,18 +5,18 @@
 
 */
 -- AlterTable
-ALTER TABLE `meal` ADD COLUMN `externalId` VARCHAR(191) NULL,
+ALTER TABLE `Meal` ADD COLUMN `externalId` VARCHAR(191) NULL,
     ADD COLUMN `imageSearchName` VARCHAR(191) NULL,
     ADD COLUMN `nutritionStatus` VARCHAR(191) NOT NULL DEFAULT 'verified';
 
 -- AlterTable
-ALTER TABLE `mealplanitem` ADD COLUMN `rankPosition` INTEGER NULL;
+ALTER TABLE `MealPlanItem` ADD COLUMN `rankPosition` INTEGER NULL;
 
 -- AlterTable
-ALTER TABLE `user` ADD COLUMN `swappUserId` VARCHAR(191) NULL;
+ALTER TABLE `User` ADD COLUMN `swappUserId` VARCHAR(191) NULL;
 
 -- AlterTable
-ALTER TABLE `userpreference` ADD COLUMN `allergies` VARCHAR(191) NULL,
+ALTER TABLE `UserPreference` ADD COLUMN `allergies` VARCHAR(191) NULL,
     ADD COLUMN `avoidedFoods` VARCHAR(191) NULL,
     ADD COLUMN `cuisines` VARCHAR(191) NULL,
     ADD COLUMN `meals` VARCHAR(191) NULL,
