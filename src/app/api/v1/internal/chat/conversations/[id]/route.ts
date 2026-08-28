@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const authResult = await validateServiceToken(request);
   if (authResult.error || !authResult.user) {
@@ -13,8 +13,9 @@ export async function GET(
   }
 
   try {
+    const { id } = await params;
     const conversation = await db.aiConversation.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         messages: {
           orderBy: { createdAt: "asc" }

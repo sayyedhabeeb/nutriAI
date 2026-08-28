@@ -44,6 +44,12 @@ export async function GET(request: Request) {
           proteinG: Math.round(log?.totalProtein || 0),
           carbsG: Math.round(log?.totalCarbs || 0),
           fatG: Math.round(log?.totalFat || 0),
+          fiberG: Math.round(log?.totalFiber || 0),
+          calciumMg: Math.round(log?.totalCalciumMg || 0),
+          ironMg: Math.round(log?.totalIronMg || 0),
+          zincMg: Math.round(log?.totalZincMg || 0),
+          magnesiumMg: Math.round(log?.totalMagnesiumMg || 0),
+          cholesterolMg: Math.round(log?.totalCholesterolMg || 0),
         },
         targets: targets
           ? {
@@ -51,6 +57,12 @@ export async function GET(request: Request) {
               proteinG: Math.round(targets.targetProtein),
               carbsG: Math.round(targets.targetCarbs),
               fatG: Math.round(targets.targetFat),
+              fiberG: Math.round(targets.targetFiber),
+              calciumMg: Math.round(targets.targetCalciumMg),
+              ironMg: Math.round(targets.targetIronMg),
+              zincMg: Math.round(targets.targetZincMg),
+              magnesiumMg: Math.round(targets.targetMagnesiumMg),
+              cholesterolMg: Math.round(targets.targetCholesterolMg),
             }
           : null,
       };

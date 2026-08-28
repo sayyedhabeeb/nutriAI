@@ -79,6 +79,14 @@ export async function syncMealPlanWithLogs(userId: string): Promise<MealPlanSync
           proteinG: meal.nutrition.proteinG,
           carbsG: meal.nutrition.carbsG,
           fatG: meal.nutrition.fatG,
+          fiberG: meal.nutrition.fiberG ?? 0,
+          sugarG: meal.nutrition.sugarG ?? 0,
+          sodiumMg: meal.nutrition.sodiumMg ?? 0,
+          calciumMg: meal.nutrition.calciumMg ?? 0,
+          ironMg: meal.nutrition.ironMg ?? 0,
+          zincMg: meal.nutrition.zincMg ?? 0,
+          magnesiumMg: meal.nutrition.magnesiumMg ?? 0,
+          cholesterolMg: meal.nutrition.cholesterolMg ?? 0,
         },
         servingGms
       );
