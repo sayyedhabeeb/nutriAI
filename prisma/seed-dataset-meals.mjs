@@ -599,84 +599,93 @@ async function main() {
   let estimated = 0;
   let notVerified = 0;
 
-  for (let i = 0; i < target.length; i++) {
-    const r = target[i];
-    const key = uniqueDishKey(r);
-    const annotation = annotated.get(key);
+  const BATCH_SIZE = 50;
+  for (let i = 0; i < target.length; i += BATCH_SIZE) {
+    const batch = target.slice(i, i + BATCH_SIZE);
+    const operations = batch.map(r => {
+      const key = uniqueDishKey(r);
+      const annotation = annotated.get(key);
 
-    const mealType = MEAL_TYPE_MAP[r.meal_type] ?? r.meal_type.toLowerCase();
-    const flags = dietFlags(r.diet_type);
-    const hasNutrition = !!annotation?.nutrition && annotation.matched.length >= 2;
-    const nutritionStatus = hasNutrition ? 'estimated' : 'not_verified';
+      const mealType = MEAL_TYPE_MAP[r.meal_type] ?? r.meal_type.toLowerCase();
+      const flags = dietFlags(r.diet_type);
+      const hasNutrition = !!annotation?.nutrition && annotation.matched.length >= 2;
+      const nutritionStatus = hasNutrition ? 'estimated' : 'not_verified';
 
-    await prisma.meal.create({
-      data: {
-        name: r.food_name,
-        description: `${r.base_dish} (${r.variant}) — ${r.cuisine} ${r.meal_type} dish from the curated catalog.`,
-        mealType,
-        cuisine: r.cuisine,
-        ...flags,
-        baseServingGms: 100,
-        isActive: true,
-        source: 'dataset',
-        externalId: r.food_id,
-        imageSearchName: r.image_search_name,
-        nutritionStatus,
-        ...(hasNutrition
-          ? {
-              nutrition: {
-                create: {
-                  calories: annotation.nutrition.calories,
-                  proteinG: annotation.nutrition.proteinG,
-                  carbsG: annotation.nutrition.carbsG,
-                  fatG: annotation.nutrition.fatG,
-                  fiberG: annotation.nutrition.fiberG,
-                  sugarG: annotation.nutrition.sugarG,
-                  sodiumMg: annotation.nutrition.sodiumMg,
-                  perServingGms: 100,
+      return prisma.meal.create({
+        data: {
+          name: r.food_name,
+          description: `${r.base_dish} (${r.variant}) — ${r.cuisine} ${r.meal_type} dish from the curated catalog.`,
+          mealType,
+          cuisine: r.cuisine,
+          ...flags,
+          baseServingGms: 100,
+          isActive: true,
+          source: 'dataset',
+          externalId: r.food_id,
+          imageSearchName: r.image_search_name,
+          nutritionStatus,
+          ...(hasNutrition
+            ? {
+                nutrition: {
+                  create: {
+                    calories: annotation.nutrition.calories,
+                    proteinG: annotation.nutrition.proteinG,
+                    carbsG: annotation.nutrition.carbsG,
+                    fatG: annotation.nutrition.fatG,
+                    fiberG: annotation.nutrition.fiberG,
+                    sugarG: annotation.nutrition.sugarG,
+                    sodiumMg: annotation.nutrition.sodiumMg,
+                    perServingGms: 100,
+                  },
                 },
-              },
-            }
-          : {}),
-        servings: {
-          create: { servingName: 'Serving (100g)', servingGms: 100, multiplier: 1 },
+              }
+            : {}),
+          servings: {
+            create: { servingName: 'Serving (100g)', servingGms: 100, multiplier: 1 },
+          },
+          aliases: {
+            create: [
+              { aliasName: r.base_dish },
+              { aliasName: r.food_name.toLowerCase() },
+              { aliasName: `${r.base_dish} ${r.variant}`.toLowerCase() },
+            ],
+          },
+          tags: {
+            create: [
+              { tagName: r.cuisine },
+              { tagName: r.variant },
+              { tagName: r.base_dish.toLowerCase() },
+              { tagName: 'dataset' },
+            ],
+          },
+          ingredients: {
+            create: (annotation?.items ?? []).map((item, idx) => {
+              const res = annotation.resolved?.[idx];
+              return {
+                ingredientName: item.name,
+                amountGrams: item.grams,
+                containsAllergen: res?.containsAllergen ?? containsAllergen(item.name),
+                ingredientId: res?.row?.id ?? null,
+              };
+            }),
+          },
         },
-        aliases: {
-          create: [
-            { aliasName: r.base_dish },
-            { aliasName: r.food_name.toLowerCase() },
-            { aliasName: `${r.base_dish} ${r.variant}`.toLowerCase() },
-          ],
-        },
-        tags: {
-          create: [
-            { tagName: r.cuisine },
-            { tagName: r.variant },
-            { tagName: r.base_dish.toLowerCase() },
-            { tagName: 'dataset' },
-          ],
-        },
-        ingredients: {
-          create: (annotation?.items ?? []).map((item, idx) => {
-            const res = annotation.resolved?.[idx];
-            return {
-              ingredientName: item.name,
-              amountGrams: item.grams,
-              containsAllergen: res?.containsAllergen ?? containsAllergen(item.name),
-              ingredientId: res?.row?.id ?? null,
-            };
-          }),
-        },
-      },
+      });
     });
 
-    created++;
-    if (hasNutrition) estimated++;
-    else notVerified++;
+    await prisma.$transaction(operations);
 
-    if (created % LOG_EVERY === 0 || i === target.length - 1) {
-      console.log(`  created ${created}/${target.length} (estimated ${estimated}, not_verified ${notVerified})`);
+    for (const r of batch) {
+      const key = uniqueDishKey(r);
+      const annotation = annotated.get(key);
+      const hasNutrition = !!annotation?.nutrition && annotation.matched.length >= 2;
+      
+      created++;
+      if (hasNutrition) estimated++;
+      else notVerified++;
     }
+
+    console.log(`  created ${created}/${target.length} (estimated ${estimated}, not_verified ${notVerified})`);
   }
 
   console.log(`\n✅ Seeded ${created} dataset meals (estimated ${estimated}, not_verified ${notVerified}).`);
