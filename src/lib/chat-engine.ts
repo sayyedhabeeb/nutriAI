@@ -64,6 +64,13 @@ export async function processChat(
     orderBy: { createdAt: "desc" },
     take: 10
   });
+
+  // CLEANUP ORPHAN USER MESSAGES
+  if (history.length > 0 && history[0].role === "user") {
+    console.log(`[ChatEngine] Cleaning up orphaned user message: ${history[0].id}`);
+    await db.aiMessage.delete({ where: { id: history[0].id } }).catch(console.error);
+    history.shift(); // Remove it from the current history array
+  }
   
   history.reverse();
 
@@ -77,6 +84,15 @@ export async function processChat(
     where: { userId_planDate: { userId, planDate: todayStr } },
     include: { items: { include: { meal: true } } }
   });
+
+  const cleanMealPlan = mealPlan ? {
+    targetCalories: mealPlan.targetCalories,
+    items: mealPlan.items.map((i: any) => ({
+      slot: i.mealSlot,
+      mealName: i.meal?.name,
+      calories: i.recommendedCalories
+    }))
+  } : null;
 
   const contextBlock = `
 --- UNTRUSTED USER CONTEXT ---
@@ -93,7 +109,7 @@ ${JSON.stringify(contextData.dietLog || [], null, 2)}
 ${JSON.stringify(contextData.activityContext || {}, null, 2)}
 
 --- MEAL PLAN (Today/Tomorrow) ---
-${JSON.stringify(mealPlan || {}, null, 2)}
+${JSON.stringify(cleanMealPlan || {}, null, 2)}
 --- END UNTRUSTED CONTEXT ---
   `.trim();
 
@@ -107,15 +123,13 @@ ${JSON.stringify(mealPlan || {}, null, 2)}
     }
   });
 
-  let fullPrompt = "";
-  if (history.length > 0) {
-    fullPrompt += "--- PREVIOUS CONVERSATION HISTORY ---\n";
-    for (const msg of history) {
-      fullPrompt += `${msg.role.toUpperCase()}: ${msg.content}\n\n`;
-    }
-    fullPrompt += "--- END HISTORY ---\n\n";
-  }
-  fullPrompt += `USER: ${message}\nASSISTANT:`;
+  const aiHistory = history.map(msg => ({
+    role: msg.role as 'user' | 'assistant' | 'system',
+    content: msg.content
+  }));
+
+  const totalChars = finalSystemPrompt.length + message.length + aiHistory.reduce((acc, msg) => acc + msg.content.length, 0);
+  console.log(`[ChatEngine] Total prompt characters: ${totalChars}`);
 
   const ai = getRecommendationClient();
   const startedAt = Date.now();
@@ -124,11 +138,16 @@ ${JSON.stringify(mealPlan || {}, null, 2)}
   try {
     aiResponseText = await ai.chat({
       system: finalSystemPrompt,
-      user: fullPrompt,
-      timeoutMs: 45000
+      history: aiHistory,
+      user: message,
+      timeoutMs: 115000
     });
   } catch (error: any) {
     console.error("[ChatEngine] AI call failed:", error);
+    await db.aiMessage.delete({ where: { id: userMsg.id } }).catch(console.error);
+    if (!conversationId) {
+      await db.aiConversation.delete({ where: { id: convId } }).catch(console.error);
+    }
     throw new Error("AI Provider failed to respond in time");
   }
 

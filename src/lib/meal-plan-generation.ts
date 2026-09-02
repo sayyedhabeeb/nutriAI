@@ -56,7 +56,7 @@ function candidateLines(pool: RankedCandidate[]): string {
   return pool
     .map(
       (rc, i) =>
-        `${i + 1}. {"id":"${rc.meal.id}","name":"${rc.meal.name}","cuisine":"${rc.meal.cuisine}","isVeg":${rc.meal.isVeg},"calories":${rc.meal.nutrition?.calories ?? 0},"proteinG":${rc.meal.nutrition?.proteinG ?? 0},"carbsG":${rc.meal.nutrition?.carbsG ?? 0},"fatG":${rc.meal.nutrition?.fatG ?? 0}}`
+        `${i + 1}. {"id":"${rc.meal.id}","name":"${rc.meal.name}","calories":${rc.meal.nutrition?.calories ?? 0},"proteinG":${rc.meal.nutrition?.proteinG ?? 0},"carbsG":${rc.meal.nutrition?.carbsG ?? 0},"fatG":${rc.meal.nutrition?.fatG ?? 0}}`
     )
     .join('\n');
 }
@@ -153,8 +153,8 @@ Return the JSON picks.`;
     }
     return result;
   } catch (err) {
-    console.warn('AI meal plan generation unavailable, using deterministic fallback:', err);
-    return {};
+    console.warn('AI meal plan generation unavailable:', err);
+    throw new GenerationError('AI provider failed to generate full day plan in time.', 504, 'AI_TIMEOUT');
   }
 }
 
@@ -249,8 +249,8 @@ Return the JSON array of days.`;
     
     return results;
   } catch (err) {
-    console.warn('AI multi-day meal plan generation unavailable, using deterministic fallback:', err);
-    return Array.from({ length: opts.daysCount }, () => ({}));
+    console.warn('AI multi-day meal plan generation unavailable:', err);
+    throw new GenerationError('AI provider failed to generate multi-day plan in time.', 504, 'AI_TIMEOUT');
   }
 }
 
@@ -307,8 +307,8 @@ Return the JSON pick.`;
     }
     return picks;
   } catch (err) {
-    console.warn('AI meal refresh unavailable, using deterministic fallback:', err);
-    return [];
+    console.warn('AI meal refresh unavailable:', err);
+    throw new GenerationError('AI provider failed to generate slot alternatives in time.', 504, 'AI_TIMEOUT');
   }
 }
 

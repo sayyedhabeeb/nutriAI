@@ -21,6 +21,7 @@ export interface AIChatMessage {
 export interface AIClient {
   chat(params: {
     system?: string;
+    history?: { role: 'system' | 'user' | 'assistant', content: string }[];
     user: string;
     model?: string;
     temperature?: number;
@@ -81,7 +82,7 @@ export function createAIClient(config: AIClientConfig): AIClient {
   const timeoutMs = config.timeoutMs ?? 90_000;
 
   return {
-    async chat({ system, user, model, temperature, timeoutMs: callTimeoutMs }) {
+    async chat({ system, history, user, model, temperature, timeoutMs: callTimeoutMs }) {
       const data = await postCompletion(
         config.baseUrl,
         config.apiKey,
@@ -90,6 +91,7 @@ export function createAIClient(config: AIClientConfig): AIClient {
           temperature: temperature ?? 0,
           messages: [
             ...(system ? [{ role: 'system', content: system }] : []),
+            ...(history || []),
             { role: 'user', content: user },
           ],
         },
@@ -159,7 +161,7 @@ export function getRecommendationClient(): AIClient {
     baseUrl: env('RECO_AI_BASE_URL', 'http://localhost:1234/v1'),
     apiKey: env('RECO_AI_API_KEY', 'lm-studio'),
     model: env('RECO_AI_MODEL', 'gemma-3-4b-it-qat'),
-    timeoutMs: envInt('RECO_AI_TIMEOUT_MS', 120_000),
+    timeoutMs: envInt('RECO_AI_TIMEOUT_MS', 115_000),
   });
 }
 

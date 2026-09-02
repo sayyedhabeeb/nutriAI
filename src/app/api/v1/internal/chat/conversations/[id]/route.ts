@@ -15,7 +15,7 @@ export async function GET(
   try {
     const params = await props.params;
     const conversation = await db.aiConversation.findUnique({
-      where: { id },
+      where: { id: params.id },
       include: {
         messages: {
           orderBy: { createdAt: "asc" }
