@@ -317,7 +317,9 @@ function toItemsForSlot(
   pool: RankedCandidate[],
   picks: SlotPick[],
   slotTargets: { calories: number; proteinG: number; carbsG: number; fatG: number },
-  usedMealIds: Set<string>
+  usedInDay: Set<string>,
+  usedAcrossDays?: Set<string>,
+  dayIndex: number = 0
 ) {
   const items: {
     mealId: string;
@@ -331,22 +333,47 @@ function toItemsForSlot(
   const poolById = new Map(pool.map((rc) => [rc.meal.id, rc]));
   const chosen: RankedCandidate[] = [];
 
+  // 1. Add valid explicit picks (from AI or caller)
   for (const pick of picks) {
     const rc = poolById.get(pick.mealId);
-    if (rc && !usedMealIds.has(rc.meal.id) && !chosen.includes(rc)) {
+    if (rc && !usedInDay.has(rc.meal.id) && !chosen.includes(rc)) {
       chosen.push(rc);
-    }
-  }
-  const byScore = [...pool].sort((a, b) => b.score - a.score);
-  for (const rc of byScore) {
-    if (chosen.length >= PICKS_PER_SLOT) break;
-    if (!usedMealIds.has(rc.meal.id) && !chosen.includes(rc)) {
-      chosen.push(rc);
+      usedInDay.add(rc.meal.id);
+      usedAcrossDays?.add(rc.meal.id);
     }
   }
 
-  for (const rc of chosen) {
-    usedMealIds.add(rc.meal.id);
+  // 2. Sort candidates by score
+  const byScore = [...pool].sort((a, b) => b.score - a.score);
+
+  // Pass A (Diversity Priority): Pick meals NOT yet assigned to any day this week
+  if (chosen.length < PICKS_PER_SLOT && byScore.length > 0) {
+    for (const rc of byScore) {
+      if (chosen.length >= PICKS_PER_SLOT) break;
+      if (!usedInDay.has(rc.meal.id) && !usedAcrossDays?.has(rc.meal.id) && !chosen.includes(rc)) {
+        chosen.push(rc);
+        usedInDay.add(rc.meal.id);
+        usedAcrossDays?.add(rc.meal.id);
+      }
+    }
+  }
+
+  // Pass B (Pool Rotation Fallback): If pool has fewer unique meals than 7 days * 3 slots,
+  // rotate through the pool with a day offset so each day starts at a different meal index
+  if (chosen.length < PICKS_PER_SLOT && byScore.length > 0) {
+    const offset = (dayIndex * PICKS_PER_SLOT) % byScore.length;
+    const rotated = [...byScore.slice(offset), ...byScore.slice(0, offset)];
+    for (const rc of rotated) {
+      if (chosen.length >= PICKS_PER_SLOT) break;
+      if (!usedInDay.has(rc.meal.id) && !chosen.includes(rc)) {
+        chosen.push(rc);
+        usedInDay.add(rc.meal.id);
+      }
+    }
+  }
+
+  for (let idx = 0; idx < chosen.length; idx++) {
+    const rc = chosen[idx];
     const servingGms = scaleServingToSlot(rc.meal, slotTargets);
     const scaled = scaleNutrition(
       {
@@ -363,7 +390,7 @@ function toItemsForSlot(
       servingGms,
       recommendedCalories: scaled.calories,
       rankScore: rc.score,
-      rankPosition: items.length + 1,
+      rankPosition: idx + 1,
     });
   }
 
@@ -373,9 +400,11 @@ function toItemsForSlot(
 async function resolvePlan(
   pools: Record<MealSlot, RankedCandidate[]>,
   picks: Partial<Record<MealSlot, SlotPick[]>>,
-  slotTargets: Record<MealSlot, { calories: number; proteinG: number; carbsG: number; fatG: number }>
+  slotTargets: Record<MealSlot, { calories: number; proteinG: number; carbsG: number; fatG: number }>,
+  usedAcrossDays?: Set<string>,
+  dayIndex: number = 0
 ) {
-  const usedMealIds = new Set<string>();
+  const usedInDay = new Set<string>();
   const items: {
     mealId: string;
     mealSlot: MealSlot;
@@ -388,7 +417,7 @@ async function resolvePlan(
   for (const slot of SLOTS) {
     const pool = pools[slot];
     if (pool.length === 0) continue;
-    items.push(...toItemsForSlot(slot, pool, picks[slot] ?? [], slotTargets[slot], usedMealIds));
+    items.push(...toItemsForSlot(slot, pool, picks[slot] ?? [], slotTargets[slot], usedInDay, usedAcrossDays, dayIndex));
   }
 
   return items;
@@ -493,7 +522,7 @@ export async function generateMealPlan(
     activityContext: options.activityContext,
   });
 
-  const planItems = await resolvePlan(pools, picks, slotTargets);
+  const planItems = await resolvePlan(pools, picks, slotTargets, undefined, options.dateOffset || 0);
 
   const planItemsCreate = planItems.map((item) => ({
     mealSlot: item.mealSlot,
@@ -731,6 +760,7 @@ export async function generateWeeklyMealPlan(
   });
 
   const generatedPayloads: any[] = [];
+  const usedAcrossDays = new Set<string>();
   
   for (let i = 0; i < generateDays; i++) {
     const loopDate = new Date(d);
@@ -748,7 +778,7 @@ export async function generateWeeklyMealPlan(
     const daySlotTargets = getSlotTargets(targets, consumed);
     const picks = multiPicks[i] || {};
     
-    const planItems = await resolvePlan(pools, picks, daySlotTargets);
+    const planItems = await resolvePlan(pools, picks, daySlotTargets, usedAcrossDays, i);
     
     const planItemsCreate = planItems.map((item) => ({
       mealSlot: item.mealSlot,
