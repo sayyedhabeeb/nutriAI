@@ -1,5 +1,5 @@
-import { db } from '@/lib/db';
-import type { MealSlot } from '@/lib/nutrition-engine';
+import { db } from "@/lib/db";
+import type { MealSlot } from "@/lib/nutrition-engine";
 
 export const TOP_N = 4;
 export const TOP_POOL = 15;
@@ -19,13 +19,13 @@ export function loadCandidateMeals() {
 }
 
 export function getTodayStr(): string {
-  return new Date().toISOString().split('T')[0];
+  return new Date().toISOString().split("T")[0];
 }
 
 export function getDateDaysAgo(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() - days);
-  return d.toISOString().split('T')[0];
+  return d.toISOString().split("T")[0];
 }
 
 export interface SlotTargets {
@@ -35,13 +35,82 @@ export interface SlotTargets {
   fatG: number;
 }
 
+export function isLowFatRequested(
+  otherInfo?: string | null,
+  avoidedFoods?: string | string[] | null
+): boolean {
+  const text = `${otherInfo || ""} ${
+    Array.isArray(avoidedFoods) ? avoidedFoods.join(" ") : avoidedFoods || ""
+  }`.toLowerCase();
+
+  const lowFatKeywords = [
+    "without fat",
+    "no fat",
+    "low fat",
+    "zero fat",
+    "fat free",
+    "fat-free",
+    "low-fat",
+    "avoid fat",
+    "no fatty",
+    "no oily",
+    "oil free",
+    "no fried",
+    "avoid fatty",
+    "avoid oily",
+    "less fat",
+    "lean food",
+    "lean only",
+    "fat food",
+    "fat foods",
+  ];
+  return lowFatKeywords.some((kw) => text.includes(kw));
+}
+
+const HIGH_FAT_KEYWORDS = [
+  "fried",
+  "deep fried",
+  "butter",
+  "cream",
+  "mayo",
+  "mayonnaise",
+  "ghee",
+  "fatty",
+  "oily",
+  "crispy fried",
+  "paratha",
+  "puri",
+  "bacon",
+  "sausage",
+  "creamy",
+  "lard",
+];
+
+export function isHighFatMeal(meal: MealCandidate): boolean {
+  if (!meal.nutrition) return false;
+  const fatG = meal.nutrition.fatG || 0;
+  const cal = meal.nutrition.calories || 1;
+  const fatCalRatio = (fatG * 9) / cal;
+
+  // If fat contributes > 30% of calories or > 8g fat per 100g
+  if (fatG > 8 || fatCalRatio > 0.30) {
+    return true;
+  }
+
+  const nameAndIngredients = `${meal.name} ${(meal.aliases || [])
+    .map((a) => a.aliasName)
+    .join(" ")} ${(meal.ingredients || [])
+    .map((i) => i.ingredientName)
+    .join(" ")}`.toLowerCase();
+
+  return HIGH_FAT_KEYWORDS.some((kw) => nameAndIngredients.includes(kw));
+}
+
 export function computeScore(
-  meal: {
-    nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number } | null;
-    cuisine: string;
-  },
+  meal: MealCandidate,
   slotTargets: SlotTargets,
-  cuisinePreference?: string | null
+  cuisinePreference?: string | null,
+  lowFatMode = false
 ): number {
   if (!meal.nutrition) return 0;
 
@@ -60,18 +129,31 @@ export function computeScore(
     Math.abs(mealProtPct - targetProtPct) +
     Math.abs(mealCarbsPct - targetCarbsPct) +
     Math.abs(mealFatPct - targetFatPct);
-  const macroFit = Math.max(0, 100 - macroDiff * 200);
+  let macroFit = Math.max(0, 100 - macroDiff * 200);
 
   let prefScore = 50;
   if (
     cuisinePreference &&
     (cuisinePreference.toLowerCase().includes(meal.cuisine.toLowerCase()) ||
-     meal.cuisine.toLowerCase() === 'general')
+      meal.cuisine.toLowerCase() === "general")
   ) {
     prefScore = 100;
   }
 
-  return macroFit * 0.5 + 100 * 0.3 + prefScore * 0.2;
+  let finalScore = macroFit * 0.5 + 100 * 0.3 + prefScore * 0.2;
+
+  if (lowFatMode) {
+    const fatG = meal.nutrition.fatG || 0;
+    if (fatG <= 3) {
+      finalScore += 50; // Huge bonus for very lean foods
+    } else if (fatG <= 6) {
+      finalScore += 20;
+    } else {
+      finalScore -= fatG * 10; // Progressive penalty for fat
+    }
+  }
+
+  return Math.max(0, finalScore);
 }
 
 export interface CandidateFilterOptions {
@@ -79,6 +161,8 @@ export interface CandidateFilterOptions {
   userAllergenNames: string[];
   cuisinePreference?: string | null;
   dietPreference?: string | null;
+  avoidedFoods?: string | string[] | null;
+  otherInfo?: string | null;
   recentMealIds: Set<string>;
   slotTargets: SlotTargets;
   strictCuisine: boolean;
@@ -88,8 +172,9 @@ export interface CandidateFilterOptions {
 // Deterministic candidate filtering:
 // 1. NON-NEGOTIABLE: Allergy removal
 // 2. Meal slot matching
-// 3. Dietary preference (veg, vegan, etc.)
-// 4. Cuisine & Recent exclusions (gracefully relaxed if pool < TOP_N)
+// 3. Low-Fat & Avoided Foods filtering
+// 4. Dietary preference (veg, vegan, etc.)
+// 5. Cuisine & Recent exclusions (gracefully relaxed if pool < TOP_N)
 export function filterCandidates(
   meals: MealCandidate[],
   opts: CandidateFilterOptions
@@ -99,6 +184,8 @@ export function filterCandidates(
     userAllergenNames,
     cuisinePreference,
     dietPreference,
+    avoidedFoods,
+    otherInfo,
     recentMealIds,
     slotTargets,
     strictCuisine,
@@ -121,7 +208,7 @@ export function filterCandidates(
     );
   }
 
-  // 2. Meal slot matching (e.g. "breakfast", "lunch", "dinner", "snack", "lunch, dinner")
+  // 2. Meal slot matching
   const slotFiltered = filtered.filter((meal) =>
     meal.mealType.toLowerCase().includes(slot)
   );
@@ -129,7 +216,49 @@ export function filterCandidates(
     filtered = slotFiltered;
   }
 
-  // 3. Recent meal exclusion for variety (skip if strictRecent=false or pool is too small)
+  // 3. User Avoided Foods Filtering
+  const avoidTerms: string[] = [];
+  if (avoidedFoods) {
+    const rawAvoid = Array.isArray(avoidedFoods) ? avoidedFoods : [avoidedFoods];
+    for (const item of rawAvoid) {
+      if (typeof item === "string") {
+        item.split(",").forEach((term) => {
+          const t = term.trim().toLowerCase();
+          if (t && t !== "none" && !t.includes("no known")) {
+            avoidTerms.push(t);
+          }
+        });
+      }
+    }
+  }
+
+  if (avoidTerms.length > 0) {
+    const nonAvoided = filtered.filter((meal) => {
+      const text = `${meal.name} ${meal.cuisine} ${(meal.ingredients || [])
+        .map((i) => i.ingredientName)
+        .join(" ")}`.toLowerCase();
+      return !avoidTerms.some((term) => text.includes(term));
+    });
+    if (nonAvoided.length >= TOP_N) {
+      filtered = nonAvoided;
+    }
+  }
+
+  // 4. Low-Fat / No-Fat Filtering (if user requested "without fat", "no fat", "low fat")
+  const lowFatMode = isLowFatRequested(otherInfo, avoidedFoods);
+  if (lowFatMode) {
+    const leanOnly = filtered.filter((meal) => !isHighFatMeal(meal));
+    if (leanOnly.length >= TOP_N) {
+      filtered = leanOnly;
+    } else if (leanOnly.length > 0) {
+      // Sort by fat ascending so least fat meals come first
+      filtered = [...filtered].sort(
+        (a, b) => (a.nutrition?.fatG || 0) - (b.nutrition?.fatG || 0)
+      );
+    }
+  }
+
+  // 5. Recent meal exclusion for variety
   if (strictRecent && recentMealIds.size > 0) {
     const nonRecent = filtered.filter((meal) => !recentMealIds.has(meal.id));
     if (nonRecent.length >= TOP_N) {
@@ -137,31 +266,31 @@ export function filterCandidates(
     }
   }
 
-  // 4. Strict cuisine filter (include "general" as valid, or relax if too few results)
+  // 6. Strict cuisine filter
   if (strictCuisine && cuisinePreference) {
     const preferredCuisines = cuisinePreference
-      .split(',')
+      .split(",")
       .map((c) => c.trim().toLowerCase());
     const cuisineMatches = filtered.filter(
       (meal) =>
         preferredCuisines.includes(meal.cuisine.toLowerCase()) ||
-        meal.cuisine.toLowerCase() === 'general'
+        meal.cuisine.toLowerCase() === "general"
     );
     if (cuisineMatches.length >= TOP_N) {
       filtered = cuisineMatches;
     }
   }
 
-  // 5. Dietary preference (veg, vegan, eggetarian)
+  // 7. Dietary preference (veg, vegan, eggetarian)
   if (dietPreference) {
     const dietMatches = filtered.filter((meal) => {
       switch (dietPreference) {
-        case 'veg':
-        case 'vegetarian':
+        case "veg":
+        case "vegetarian":
           return meal.isVeg || meal.isVegan;
-        case 'vegan':
+        case "vegan":
           return meal.isVegan;
-        case 'eggetarian':
+        case "eggetarian":
           return meal.isVeg || meal.isEggetarian || meal.isVegan;
         default:
           return true;
@@ -210,10 +339,12 @@ export function buildRankedPool(
     );
   }
 
+  const lowFatMode = isLowFatRequested(opts.otherInfo, opts.avoidedFoods);
+
   return candidates
     .map((meal) => ({
       meal,
-      score: computeScore(meal, opts.slotTargets, opts.cuisinePreference),
+      score: computeScore(meal, opts.slotTargets, opts.cuisinePreference, lowFatMode),
     }))
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
@@ -223,7 +354,8 @@ export function scaleServingToSlot(
   meal: MealCandidate,
   slotTargets: SlotTargets
 ): number {
-  if (!meal.nutrition || meal.nutrition.calories <= 0) return meal.baseServingGms || 100;
+  if (!meal.nutrition || meal.nutrition.calories <= 0)
+    return meal.baseServingGms || 100;
   const targetCal = Math.max(100, slotTargets.calories);
   const idealServing = (targetCal / meal.nutrition.calories) * 100;
   return Math.round(Math.min(500, Math.max(50, idealServing)));

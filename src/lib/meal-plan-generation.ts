@@ -3,6 +3,7 @@ import { scaleNutrition, getSlotTargets, type MealSlot } from '@/lib/nutrition-e
 import { getRecommendationClient, logAiCall } from '@/lib/ai/client';
 import {
   TOP_POOL,
+  isLowFatRequested,
   buildRankedPool,
   getDateDaysAgo,
   getTodayStr,
@@ -65,15 +66,21 @@ function buildContext(opts: {
   userGoalType: string;
   dietPreference?: string | null;
   cuisinePreference?: string | null;
+  avoidedFoods?: string | string[] | null;
+  otherInfo?: string | null;
   recentMealNames: string[];
   activityContext?: any;
   slotTargets?: Record<MealSlot, { calories: number; proteinG: number; carbsG: number; fatG: number }>;
   slot?: MealSlot;
 }): string {
+  const lowFat = isLowFatRequested(opts.otherInfo, opts.avoidedFoods);
   return [
     `Goal: ${opts.userGoalType}`,
     `Diet type: ${opts.dietPreference ?? 'any'}`,
     opts.cuisinePreference ? `Cuisine preference: ${opts.cuisinePreference}` : null,
+    opts.avoidedFoods ? `Avoided Foods / Ingredients (STRICTLY AVOID): ${Array.isArray(opts.avoidedFoods) ? opts.avoidedFoods.join(', ') : opts.avoidedFoods}` : null,
+    opts.otherInfo ? `User Custom Dietary Notes: ${opts.otherInfo}` : null,
+    lowFat ? `STRICT USER REQUIREMENT: User requested WITHOUT FAT / NO FAT / LOW FAT. NEVER pick high-fat, deep-fried, oily, buttery, creamy, or greasy foods. Pick ONLY lean, low-fat options.` : null,
     opts.recentMealNames.length > 0
       ? `Recently eaten in the last 2 days (DO NOT recommend): ${opts.recentMealNames.join(', ')}`
       : null,
@@ -102,6 +109,8 @@ async function aiPickFullDay(opts: {
   userGoalType: string;
   dietPreference?: string | null;
   cuisinePreference?: string | null;
+  avoidedFoods?: string | string[] | null;
+  otherInfo?: string | null;
   recentMealNames: string[];
   activityContext?: any;
 }): Promise<Partial<Record<MealSlot, SlotPick[]>>> {
@@ -165,6 +174,8 @@ async function aiPickMultiDay(opts: {
   userGoalType: string;
   dietPreference?: string | null;
   cuisinePreference?: string | null;
+  avoidedFoods?: string | string[] | null;
+  otherInfo?: string | null;
   recentMealNames: string[];
   activityContext?: any;
 }): Promise<Array<Partial<Record<MealSlot, SlotPick[]>>>> {
@@ -470,10 +481,53 @@ export async function generateMealPlan(
   });
   if (!user) throw new GenerationError('User not found', 404, 'USER_NOT_FOUND');
 
-  const cuisinePreference = user.preference?.cuisinePreference ?? null;
+  let cuisinePreference = user.preference?.cuisinePreference ?? null;
+  if (!cuisinePreference && user.preference?.cuisines) {
+    try {
+      const parsedCuisines = typeof user.preference.cuisines === 'string'
+        ? JSON.parse(user.preference.cuisines)
+        : user.preference.cuisines;
+      if (Array.isArray(parsedCuisines) && parsedCuisines.length > 0) {
+        cuisinePreference = parsedCuisines.join(', ');
+      }
+    } catch {
+      cuisinePreference = String(user.preference.cuisines);
+    }
+  }
+
   const dietPreference = user.preference?.dietType?.toLowerCase();
+  const avoidedFoods = user.preference?.avoidedFoods ?? null;
+  const otherInfo = user.preference?.otherInfo ?? null;
   const userGoalType = user.goal?.goalType || 'not set';
-  const userAllergenNames = (user.allergies || []).map((a) => a.allergyName.toLowerCase());
+
+  let userAllergenNames = (user.allergies || []).map((a) => a.allergyName.toLowerCase());
+  if (user.preference?.allergies) {
+    try {
+      const parsedAllergies = typeof user.preference.allergies === 'string'
+        ? JSON.parse(user.preference.allergies)
+        : user.preference.allergies;
+      if (Array.isArray(parsedAllergies)) {
+        userAllergenNames = [...new Set([...userAllergenNames, ...parsedAllergies.map((a) => String(a).toLowerCase())])];
+      }
+    } catch {
+      userAllergenNames = [...new Set([...userAllergenNames, ...String(user.preference.allergies).split(',').map((a) => a.trim().toLowerCase())])];
+    }
+  }
+  userAllergenNames = userAllergenNames.filter((a) => a !== 'no known allergies' && a !== 'none' && a.length > 0);
+
+  let skipDaysList: string[] = [];
+  if (user.preference?.skipDays) {
+    try {
+      const parsedSkip = typeof user.preference.skipDays === 'string'
+        ? JSON.parse(user.preference.skipDays)
+        : user.preference.skipDays;
+      if (Array.isArray(parsedSkip)) {
+        skipDaysList = parsedSkip.map((s) => String(s).toLowerCase());
+      }
+    } catch {
+      skipDaysList = String(user.preference.skipDays).split(',').map((s) => s.trim().toLowerCase());
+    }
+  }
 
   // Use today's nutrition targets for all future days
   const todayStr = getTodayStr();
@@ -506,7 +560,9 @@ export async function generateMealPlan(
       userAllergenNames,
       cuisinePreference,
       dietPreference,
-      recentMealIds: recent.ids, // We don't have IDs for Swapp's external meals, so they bypass ID filtering here
+      recentMealIds: recent.ids,
+      avoidedFoods,
+      otherInfo,
       slotTargets: slotTargets[slot],
       strictCuisine: true,
     });
@@ -518,7 +574,9 @@ export async function generateMealPlan(
     userGoalType,
     dietPreference,
     cuisinePreference,
-    recentMealNames: allRecentNames, // LLM will filter out recent meals by name
+    avoidedFoods,
+    otherInfo,
+    recentMealNames: allRecentNames,
     activityContext: options.activityContext,
   });
 
@@ -715,6 +773,8 @@ export async function generateWeeklyMealPlan(
 
   const cuisinePreference = user.preference?.cuisinePreference ?? null;
   const dietPreference = user.preference?.dietType?.toLowerCase();
+  const avoidedFoods = user.preference?.avoidedFoods ?? null;
+  const otherInfo = user.preference?.otherInfo ?? null;
   const userGoalType = user.goal?.goalType || 'not set';
   const userAllergenNames = (user.allergies || []).map((a) => a.allergyName.toLowerCase());
 
@@ -743,6 +803,8 @@ export async function generateWeeklyMealPlan(
       cuisinePreference,
       dietPreference,
       recentMealIds: recent.ids,
+      avoidedFoods,
+      otherInfo,
       slotTargets: baseSlotTargets[slot],
       strictCuisine: true,
     });
@@ -755,6 +817,8 @@ export async function generateWeeklyMealPlan(
     userGoalType,
     dietPreference,
     cuisinePreference,
+    avoidedFoods,
+    otherInfo,
     recentMealNames: allRecentNames,
     activityContext: options.activityContext,
   });
