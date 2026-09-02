@@ -201,6 +201,11 @@ function toNutritionValues(n: NonNullable<MealWithNutrition>['nutrition']): Nutr
     fiberG: n?.fiberG ?? 0,
     sugarG: n?.sugarG ?? 0,
     sodiumMg: n?.sodiumMg ?? 0,
+    calciumMg: n?.calciumMg ?? 0,
+    ironMg: n?.ironMg ?? 0,
+    zincMg: n?.zincMg ?? 0,
+    magnesiumMg: n?.magnesiumMg ?? 0,
+    cholesterolMg: n?.cholesterolMg ?? 0,
   };
 }
 

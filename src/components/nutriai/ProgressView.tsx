@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select';
 import {
   TrendingUp, Flame, Dumbbell, Scale, Droplets, Plus, Minus,
-  BarChart3, Download, Lightbulb, Trophy, Lock, CalendarDays,
+  BarChart3, Download, Lightbulb, Trophy, Lock, CalendarDays, Leaf,
 } from 'lucide-react';
 import { apiFetch } from './api';
 import { PIE_COLORS, fadeIn } from './constants';
@@ -116,10 +116,10 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
       toast.error('No data to export');
       return;
     }
-    const header = 'Date,Calories,Protein,Carbs,Fat';
+    const header = 'Date,Calories,Protein,Carbs,Fat,Fiber';
     const rows = weeklyData.map((d) => {
       const consumed = d.consumed as Record<string, number>;
-      return `${d.date},${consumed?.calories || 0},${consumed?.proteinG || 0},${consumed?.carbsG || 0},${consumed?.fatG || 0}`;
+      return `${d.date},${consumed?.calories || 0},${consumed?.proteinG || 0},${consumed?.carbsG || 0},${consumed?.fatG || 0},${consumed?.fiberG || 0}`;
     });
     const csvContent = [header, ...rows].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -187,6 +187,7 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
     { name: 'Protein', value: Number(summary?.avgProtein) || 0, color: PIE_COLORS[0] },
     { name: 'Carbs', value: Number(summary?.avgCarbs) || 0, color: PIE_COLORS[1] },
     { name: 'Fat', value: Number(summary?.avgFat) || 0, color: PIE_COLORS[2] },
+    { name: 'Fiber', value: Number(summary?.avgFiber) || 0, color: PIE_COLORS[3] },
   ];
   const allMacrosZero = macroData.every((m) => m.value === 0);
 
@@ -244,6 +245,7 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
   const statCards = [
     { label: 'Avg Daily Calories', value: `${Math.round(Number(summary?.avgCalories) || 0)}`, icon: Flame, iconBg: 'bg-orange-100 dark:bg-orange-900/30', iconColor: 'text-orange-600 dark:text-orange-400' },
     { label: 'Avg Protein', value: `${Math.round(Number(summary?.avgProtein) || 0)}g`, icon: Dumbbell, iconBg: 'bg-blue-100 dark:bg-blue-900/30', iconColor: 'text-blue-600 dark:text-blue-400' },
+    { label: 'Avg Fiber', value: `${Math.round(Number(summary?.avgFiber) || 0)}g`, icon: Leaf, iconBg: 'bg-green-100 dark:bg-green-900/30', iconColor: 'text-green-600 dark:text-green-400' },
     { label: 'Total Days', value: `${Number(summary?.totalDays) || 0}`, icon: CalendarDays, iconBg: 'bg-emerald-100 dark:bg-emerald-900/30', iconColor: 'text-emerald-600 dark:text-emerald-400' },
     { label: 'Current Weight', value: currentWeight ? `${currentWeight}kg` : 'N/A', icon: Scale, iconBg: 'bg-purple-100 dark:bg-purple-900/30', iconColor: 'text-purple-600 dark:text-purple-400' },
   ];
@@ -522,6 +524,9 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
                       const avgProtein = Math.round(Number(summary?.avgProtein) || 0);
                       const targetProtein = summary?.targetProtein ? Math.round(summary.targetProtein as number) : 0;
                       const proteinPct = targetProtein > 0 ? Math.round((avgProtein / targetProtein) * 100) : 0;
+                      const avgFiber = Math.round(Number(summary?.avgFiber) || 0);
+                      const targetFiber = summary?.targetFiber ? Math.round(summary.targetFiber as number) : 0;
+                      const fiberPct = targetFiber > 0 ? Math.round((avgFiber / targetFiber) * 100) : 0;
                       const bestDay = weeklyData.reduce((best: Record<string, unknown> | null, d) => {
                         const cal = (d.consumed as Record<string, number>)?.calories || 0;
                         const bestCal = best ? (best.consumed as Record<string, number>)?.calories || 0 : 0;
@@ -530,6 +535,7 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
                       const bestDayName = bestDay ? format(parseISO(bestDay.date as string), 'EEEE') : '';
                       const parts = [`You averaged ${avgCal} kcal/day this ${tab === 'monthly' ? 'month' : 'week'}.`];
                       if (proteinPct > 0) parts.push(`Protein intake was ${proteinPct}% of target.`);
+                      if (fiberPct > 0) parts.push(`Fiber intake was ${fiberPct}% of target.`);
                       if (targetCal > 0 && avgCal < targetCal) parts.push(`You're ${targetCal - avgCal} kcal under daily target.`);
                       else if (targetCal > 0 && avgCal > targetCal) parts.push(`You're ${avgCal - targetCal} kcal over daily target.`);
                       if (bestDayName) parts.push(`Best day: ${bestDayName}.`);
@@ -694,7 +700,7 @@ export function ProgressView({ onNavigate }: { onNavigate?: (v: string) => void 
               <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                 <Droplets className="h-4 w-4 text-blue-500" /> Water Intake
               </h3>
-              <span className="text-sm font-semibold text-gray-700">{waterGlasses} / 8 glasses</span>
+              <span className="text-sm font-semibold text-gray-700">{waterGlasses} / 8 glasses ({waterGlasses * 250}ml / 2000ml)</span>
             </div>
             <div className="flex items-center justify-center gap-4">
               <Button

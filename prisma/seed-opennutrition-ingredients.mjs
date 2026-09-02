@@ -111,6 +111,11 @@ function parseNutrition(json) {
       fiberPer100g: toNum(n.dietary_fiber),
       sugarPer100g: toNum(n.total_sugars),
       sodiumMgPer100g: toNum(n.sodium),
+      calciumMgPer100g: toNum(n.calcium),
+      ironMgPer100g: toNum(n.iron),
+      zincMgPer100g: toNum(n.zinc),
+      magnesiumMgPer100g: toNum(n.magnesium),
+      cholesterolMgPer100g: toNum(n.cholesterol),
     };
   } catch {
     return null;
@@ -126,6 +131,11 @@ function completeness(r) {
   if (r.fiberPer100g != null && r.fiberPer100g > 0) c++;
   if (r.sugarPer100g != null && r.sugarPer100g > 0) c++;
   if (r.sodiumMgPer100g != null && r.sodiumMgPer100g > 0) c++;
+  if (r.calciumMgPer100g != null && r.calciumMgPer100g > 0) c++;
+  if (r.ironMgPer100g != null && r.ironMgPer100g > 0) c++;
+  if (r.zincMgPer100g != null && r.zincMgPer100g > 0) c++;
+  if (r.magnesiumMgPer100g != null && r.magnesiumMgPer100g > 0) c++;
+  if (r.cholesterolMgPer100g != null && r.cholesterolMgPer100g > 0) c++;
   return c;
 }
 
@@ -134,19 +144,23 @@ function upsertSql(rows) {
   const params = [];
   for (const r of rows) {
     values.push(
-      `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))`
+      `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))`
     );
     params.push(
       r.id, r.name, r.isVeg, r.isVegan, r.containsAllergen,
       r.caloriesPer100g, r.proteinPer100g, r.carbsPer100g, r.fatPer100g,
-      r.fiberPer100g, r.sugarPer100g, r.sodiumMgPer100g
+      r.fiberPer100g, r.sugarPer100g, r.sodiumMgPer100g,
+      r.calciumMgPer100g, r.ironMgPer100g, r.zincMgPer100g,
+      r.magnesiumMgPer100g, r.cholesterolMgPer100g
     );
   }
   const sql = `
     INSERT INTO Ingredient
       (id, name, isVeg, isVegan, containsAllergen, caloriesPer100g,
        proteinPer100g, carbsPer100g, fatPer100g, fiberPer100g,
-       sugarPer100g, sodiumMgPer100g, createdAt, updatedAt)
+       sugarPer100g, sodiumMgPer100g, calciumMgPer100g, ironMgPer100g,
+       zincMgPer100g, magnesiumMgPer100g, cholesterolMgPer100g,
+       createdAt, updatedAt)
     VALUES ${values.join(', ')}
     AS new
     ON DUPLICATE KEY UPDATE
@@ -161,6 +175,11 @@ function upsertSql(rows) {
       fiberPer100g = new.fiberPer100g,
       sugarPer100g = new.sugarPer100g,
       sodiumMgPer100g = new.sodiumMgPer100g,
+      calciumMgPer100g = new.calciumMgPer100g,
+      ironMgPer100g = new.ironMgPer100g,
+      zincMgPer100g = new.zincMgPer100g,
+      magnesiumMgPer100g = new.magnesiumMgPer100g,
+      cholesterolMgPer100g = new.cholesterolMgPer100g,
       updatedAt = CURRENT_TIMESTAMP(3)`;
   return { sql, params };
 }

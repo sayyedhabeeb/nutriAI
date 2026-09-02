@@ -18,6 +18,11 @@ export interface IngredientNutritionRow {
   fiberPer100g: number | null;
   sugarPer100g: number | null;
   sodiumMgPer100g: number | null;
+  calciumMgPer100g: number | null;
+  ironMgPer100g: number | null;
+  zincMgPer100g: number | null;
+  magnesiumMgPer100g: number | null;
+  cholesterolMgPer100g: number | null;
 }
 
 export type PortionType = 'piece' | 'portion' | 'bowl' | 'drink' | 'weight';
@@ -44,7 +49,7 @@ export function composeNutritionFromItems(
   const knownMap = new Map(known.map((i) => [i.name.toLowerCase(), i]));
   const matched: string[] = [];
   const missing: string[] = [];
-  const totals = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0, sodiumMg: 0 };
+  const totals = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0, sodiumMg: 0, calciumMg: 0, ironMg: 0, zincMg: 0, magnesiumMg: 0, cholesterolMg: 0 };
   let anyMatched = false;
 
   for (const item of items) {
@@ -63,6 +68,11 @@ export function composeNutritionFromItems(
     totals.fiberG += (row.fiberPer100g ?? 0) * f;
     totals.sugarG += (row.sugarPer100g ?? 0) * f;
     totals.sodiumMg += (row.sodiumMgPer100g ?? 0) * f;
+    totals.calciumMg += (row.calciumMgPer100g ?? 0) * f;
+    totals.ironMg += (row.ironMgPer100g ?? 0) * f;
+    totals.zincMg += (row.zincMgPer100g ?? 0) * f;
+    totals.magnesiumMg += (row.magnesiumMgPer100g ?? 0) * f;
+    totals.cholesterolMg += (row.cholesterolMgPer100g ?? 0) * f;
   }
 
   if (!anyMatched) {
@@ -82,6 +92,11 @@ export function composeNutritionFromItems(
       fiberG: Math.round(totals.fiberG * 10) / 10,
       sugarG: Math.round(totals.sugarG * 10) / 10,
       sodiumMg: Math.round(totals.sodiumMg),
+      calciumMg: Math.round(totals.calciumMg * 10) / 10,
+      ironMg: Math.round(totals.ironMg * 10) / 10,
+      zincMg: Math.round(totals.zincMg * 10) / 10,
+      magnesiumMg: Math.round(totals.magnesiumMg * 10) / 10,
+      cholesterolMg: Math.round(totals.cholesterolMg * 10) / 10,
     },
     matched,
     missing,
