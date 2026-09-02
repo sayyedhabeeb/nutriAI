@@ -1,9 +1,9 @@
 -- AlterTable
-ALTER TABLE `mealingredient` ADD COLUMN `amountGrams` DOUBLE NULL,
+ALTER TABLE `MealIngredient` ADD COLUMN `amountGrams` DOUBLE NULL,
     ADD COLUMN `ingredientId` VARCHAR(191) NULL;
 
 -- AlterTable
-ALTER TABLE `unknownfoodsubmission` ADD COLUMN `baseServingGms` INTEGER NULL,
+ALTER TABLE `UnknownFoodSubmission` ADD COLUMN `baseServingGms` INTEGER NULL,
     ADD COLUMN `computedNutritionJson` VARCHAR(191) NULL,
     ADD COLUMN `ingredientsJson` VARCHAR(191) NULL;
 

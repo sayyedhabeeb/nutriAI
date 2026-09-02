@@ -17,7 +17,7 @@ export interface PlanItemWithMeal {
     isVeg: boolean;
     isVegan: boolean;
     prepTimeMin: number | null;
-    nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number } | null;
+    nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number | null; sugarG: number | null; sodiumMg: number | null; calciumMg: number | null; ironMg: number | null; zincMg: number | null; magnesiumMg: number | null; cholesterolMg: number | null } | null;
   };
 }
 
@@ -38,7 +38,7 @@ export interface PlanItemView {
     isVegan: boolean;
     prepTimeMin: number | null;
   };
-  nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number } | null;
+  nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number | null; sugarG: number | null; sodiumMg: number | null; calciumMg: number | null; ironMg: number | null; zincMg: number | null; magnesiumMg: number | null; cholesterolMg: number | null } | null;
 }
 
 const SLOT_ORDER = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -70,6 +70,14 @@ export function buildPlanItems(items: PlanItemWithMeal[]): PlanItemView[] {
               proteinG: item.meal.nutrition.proteinG,
               carbsG: item.meal.nutrition.carbsG,
               fatG: item.meal.nutrition.fatG,
+              fiberG: item.meal.nutrition.fiberG ?? 0,
+              sugarG: item.meal.nutrition.sugarG ?? 0,
+              sodiumMg: item.meal.nutrition.sodiumMg ?? 0,
+              calciumMg: item.meal.nutrition.calciumMg ?? 0,
+              ironMg: item.meal.nutrition.ironMg ?? 0,
+              zincMg: item.meal.nutrition.zincMg ?? 0,
+              magnesiumMg: item.meal.nutrition.magnesiumMg ?? 0,
+              cholesterolMg: item.meal.nutrition.cholesterolMg ?? 0,
             },
             item.servingGms
           )

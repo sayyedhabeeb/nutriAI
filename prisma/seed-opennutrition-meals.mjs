@@ -156,6 +156,11 @@ function parseNutrition(json) {
       fiberG: toNum(n.dietary_fiber),
       sugarG: toNum(n.total_sugars),
       sodiumMg: toNum(n.sodium),
+      calciumMg: toNum(n.calcium),
+      ironMg: toNum(n.iron),
+      zincMg: toNum(n.zinc),
+      magnesiumMg: toNum(n.magnesium),
+      cholesterolMg: toNum(n.cholesterol),
     };
   } catch {
     return null;
@@ -171,6 +176,11 @@ function completeness(r) {
   if (r.fiberG != null && r.fiberG > 0) c++;
   if (r.sugarG != null && r.sugarG > 0) c++;
   if (r.sodiumMg != null && r.sodiumMg > 0) c++;
+  if (r.calciumMg != null && r.calciumMg > 0) c++;
+  if (r.ironMg != null && r.ironMg > 0) c++;
+  if (r.zincMg != null && r.zincMg > 0) c++;
+  if (r.magnesiumMg != null && r.magnesiumMg > 0) c++;
+  if (r.cholesterolMg != null && r.cholesterolMg > 0) c++;
   return c;
 }
 
@@ -269,6 +279,11 @@ async function main() {
               fiberG: m.fiberG,
               sugarG: m.sugarG,
               sodiumMg: m.sodiumMg,
+              calciumMg: m.calciumMg,
+              ironMg: m.ironMg,
+              zincMg: m.zincMg,
+              magnesiumMg: m.magnesiumMg,
+              cholesterolMg: m.cholesterolMg,
               perServingGms: 100,
             },
           },

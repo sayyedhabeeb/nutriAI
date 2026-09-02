@@ -10,6 +10,7 @@ export interface NutritionTargets {
   proteinG: number;
   carbsG: number;
   fatG: number;
+  fiberG: number;
 }
 
 export interface UserNutritionProfile {
@@ -100,8 +101,9 @@ export function calculateMacroTargets(
   const proteinG = Math.round((targetCalories * macros.protein) / 4);
   const carbsG = Math.round((targetCalories * macros.carbs) / 4);
   const fatG = Math.round((targetCalories * macros.fat) / 9);
+  const fiberG = 30;
   
-  return { calories: targetCalories, proteinG, carbsG, fatG };
+  return { calories: targetCalories, proteinG, carbsG, fatG, fiberG };
 }
 
 // Full nutrition calculation pipeline
@@ -153,6 +155,7 @@ export function getSlotTargets(
     proteinG: clamp(dailyTargets.proteinG - (consumed.proteinG || 0)),
     carbsG: clamp(dailyTargets.carbsG - (consumed.carbsG || 0)),
     fatG: clamp(dailyTargets.fatG - (consumed.fatG || 0)),
+    fiberG: clamp(dailyTargets.fiberG - 0),
   };
   const slots = activeSlots.length > 0 ? activeSlots : ALL_SLOTS;
   const weightSum = slots.reduce((s, slot) => s + MEAL_SLOT_DISTRIBUTION[slot], 0) || 1;
@@ -160,7 +163,7 @@ export function getSlotTargets(
   const result = {} as Record<MealSlot, NutritionTargets>;
   for (const slot of ALL_SLOTS) {
     if (!slots.includes(slot)) {
-      result[slot] = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 };
+      result[slot] = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0 };
       continue;
     }
     const pct = MEAL_SLOT_DISTRIBUTION[slot] / weightSum;
@@ -169,6 +172,7 @@ export function getSlotTargets(
       proteinG: Math.round(remaining.proteinG * pct),
       carbsG: Math.round(remaining.carbsG * pct),
       fatG: Math.round(remaining.fatG * pct),
+      fiberG: Math.round(remaining.fiberG * pct),
     };
   }
   return result;
@@ -183,6 +187,11 @@ export interface NutritionValues {
   fiberG?: number;
   sugarG?: number;
   sodiumMg?: number;
+  calciumMg?: number;
+  ironMg?: number;
+  zincMg?: number;
+  magnesiumMg?: number;
+  cholesterolMg?: number;
 }
 
 export type ScaledNutrition = Required<NutritionValues>;
@@ -200,5 +209,10 @@ export function scaleNutrition(
     fiberG: Math.round((basePer100g.fiberG ?? 0) * factor * 10) / 10,
     sugarG: Math.round((basePer100g.sugarG ?? 0) * factor * 10) / 10,
     sodiumMg: Math.round((basePer100g.sodiumMg ?? 0) * factor),
+    calciumMg: Math.round((basePer100g.calciumMg ?? 0) * factor * 10) / 10,
+    ironMg: Math.round((basePer100g.ironMg ?? 0) * factor * 10) / 10,
+    zincMg: Math.round((basePer100g.zincMg ?? 0) * factor * 10) / 10,
+    magnesiumMg: Math.round((basePer100g.magnesiumMg ?? 0) * factor * 10) / 10,
+    cholesterolMg: Math.round((basePer100g.cholesterolMg ?? 0) * factor * 10) / 10,
   };
 }

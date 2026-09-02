@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE `foodlogitem` ADD COLUMN `name` VARCHAR(191) NULL;
+ALTER TABLE `FoodLogItem` ADD COLUMN `name` VARCHAR(191) NULL;

@@ -8,7 +8,7 @@ import { Flame, UtensilsCrossed } from 'lucide-react';
 export function NutritionFactsLabel({
   nutrition, servingGms, label,
 }: {
-  nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG?: number; sugarG?: number; sodiumMg?: number } | null;
+  nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number; fiberG?: number; sugarG?: number; sodiumMg?: number; calciumMg?: number; ironMg?: number; zincMg?: number; magnesiumMg?: number; cholesterolMg?: number } | null;
   servingGms: number;
   label?: string;
 }) {
@@ -21,6 +21,11 @@ export function NutritionFactsLabel({
     fiberG: nutrition.fiberG ? Math.round(nutrition.fiberG * servingGms / 100 * 10) / 10 : null,
     sugarG: nutrition.sugarG ? Math.round(nutrition.sugarG * servingGms / 100 * 10) / 10 : null,
     sodiumMg: nutrition.sodiumMg ? Math.round(nutrition.sodiumMg * servingGms / 100) : null,
+    calciumMg: nutrition.calciumMg ? Math.round(nutrition.calciumMg * servingGms / 100 * 10) / 10 : null,
+    ironMg: nutrition.ironMg ? Math.round(nutrition.ironMg * servingGms / 100 * 10) / 10 : null,
+    zincMg: nutrition.zincMg ? Math.round(nutrition.zincMg * servingGms / 100 * 10) / 10 : null,
+    magnesiumMg: nutrition.magnesiumMg ? Math.round(nutrition.magnesiumMg * servingGms / 100 * 10) / 10 : null,
+    cholesterolMg: nutrition.cholesterolMg ? Math.round(nutrition.cholesterolMg * servingGms / 100 * 10) / 10 : null,
   };
 
   return (
@@ -64,6 +69,36 @@ export function NutritionFactsLabel({
         <div className="px-3 py-1.5 border-b border-gray-200 dark:border-gray-700 flex justify-between">
           <span className="text-xs font-bold text-gray-900 dark:text-gray-100">Sodium</span>
           <span className="text-xs font-bold text-gray-900 dark:text-gray-100">{scaled.sodiumMg}mg</span>
+        </div>
+      )}
+      {scaled.calciumMg !== null && scaled.calciumMg > 0 && (
+        <div className="px-3 py-1 border-b border-gray-200 dark:border-gray-700 flex justify-between">
+          <span className="text-xs text-gray-600 dark:text-gray-400">Calcium</span>
+          <span className="text-xs text-gray-900 dark:text-gray-100 font-medium">{scaled.calciumMg}mg</span>
+        </div>
+      )}
+      {scaled.ironMg !== null && scaled.ironMg > 0 && (
+        <div className="px-3 py-1 border-b border-gray-200 dark:border-gray-700 flex justify-between">
+          <span className="text-xs text-gray-600 dark:text-gray-400">Iron</span>
+          <span className="text-xs text-gray-900 dark:text-gray-100 font-medium">{scaled.ironMg}mg</span>
+        </div>
+      )}
+      {scaled.zincMg !== null && scaled.zincMg > 0 && (
+        <div className="px-3 py-1 border-b border-gray-200 dark:border-gray-700 flex justify-between">
+          <span className="text-xs text-gray-600 dark:text-gray-400">Zinc</span>
+          <span className="text-xs text-gray-900 dark:text-gray-100 font-medium">{scaled.zincMg}mg</span>
+        </div>
+      )}
+      {scaled.magnesiumMg !== null && scaled.magnesiumMg > 0 && (
+        <div className="px-3 py-1 border-b border-gray-200 dark:border-gray-700 flex justify-between">
+          <span className="text-xs text-gray-600 dark:text-gray-400">Magnesium</span>
+          <span className="text-xs text-gray-900 dark:text-gray-100 font-medium">{scaled.magnesiumMg}mg</span>
+        </div>
+      )}
+      {scaled.cholesterolMg !== null && scaled.cholesterolMg > 0 && (
+        <div className="px-3 py-1 border-b border-gray-200 dark:border-gray-700 flex justify-between">
+          <span className="text-xs font-bold text-gray-900 dark:text-gray-100">Cholesterol</span>
+          <span className="text-xs font-bold text-gray-900 dark:text-gray-100">{scaled.cholesterolMg}mg</span>
         </div>
       )}
       <div className="px-3 py-2 flex justify-between">

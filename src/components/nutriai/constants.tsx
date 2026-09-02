@@ -34,7 +34,7 @@ export const SLOT_GRADIENT_COLORS: Record<string, { from: string; to: string }> 
 
 export const ALLERGENS = ['Peanuts', 'Tree Nuts', 'Dairy', 'Eggs', 'Gluten', 'Shellfish', 'Soy', 'Fish'];
 
-export const PIE_COLORS = ['#009060', '#00a070', '#00b070'];
+export const PIE_COLORS = ['#009060', '#00a070', '#00b070', '#22c55e'];
 
 export const CUISINES = ['Indian', 'Chinese', 'Italian', 'American', 'Mexican', 'Mediterranean', 'Japanese', 'Thai', 'Mixed'];
 

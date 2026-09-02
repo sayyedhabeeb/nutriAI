@@ -31,6 +31,7 @@ export async function GET(request: Request) {
         totalProtein: true,
         totalCarbs: true,
         totalFat: true,
+        totalFiber: true,
       },
       orderBy: { logDate: 'asc' },
     });
@@ -49,6 +50,7 @@ export async function GET(request: Request) {
     const avgProtein = foodLogStats.reduce((sum, d) => sum + (d.totalProtein || 0), 0) / totalDays;
     const avgCarbs = foodLogStats.reduce((sum, d) => sum + (d.totalCarbs || 0), 0) / totalDays;
     const avgFat = foodLogStats.reduce((sum, d) => sum + (d.totalFat || 0), 0) / totalDays;
+    const avgFiber = foodLogStats.reduce((sum, d) => sum + (d.totalFiber || 0), 0) / totalDays;
 
     // Days on target (within 10% of calorie target)
     let daysOnTarget = 0;
@@ -110,6 +112,7 @@ export async function GET(request: Request) {
         avgProtein: Math.round(avgProtein),
         avgCarbs: Math.round(avgCarbs),
         avgFat: Math.round(avgFat),
+        avgFiber: Math.round(avgFiber),
         daysOnTarget,
         adherencePct:
           dailyNutritions.length > 0

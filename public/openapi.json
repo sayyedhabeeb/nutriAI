@@ -23,7 +23,8 @@
     { "name": "Chat", "description": "NutriAI conversational assistant & contextual meal suggestions" },
     { "name": "Food Log", "description": "Daily food logging, history retrieval, quick macro logging, and item deletion" },
     { "name": "Hydration", "description": "Water logging and daily hydration tracking" },
-    { "name": "Progress", "description": "Dashboard analytics, progress insights, weekly trend charts, logging streaks, weight tracking, and data export" }
+    { "name": "Progress", "description": "Dashboard analytics, progress insights, weekly trend charts, logging streaks, weight tracking, and data export" },
+    { "name": "Internal", "description": "Service-to-service endpoints used by the Swapp Backend (secured with a signed service JWT). Manages nutrition profiles, macro targets, meal plans, and AI chat for integrated users." }
   ],
   "security": [
     { "bearerAuth": [] },
@@ -226,17 +227,74 @@
                     "targetProtein": 198,
                     "targetCarbs": 298,
                     "targetFat": 73,
+                    "targetFiberG": 30,
+                    "targetCalciumMg": 1000,
+                    "targetIronMg": 18,
+                    "targetZincMg": 11,
+                    "targetMagnesiumMg": 420,
+                    "targetCholesterolMg": 300,
                     "consumedCalories": 1420,
                     "consumedProtein": 115,
                     "consumedCarbs": 150,
                     "consumedFat": 38,
-                    "remainingCalories": 1230
+                    "consumedFiberG": 12,
+                    "consumedCalciumMg": 450,
+                    "consumedIronMg": 8,
+                    "consumedZincMg": 5,
+                    "consumedMagnesiumMg": 180,
+                    "consumedCholesterolMg": 120,
+                    "remainingCalories": 1230,
+                    "remainingFiberG": 18,
+                    "remainingCalciumMg": 550,
+                    "remainingIronMg": 10,
+                    "remainingZincMg": 6,
+                    "remainingMagnesiumMg": 240,
+                    "remainingCholesterolMg": 180,
+                    "percentFiberG": 40,
+                    "percentCalciumMg": 45,
+                    "percentIronMg": 44,
+                    "percentZincMg": 45,
+                    "percentMagnesiumMg": 43,
+                    "percentCholesterolMg": 40,
+                    "hydration": {
+                      "glassesConsumed": 3,
+                      "targetGlasses": 8,
+                      "mlConsumed": 750,
+                      "targetMl": 2000,
+                      "percentage": 37,
+                      "status": "under"
+                    }
                   }
                 }
               }
             }
           },
           "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/nutrition/hydration-analysis": {
+      "get": {
+        "tags": ["Nutrition", "Hydration"],
+        "summary": "Get AI-powered hydration assessment",
+        "description": "Returns a brief AI-generated analysis of the user's current hydration status based on today's water intake. Falls back to a rule-based assessment if the AI service is unavailable.",
+        "responses": {
+          "200": {
+            "description": "Hydration analysis text",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "analysis": "You're at 3 glasses (750ml) — about 37% of your daily goal. Try sipping a glass with each meal to stay on track."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
         }
       }
     },
@@ -347,7 +405,62 @@
         "summary": "Generate dynamic daily meal plan",
         "description": "Generates a full daily meal plan distributed across meal slots based on remaining macro targets.",
         "responses": {
-          "200": { "description": "Meal plan generated successfully" }
+          "200": {
+            "description": "Meal plan generated successfully",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "meals": [
+                      {
+                        "mealSlot": "breakfast",
+                        "mealId": "meal_101",
+                        "name": "Protein Oatmeal Bowl",
+                        "calories": 420,
+                        "proteinG": 35,
+                        "carbsG": 48,
+                        "fatG": 12,
+                        "fiberG": 8,
+                        "calciumMg": 150,
+                        "ironMg": 4,
+                        "zincMg": 3,
+                        "magnesiumMg": 85,
+                        "cholesterolMg": 45
+                      },
+                      {
+                        "mealSlot": "lunch",
+                        "mealId": "meal_202",
+                        "name": "Chicken Tikka Bowl",
+                        "calories": 520,
+                        "proteinG": 45,
+                        "carbsG": 50,
+                        "fatG": 14,
+                        "fiberG": 6,
+                        "calciumMg": 120,
+                        "ironMg": 3,
+                        "zincMg": 2,
+                        "magnesiumMg": 65,
+                        "cholesterolMg": 95
+                      }
+                    ],
+                    "totalNutrition": {
+                      "calories": 2650,
+                      "proteinG": 198,
+                      "carbsG": 298,
+                      "fatG": 73,
+                      "fiberG": 30,
+                      "calciumMg": 1000,
+                      "ironMg": 18,
+                      "zincMg": 11,
+                      "magnesiumMg": 420,
+                      "cholesterolMg": 300
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -415,7 +528,18 @@
                     "foodName": "Grilled Chicken Salad",
                     "confidence": 0.94,
                     "estimatedGrams": 250,
-                    "nutrition": { "calories": 380, "proteinG": 42, "carbsG": 12, "fatG": 18 },
+                    "nutrition": {
+                      "calories": 380,
+                      "proteinG": 42,
+                      "carbsG": 12,
+                      "fatG": 18,
+                      "fiberG": 5,
+                      "calciumMg": 95,
+                      "ironMg": 2.5,
+                      "zincMg": 1.8,
+                      "magnesiumMg": 55,
+                      "cholesterolMg": 85
+                    },
                     "matchedMealId": "meal_789"
                   }
                 }
@@ -439,7 +563,30 @@
           }
         },
         "responses": {
-          "201": { "description": "Recognized food confirmed and logged" }
+          "201": {
+            "description": "Recognized food confirmed and logged",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "log_2",
+                    "name": "Grilled Chicken Salad",
+                    "calories": 380,
+                    "proteinG": 42,
+                    "carbsG": 12,
+                    "fatG": 18,
+                    "fiberG": 5,
+                    "calciumMg": 95,
+                    "ironMg": 2.5,
+                    "zincMg": 1.8,
+                    "magnesiumMg": 55,
+                    "cholesterolMg": 85
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -545,7 +692,30 @@
           }
         },
         "responses": {
-          "201": { "description": "Food item logged and daily totals updated" }
+          "201": {
+            "description": "Food item logged and daily totals updated",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "log_1",
+                    "name": "Chicken Tikka Bowl",
+                    "calories": 520,
+                    "proteinG": 45,
+                    "carbsG": 50,
+                    "fatG": 14,
+                    "fiberG": 6,
+                    "calciumMg": 120,
+                    "ironMg": 3,
+                    "zincMg": 2,
+                    "magnesiumMg": 65,
+                    "cholesterolMg": 95
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "delete": {
@@ -588,23 +758,140 @@
         "tags": ["Hydration"],
         "summary": "Get water consumption log",
         "parameters": [{ "name": "date", "in": "query", "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Water log data" } }
+        "responses": {
+          "200": {
+            "description": "Water log data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "logDate": "2026-08-26",
+                    "glassesConsumed": 3,
+                    "targetGlasses": 8,
+                    "percentage": 37,
+                    "mlConsumed": 750,
+                    "targetMl": 2000
+                  }
+                }
+              }
+            }
+          }
+        }
       },
       "post": {
         "tags": ["Hydration"],
         "summary": "Log water intake",
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "example": { "glassesConsumed": 8, "logDate": "2026-08-18" } } }
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "glasses": { "type": "number", "description": "Number of glasses to add", "example": 1 },
+                  "date": { "type": "string", "description": "Optional date (YYYY-MM-DD)", "example": "2026-08-26" }
+                },
+                "required": ["glasses"]
+              }
+            }
+          }
         },
-        "responses": { "200": { "description": "Water log updated" } }
+        "responses": {
+          "200": {
+            "description": "Water log updated",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "glassesConsumed": 4,
+                    "targetGlasses": 8,
+                    "percentage": 50,
+                    "mlConsumed": 1000,
+                    "targetMl": 2000
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/dashboard": {
       "get": {
         "tags": ["Progress"],
         "summary": "Fetch dashboard overview stats",
-        "responses": { "200": { "description": "Dashboard analytics metrics" } }
+        "responses": {
+          "200": {
+            "description": "Dashboard analytics metrics",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "targets": {
+                      "calories": 2650,
+                      "proteinG": 198,
+                      "carbsG": 298,
+                      "fatG": 73,
+                      "fiberG": 30,
+                      "calciumMg": 1000,
+                      "ironMg": 18,
+                      "zincMg": 11,
+                      "magnesiumMg": 420,
+                      "cholesterolMg": 300
+                    },
+                    "consumed": {
+                      "calories": 1420,
+                      "proteinG": 115,
+                      "carbsG": 150,
+                      "fatG": 38,
+                      "fiberG": 12,
+                      "calciumMg": 450,
+                      "ironMg": 8,
+                      "zincMg": 5,
+                      "magnesiumMg": 180,
+                      "cholesterolMg": 120
+                    },
+                    "remaining": {
+                      "calories": 1230,
+                      "proteinG": 83,
+                      "carbsG": 148,
+                      "fatG": 35,
+                      "fiberG": 18,
+                      "calciumMg": 550,
+                      "ironMg": 10,
+                      "zincMg": 6,
+                      "magnesiumMg": 240,
+                      "cholesterolMg": 180
+                    },
+                    "percentages": {
+                      "calories": 54,
+                      "proteinG": 58,
+                      "carbsG": 50,
+                      "fatG": 52,
+                      "fiberG": 40,
+                      "calciumMg": 45,
+                      "ironMg": 44,
+                      "zincMg": 45,
+                      "magnesiumMg": 43,
+                      "cholesterolMg": 40
+                    },
+                    "hydration": {
+                      "glassesConsumed": 3,
+                      "targetGlasses": 8,
+                      "mlConsumed": 750,
+                      "targetMl": 2000,
+                      "percentage": 37,
+                      "status": "under"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/progress/summary": {
@@ -618,7 +905,49 @@
       "get": {
         "tags": ["Progress"],
         "summary": "Fetch weekly trend graphs (calories, macros, weight)",
-        "responses": { "200": { "description": "Weekly trend data" } }
+        "responses": {
+          "200": {
+            "description": "Weekly trend data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "dailyData": [
+                      {
+                        "date": "2026-08-18",
+                        "consumed": {
+                          "calories": 1420,
+                          "proteinG": 115,
+                          "carbsG": 150,
+                          "fatG": 38,
+                          "fiberG": 12,
+                          "calciumMg": 450,
+                          "ironMg": 8,
+                          "zincMg": 5,
+                          "magnesiumMg": 180,
+                          "cholesterolMg": 120
+                        },
+                        "targets": {
+                          "calories": 2650,
+                          "proteinG": 198,
+                          "carbsG": 298,
+                          "fatG": 73,
+                          "fiberG": 30,
+                          "calciumMg": 1000,
+                          "ironMg": 18,
+                          "zincMg": 11,
+                          "magnesiumMg": 420,
+                          "cholesterolMg": 300
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/achievements": {
@@ -666,6 +995,292 @@
         "summary": "Export complete user nutrition history",
         "responses": { "200": { "description": "Exported user nutrition JSON dataset" } }
       }
+    },
+    "/api/hydration": {
+      "get": {
+        "tags": ["Hydration", "Nutrition"],
+        "summary": "Get daily hydration goal & status summary",
+        "description": "Returns the user's daily hydration goal (glass/ml target derived from profile weight, activity level, and goals) and current progress/status, separate from meal nutrition.",
+        "responses": {
+          "200": {
+            "description": "Hydration goal and status summary",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "hydration": {
+                      "glassesConsumed": 3,
+                      "targetGlasses": 8,
+                      "mlConsumed": 750,
+                      "targetMl": 2000,
+                      "percentage": 37,
+                      "status": "under"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/internal/nutrition/macros": {
+      "post": {
+        "tags": ["Internal"],
+        "summary": "Recalculate & persist daily macro targets",
+        "description": "Service-to-service. Recomputes the user's daily macro targets deterministically from their nutrition profile, goal, activity level, and macro overrides, then upserts today's daily nutrition row. Response uses flat 'protein/carbs/fat' keys expected by mobile.",
+        "security": [{ "serviceToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Recalculated macro targets",
+            "content": {
+              "application/json": {
+                "example": { "calories": 2000, "protein": 150, "carbs": 200, "fat": 66 }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/internal/nutrition/profile": {
+      "get": {
+        "tags": ["Internal"],
+        "summary": "Fetch integrated user nutrition profile",
+        "description": "Service-to-service. Returns the user's physical profile, fitness goal, and preferences by service subject (swappUserId).",
+        "security": [{ "serviceToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Profile, goal, and preferences",
+            "content": {
+              "application/json": {
+                "example": {
+                  "profile": { "id": "prof_123", "userId": "usr_1", "age": 25, "gender": "male", "heightCm": 178, "weightKg": 75 },
+                  "goal": { "goalType": "lose_fat", "activityLevel": "moderately_active" },
+                  "preference": { "dietType": "veg", "macroOverrideJson": null }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "tags": ["Internal"],
+        "summary": "Create/update integrated user nutrition profile",
+        "description": "Service-to-service. Upserts the user's profile, goal, and preferences from the Swapp Backend, recalculating and persisting today's macro targets.",
+        "security": [{ "serviceToken": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InternalProfileUpdate" },
+              "example": {
+                "age": 26,
+                "gender": "male",
+                "heightCm": 178,
+                "weightKg": 74,
+                "goalType": "maintain",
+                "activityLevel": "lightly_active",
+                "dietPreference": "veg",
+                "allergies": "peanuts",
+                "macroOverrideJson": null
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile, goal, preferences, and recalculated targets",
+            "content": {
+              "application/json": {
+                "example": {
+                  "profile": { "id": "prof_123", "age": 26, "gender": "male", "heightCm": 178, "weightKg": 74 },
+                  "goal": { "goalType": "maintain", "activityLevel": "lightly_active" },
+                  "preference": { "dietType": "veg" },
+                  "targets": { "calories": 2100, "proteinG": 158, "carbsG": 210, "fatG": 70, "fiberG": 30 }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/internal/recommendations/meal-plan": {
+      "post": {
+        "tags": ["Internal"],
+        "summary": "Generate & return a user meal plan (multi-day)",
+        "description": "Service-to-service. Generates a personalized meal plan for the requested number of days (default 1, weekly up to 7) using AI ranking against the user's macro/micronutrient targets, then returns the committed plan days.",
+        "security": [{ "serviceToken": [] }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refresh": { "type": "string", "description": "Optional meal slot name to force-refresh for today only (e.g. 'lunch')", "example": "lunch" },
+                  "generateDays": { "type": "integer", "minimum": 1, "maximum": 7, "default": 1, "example": 7 },
+                  "recentMealNames": { "type": "array", "items": { "type": "string" }, "description": "Recently consumed meal names to avoid repeating" },
+                  "activityContext": { "type": "object", "description": "Optional activity/context hints passed to the AI" },
+                  "force": { "type": "boolean", "default": false, "description": "Force regeneration even if a plan exists" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Generated meal plan day(s)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "days": [
+                      {
+                        "planDate": "2026-08-27",
+                        "targetCalories": 2000,
+                        "targetProtein": 150,
+                        "targetCarbs": 200,
+                        "targetFat": 66,
+                        "items": [
+                          {
+                            "id": "itm_1",
+                            "mealSlot": "breakfast",
+                            "servingGms": 250,
+                            "recommendedCalories": 500,
+                            "rankScore": 0.92,
+                            "rankPosition": 1,
+                            "meal": { "id": "meal_1", "name": "Greek Yogurt Parfait", "mealType": "breakfast", "cuisine": "Continental", "imageUrl": null, "isVeg": true, "isVegan": false, "prepTimeMin": 10 },
+                            "nutrition": { "calories": 220, "proteinG": 12, "carbsG": 30, "fatG": 6, "fiberG": 3, "sugarG": 12, "sodiumMg": 60, "calciumMg": 180, "ironMg": 1, "zincMg": 1, "magnesiumMg": 20, "cholesterolMg": 5 }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/internal/chat": {
+      "post": {
+        "tags": ["Internal"],
+        "summary": "Send an AI chat message on behalf of an integrated user",
+        "description": "Service-to-service. Routes a user message through the NutriAI chat engine, persisting the conversation and returning the assistant reply.",
+        "security": [{ "serviceToken": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["message"],
+                "properties": {
+                  "message": { "type": "string", "maxLength": 1000, "example": "Suggest a high-protein dinner" },
+                  "conversationId": { "type": "string", "nullable": true, "description": "Existing conversation id, or omit to start a new one" },
+                  "contextData": { "type": "object", "description": "Optional nutrition/goal context to inform the assistant" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Assistant reply message",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "conversationId": "conv_123",
+                    "message": { "id": "msg_1", "conversationId": "conv_123", "role": "assistant", "content": "Try grilled chicken with quinoa and steamed broccoli — about 45g of protein!", "createdAt": "2026-08-27T12:00:00.000Z" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/internal/chat/conversations": {
+      "get": {
+        "tags": ["Internal"],
+        "summary": "List conversation history for an integrated user",
+        "description": "Service-to-service. Returns the user's chat conversations ordered by most recently updated.",
+        "security": [{ "serviceToken": [] }],
+        "responses": {
+          "200": {
+            "description": "List of conversations",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": [
+                    { "id": "conv_123", "title": "Meal ideas", "createdAt": "2026-08-27T11:00:00.000Z", "updatedAt": "2026-08-27T12:00:00.000Z" }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/internal/chat/conversations/{id}": {
+      "get": {
+        "tags": ["Internal"],
+        "summary": "Get a conversation and its full message history",
+        "description": "Service-to-service. Returns an owned conversation with all messages in chronological order.",
+        "security": [{ "serviceToken": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Conversation id",
+            "schema": { "type": "string", "example": "conv_123" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversation with messages",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "conv_123",
+                    "userId": "usr_1",
+                    "title": "Meal ideas",
+                    "createdAt": "2026-08-27T11:00:00.000Z",
+                    "updatedAt": "2026-08-27T12:00:00.000Z",
+                    "messages": [
+                      { "id": "msg_1", "conversationId": "conv_123", "role": "user", "content": "Suggest a high-protein dinner", "createdAt": "2026-08-27T11:59:00.000Z" },
+                      { "id": "msg_2", "conversationId": "conv_123", "role": "assistant", "content": "Try grilled chicken with quinoa and steamed broccoli!", "createdAt": "2026-08-27T12:00:00.000Z" }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
     }
   },
   "components": {
@@ -679,6 +1294,12 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "session"
+      },
+      "serviceToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Service JWT signed with INTERNAL_SERVICE_SECRET (issuer 'swapp-backend', audience 'nutriai-service'). The 'sub' claim is the SwappFit user id."
       }
     },
     "schemas": {
@@ -709,6 +1330,26 @@
           "gender": { "type": "string" },
           "heightCm": { "type": "number" },
           "weightKg": { "type": "number" }
+        }
+      },
+      "InternalProfileUpdate": {
+        "type": "object",
+        "description": "Payload to create/update an integrated user's nutrition profile, goal, and preferences.",
+        "properties": {
+          "age": { "type": "integer", "minimum": 10, "maximum": 120 },
+          "gender": { "type": "string", "enum": ["male", "female", "other"] },
+          "heightCm": { "type": "number", "minimum": 50, "maximum": 300 },
+          "weightKg": { "type": "number", "minimum": 20, "maximum": 500 },
+          "goalType": { "type": "string", "enum": ["muscle_gain", "lose_fat", "maintain", "recomp", "weight_gain", "athlete"] },
+          "activityLevel": { "type": "string", "enum": ["sedentary", "lightly_active", "moderately_active", "very_active", "extra_active"] },
+          "macroOverrideJson": { "type": "string", "nullable": true, "description": "Optional JSON string overriding default macro percentages" },
+          "dietPreference": { "type": "string", "nullable": true, "description": "Diet type (e.g. veg, non-veg)" },
+          "allergies": { "type": "string", "nullable": true },
+          "skipDays": { "type": "string", "nullable": true },
+          "meals": { "type": "string", "nullable": true },
+          "cuisines": { "type": "string", "nullable": true },
+          "avoidedFoods": { "type": "string", "nullable": true },
+          "otherInfo": { "type": "string", "nullable": true }
         }
       }
     },
