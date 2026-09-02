@@ -39,6 +39,50 @@ export async function POST(request: Request) {
   }
 
   try {
+    // If not forcing generation, check if all requested days already exist in DB
+    if (!force && !refreshSlot) {
+      const existingDays: any[] = [];
+      for (let i = 0; i < generateDays; i++) {
+        const targetDate = new Date();
+        targetDate.setDate(targetDate.getDate() + i);
+        const planDateStr = targetDate.toISOString().split('T')[0];
+
+        const planDay = await db.mealPlanDay.findUnique({
+          where: { userId_planDate: { userId: user.id, planDate: planDateStr } },
+          include: {
+            items: {
+              include: {
+                meal: {
+                  include: { nutrition: true },
+                },
+              },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+        });
+
+        if (planDay && planDay.items.length > 0) {
+          existingDays.push({
+            planDate: planDay.planDate,
+            targetCalories: planDay.targetCalories,
+            targetProtein: planDay.targetProtein,
+            targetCarbs: planDay.targetCarbs,
+            targetFat: planDay.targetFat,
+            items: buildPlanItems(planDay.items),
+          });
+        }
+      }
+
+      if (existingDays.length === generateDays) {
+        return NextResponse.json({
+          success: true,
+          data: {
+            days: existingDays,
+          }
+        });
+      }
+    }
+
     // 1. Generate the plan (or refresh slot)
     // If it's a refresh, we only do today
     if (refreshSlot) {
@@ -50,7 +94,7 @@ export async function POST(request: Request) {
       });
       generateDays = 1;
     } else {
-      // Generate the weekly plan in a single AI operation
+      // Generate the weekly plan in a single AI operation with updated preferences
       const result = await generateWeeklyMealPlan(user.id, generateDays, startedAt, {
         externalRecentMealNames: recentMealNames,
         force,
@@ -61,7 +105,7 @@ export async function POST(request: Request) {
         const generatedPayloads = result.data;
         const datesToReplace = generatedPayloads.map(p => p.planDate);
 
-        // Commit all 7 days atomically
+        // Commit all days atomically
         await db.$transaction([
           db.mealPlanDay.deleteMany({
             where: {

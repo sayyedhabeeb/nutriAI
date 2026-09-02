@@ -118,29 +118,34 @@ export async function PUT(request: Request) {
       },
     });
 
+    const formatStr = (val: any) => {
+      if (val === undefined || val === null) return undefined;
+      return typeof val === 'object' ? JSON.stringify(val) : String(val);
+    };
+
     // Upsert Preferences
     const preference = await db.userPreference.upsert({
       where: { userId: user.id },
       update: {
-        ...(macroOverrideJson !== undefined && { macroOverrideJson }),
+        ...(macroOverrideJson !== undefined && { macroOverrideJson: formatStr(macroOverrideJson) }),
         ...(dietPreference !== undefined && { dietType: dietPreference }),
-        ...(allergies !== undefined && { allergies }),
-        ...(skipDays !== undefined && { skipDays }),
-        ...(meals !== undefined && { meals }),
-        ...(cuisines !== undefined && { cuisines }),
-        ...(avoidedFoods !== undefined && { avoidedFoods }),
-        ...(otherInfo !== undefined && { otherInfo }),
+        ...(allergies !== undefined && { allergies: formatStr(allergies) }),
+        ...(skipDays !== undefined && { skipDays: formatStr(skipDays) }),
+        ...(meals !== undefined && { meals: formatStr(meals) }),
+        ...(cuisines !== undefined && { cuisines: formatStr(cuisines) }),
+        ...(avoidedFoods !== undefined && { avoidedFoods: formatStr(avoidedFoods) }),
+        ...(otherInfo !== undefined && { otherInfo: formatStr(otherInfo) }),
       },
       create: {
         userId: user.id,
-        macroOverrideJson: macroOverrideJson || null,
+        macroOverrideJson: formatStr(macroOverrideJson) || null,
         dietType: dietPreference || null,
-        allergies: allergies || null,
-        skipDays: skipDays || null,
-        meals: meals || null,
-        cuisines: cuisines || null,
-        avoidedFoods: avoidedFoods || null,
-        otherInfo: otherInfo || null,
+        allergies: formatStr(allergies) || null,
+        skipDays: formatStr(skipDays) || null,
+        meals: formatStr(meals) || null,
+        cuisines: formatStr(cuisines) || null,
+        avoidedFoods: formatStr(avoidedFoods) || null,
+        otherInfo: formatStr(otherInfo) || null,
       },
     });
 
