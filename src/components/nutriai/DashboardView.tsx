@@ -234,6 +234,7 @@ export function DashboardView({ onNavigate }: { onNavigate: (v: ViewType) => voi
 
   // Generate meal plan
   const handleGeneratePlan = async () => {
+    if (planLoading) return;
     setPlanLoading(true);
     try {
       const result = await apiFetch('/api/meal-plan/generate');

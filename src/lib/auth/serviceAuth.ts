@@ -2,12 +2,12 @@ import jwt from 'jsonwebtoken';
 import { db } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
-const INTERNAL_SERVICE_SECRET = process.env.INTERNAL_SERVICE_SECRET as string;
-if (!INTERNAL_SERVICE_SECRET) {
-  throw new Error('INTERNAL_SERVICE_SECRET is missing. Cannot start service.');
-}
-
 export async function validateServiceToken(request: Request) {
+  const secret = process.env.INTERNAL_SERVICE_SECRET;
+  if (!secret) {
+    return { error: NextResponse.json({ error: 'INTERNAL_SERVICE_SECRET configuration missing' }, { status: 500 }) };
+  }
+
   const authHeader = request.headers.get('authorization');
   console.log('[serviceAuth] Incoming authorization header:', authHeader ? `${authHeader.substring(0, 15)}... (len: ${authHeader.length})` : 'MISSING');
 
@@ -21,7 +21,7 @@ export async function validateServiceToken(request: Request) {
 
   let decoded: jwt.JwtPayload;
   try {
-    decoded = jwt.verify(token, INTERNAL_SERVICE_SECRET, {
+    decoded = jwt.verify(token, secret, {
       audience: 'nutriai-service',
       issuer: 'swapp-backend'
     }) as jwt.JwtPayload;

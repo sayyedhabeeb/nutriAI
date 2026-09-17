@@ -112,7 +112,7 @@ export function UploadView() {
   };
 
   const handleRecognize = async () => {
-    if (!imageFile) return;
+    if (!imageFile || recognizing) return;
     setRecognizing(true);
     try {
       const formData = new FormData();

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/auth';
 import { getRecommendationClient, logAiCall } from '@/lib/ai/client';
+import { checkAiRateLimit } from '@/lib/ai/rate-limiter';
 
 export async function POST(request: Request) {
   const startedAt = Date.now();
@@ -14,6 +15,14 @@ export async function POST(request: Request) {
       );
     }
     userId = session.userId;
+
+    const rateCheck = checkAiRateLimit(userId, 'chat');
+    if (!rateCheck.allowed) {
+      return NextResponse.json({
+        success: true,
+        data: { reply: 'You have sent several messages quickly. Please wait a moment before sending another message.' },
+      });
+    }
 
     const body = await request.json();
     const { message, context } = body as {
@@ -38,9 +47,12 @@ export async function POST(request: Request) {
       );
     }
 
+    const cleanMessage = message.trim().slice(0, 1000);
+
     let contextStr = '';
     if (context) {
-      contextStr = `\n\nUser's nutrition context for today:\n- Calories: ${context.todayCalories}/${context.targetCalories} kcal\n- Protein: ${context.todayProtein}/${context.targetProtein}g\n- Carbs: ${context.todayCarbs}/${context.targetCarbs}g\n- Fat: ${context.todayFat}/${context.targetFat}g${context.recentMeals.length > 0 ? `\n- Recent meals: ${context.recentMeals.join(', ')}` : ''}`;
+      const recent = (context.recentMeals || []).slice(-3);
+      contextStr = `\n\nUser's nutrition context for today:\n- Calories: ${context.todayCalories}/${context.targetCalories} kcal\n- Protein: ${context.todayProtein}/${context.targetProtein}g\n- Carbs: ${context.todayCarbs}/${context.targetCarbs}g\n- Fat: ${context.todayFat}/${context.targetFat}g${recent.length > 0 ? `\n- Recent meals: ${recent.join(', ')}` : ''}`;
     }
 
     const systemPrompt = `You are NutriAI, a friendly and knowledgeable nutrition assistant. You help users with diet questions, meal suggestions, and nutritional advice. Be concise but informative. Use the user's nutrition context to give personalized advice. Keep responses under 150 words unless asked for detailed info.${contextStr}`;

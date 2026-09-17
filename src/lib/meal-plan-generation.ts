@@ -535,8 +535,8 @@ export async function generateMealPlan(
     where: { userId_date: { userId, date: todayStr } },
   });
   const targets = dailyNutrition
-    ? { calories: dailyNutrition.targetCalories, proteinG: dailyNutrition.targetProtein, carbsG: dailyNutrition.targetCarbs, fatG: dailyNutrition.targetFat }
-    : { calories: 2000, proteinG: 150, carbsG: 250, fatG: 67 };
+    ? { calories: dailyNutrition.targetCalories, proteinG: dailyNutrition.targetProtein, carbsG: dailyNutrition.targetCarbs, fatG: dailyNutrition.targetFat, fiberG: dailyNutrition.targetFiber ?? 30 }
+    : { calories: 2000, proteinG: 150, carbsG: 250, fatG: 67, fiberG: 30 };
   
   // Only apply 'consumed' deductions to today's plan
   const consumed = (options.dateOffset === 0 || !options.dateOffset) ? {
@@ -669,8 +669,8 @@ async function refreshSlotPlan(slot: MealSlot, userId: string, startedAt: number
     where: { userId_date: { userId, date: today } },
   });
   const targets = dailyNutrition
-    ? { calories: dailyNutrition.targetCalories, proteinG: dailyNutrition.targetProtein, carbsG: dailyNutrition.targetCarbs, fatG: dailyNutrition.targetFat }
-    : { calories: 2000, proteinG: 150, carbsG: 250, fatG: 67 };
+    ? { calories: dailyNutrition.targetCalories, proteinG: dailyNutrition.targetProtein, carbsG: dailyNutrition.targetCarbs, fatG: dailyNutrition.targetFat, fiberG: dailyNutrition.targetFiber ?? 30 }
+    : { calories: 2000, proteinG: 150, carbsG: 250, fatG: 67, fiberG: 30 };
   const consumed = {
     calories: dailyNutrition?.consumedCalories || 0,
     proteinG: dailyNutrition?.consumedProtein || 0,
@@ -782,8 +782,8 @@ export async function generateWeeklyMealPlan(
     where: { userId_date: { userId, date: targetDateStr } },
   });
   const targets = dailyNutrition
-    ? { calories: dailyNutrition.targetCalories, proteinG: dailyNutrition.targetProtein, carbsG: dailyNutrition.targetCarbs, fatG: dailyNutrition.targetFat }
-    : { calories: 2000, proteinG: 150, carbsG: 250, fatG: 67 };
+    ? { calories: dailyNutrition.targetCalories, proteinG: dailyNutrition.targetProtein, carbsG: dailyNutrition.targetCarbs, fatG: dailyNutrition.targetFat, fiberG: dailyNutrition.targetFiber ?? 30 }
+    : { calories: 2000, proteinG: 150, carbsG: 250, fatG: 67, fiberG: 30 };
     
   // We use the same base targets for all days. Consumed gets zeroed out for future days.
   const baseSlotTargets = getSlotTargets(targets, { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 });

@@ -29,12 +29,12 @@ export interface FoodLogItem {
   proteinG: number;
   carbsG: number;
   fatG: number;
-  fiberG: number;
-  calciumMg: number;
-  ironMg: number;
-  zincMg: number;
-  magnesiumMg: number;
-  cholesterolMg: number;
+  fiberG?: number;
+  calciumMg?: number;
+  ironMg?: number;
+  zincMg?: number;
+  magnesiumMg?: number;
+  cholesterolMg?: number;
   mealSlot: string;
   meal: { name: string; nutrition: { calories: number; proteinG: number; carbsG: number; fatG: number } | null } | null;
 }

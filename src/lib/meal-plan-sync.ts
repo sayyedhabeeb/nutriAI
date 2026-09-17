@@ -53,6 +53,7 @@ export async function syncMealPlanWithLogs(userId: string): Promise<MealPlanSync
       proteinG: dailyNutrition?.targetProtein ?? 150,
       carbsG: dailyNutrition?.targetCarbs ?? 250,
       fatG: dailyNutrition?.targetFat ?? 67,
+      fiberG: dailyNutrition?.targetFiber ?? 30,
     };
     const consumed = {
       calories: dailyNutrition?.consumedCalories || 0,

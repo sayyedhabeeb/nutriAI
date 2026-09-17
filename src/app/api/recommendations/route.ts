@@ -7,6 +7,7 @@ import {
 } from '@/lib/nutrition-engine';
 import { success, unauthorized, serverError, error } from '@/lib/response';
 import { getRecommendationClient, logAiCall } from '@/lib/ai/client';
+import { checkAiRateLimit } from '@/lib/ai/rate-limiter';
 import {
   TOP_N,
   computeScore,
@@ -75,8 +76,9 @@ export async function GET(request: Request) {
           proteinG: dailyNutrition.targetProtein,
           carbsG: dailyNutrition.targetCarbs,
           fatG: dailyNutrition.targetFat,
+          fiberG: dailyNutrition.targetFiber ?? 30,
         }
-      : { calories: 500, proteinG: 30, carbsG: 60, fatG: 15 };
+      : { calories: 500, proteinG: 30, carbsG: 60, fatG: 15, fiberG: 30 };
 
     const consumed = {
       calories: dailyNutrition?.consumedCalories || 0,
@@ -139,7 +141,9 @@ export async function GET(request: Request) {
     const aiReasons = new Map<string, string>();
     let topMeals = candidates;
 
-    try {
+    const rateCheck = checkAiRateLimit(session.userId, 'recommendations');
+    if (rateCheck.allowed) {
+      try {
       // Keep AI payload small: pre-rank by macro fit and send top 30
       const preRanked = [...candidates].sort(
         (a, b) =>
@@ -218,6 +222,7 @@ Return the JSON ranking.`;
       }
     } catch (err) {
       console.warn('AI ranking unavailable, using deterministic fallback:', err);
+    }
     }
 
     // --- Stage 9: fallback + final ordering

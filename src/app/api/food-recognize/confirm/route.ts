@@ -250,22 +250,7 @@ async function resolveFood(item: ConfirmBody, userId: string): Promise<ResolvedF
       // ── Tier 4 (fallback): AI gives the recipe ingredients; the backend
       // computes nutrition from the Ingredient table (never from the AI).
       const ingredientRows = await db.ingredient.findMany();
-      const matcher = new IngredientMatcher(
-        ingredientRows.map((r) => ({
-          id: r.id,
-          name: r.name,
-          isVeg: r.isVeg,
-          isVegan: r.isVegan,
-          containsAllergen: r.containsAllergen,
-          caloriesPer100g: r.caloriesPer100g,
-          proteinPer100g: r.proteinPer100g,
-          carbsPer100g: r.carbsPer100g,
-          fatPer100g: r.fatPer100g,
-          fiberPer100g: r.fiberPer100g,
-          sugarPer100g: r.sugarPer100g,
-          sodiumMgPer100g: r.sodiumMgPer100g,
-        }))
-      );
+      const matcher = new IngredientMatcher(ingredientRows);
 
       let items = (item.ingredients || [])
         .map((i) => ({ name: i.name, grams: Math.max(1, i.grams || 0) }))

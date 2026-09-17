@@ -5,6 +5,8 @@ import { db } from '@/lib/db';
 import { getSessionFromRequest } from '@/lib/auth';
 import { created, unauthorized, serverError, error } from '@/lib/response';
 import { getFoodRecognitionClient, detectFoodPresence, logAiCall } from '@/lib/ai/client';
+import { checkAiRateLimit } from '@/lib/ai/rate-limiter';
+import { computePayloadHash, executeIdempotent } from '@/lib/ai/idempotency';
 import { scaleNutrition, type NutritionValues } from '@/lib/nutrition-engine';
 import {
   buildPortionOptions,
@@ -217,6 +219,15 @@ export async function POST(request: Request) {
     if (!session) return unauthorized();
     userId = session.userId;
 
+    const rateCheck = checkAiRateLimit(userId, 'food-recognize');
+    if (!rateCheck.allowed) {
+      return error(
+        'Too many food recognition requests. Please wait a minute before trying again.',
+        429,
+        'RATE_LIMIT_EXCEEDED'
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get('image') as File | null;
 
@@ -248,22 +259,22 @@ export async function POST(request: Request) {
       }
     }
     const base64 = buffer.toString('base64');
+    const idempotencyKey = `food-recognize:${userId}:${computePayloadHash(base64)}`;
 
-    // ── Strict pre-validation: does the image actually contain food? ──
-    // Runs BEFORE food recognition. Text, labels, words, or drawings never
-    // count — a paper with "Chapathi" written on it is not food.
-    const foodPresent = await detectFoodPresence({ imageBase64: base64, mimeType });
-    if (!foodPresent) {
-      return error('Sorry, no food detected.', 422, 'NO_FOOD_DETECTED');
-    }
+    return await executeIdempotent(idempotencyKey, async () => {
+      // ── Strict pre-validation: does the image actually contain food? ──
+      const foodPresent = await detectFoodPresence({ imageBase64: base64, mimeType });
+      if (!foodPresent) {
+        return error('Sorry, no food detected.', 422, 'NO_FOOD_DETECTED');
+      }
 
-    const ai = getFoodRecognitionClient();
-    const content = await ai.vision({
-      system: VISION_PROMPT,
-      user: 'Identify the food(s) in this image and return the JSON as instructed.',
-      imageBase64: base64,
-      mimeType,
-    });
+      const ai = getFoodRecognitionClient();
+      const content = await ai.vision({
+        system: VISION_PROMPT,
+        user: 'Identify the food(s) in this image and return the JSON as instructed.',
+        imageBase64: base64,
+        mimeType,
+      });
 
     let aiResponse: AIResponse;
     try {
@@ -303,22 +314,7 @@ export async function POST(request: Request) {
     // Load the ingredient nutrition master table once per request and build a
     // matcher that resolves raw AI ingredient names against it.
     const ingredientRows = await db.ingredient.findMany();
-    const matcher = new IngredientMatcher(
-      ingredientRows.map((r) => ({
-        id: r.id,
-        name: r.name,
-        isVeg: r.isVeg,
-        isVegan: r.isVegan,
-        containsAllergen: r.containsAllergen,
-        caloriesPer100g: r.caloriesPer100g,
-        proteinPer100g: r.proteinPer100g,
-        carbsPer100g: r.carbsPer100g,
-        fatPer100g: r.fatPer100g,
-        fiberPer100g: r.fiberPer100g,
-        sugarPer100g: r.sugarPer100g,
-        sodiumMgPer100g: r.sodiumMgPer100g,
-      }))
-    );
+    const matcher = new IngredientMatcher(ingredientRows);
 
     // Load known "new foods" for reuse lookup (skip rejected).
     const storedFoods = await db.unknownFoodSubmission.findMany({
@@ -514,7 +510,7 @@ export async function POST(request: Request) {
     }
 
     await logAiCall({
-      userId,
+      userId: userId ?? undefined,
       modelType: 'food-recognition',
       requestPayload: JSON.stringify({
         fileName: file.name,
@@ -525,7 +521,8 @@ export async function POST(request: Request) {
       latencyMs: Date.now() - startedAt,
     });
 
-    return created({ foods: results, tempImagePath });
+    return created({ foods: results, tempImagePath: tempImagePath ?? undefined });
+    });
   } catch (err) {
     console.error('Food recognize error:', err);
     await logAiCall({
@@ -536,6 +533,13 @@ export async function POST(request: Request) {
       latencyMs: Date.now() - startedAt,
     });
     const msg = err instanceof Error ? err.message : 'Recognition failed';
+    if ((err as { code?: string })?.code === 'AI_BUSY' || msg.includes('currently busy')) {
+      return error(
+        'Food recognition is temporarily unavailable as the AI server is at capacity. Please try again in a few moments.',
+        503,
+        'AI_BUSY'
+      );
+    }
     if (msg.includes('format') || msg.includes('解析')) {
       return error('Failed to process image. Please try a different format (JPG, PNG, or WebP).');
     }
