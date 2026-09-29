@@ -3,23 +3,26 @@
 import { useEffect, useRef, useState } from 'react';
 import { Mic, RotateCcw, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-
-type Recognition = { continuous: boolean; interimResults: boolean; lang: string; start: () => void; stop: () => void; onresult: ((event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null; onend: (() => void) | null; onstart: (() => void) | null; onspeechstart: (() => void) | null; onnomatch: (() => void) | null; onerror: ((event: { error: string }) => void) | null };
-declare global { interface Window { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition } }
+import { transcribeBlob, type WhisperProgress } from '@/lib/voice/local-whisper';
 
 const MAX_LISTENING_MS = 10_000;
 const SILENCE_GRACE_MS = 5_000;
+const LOCAL_SPEECH_RMS = 0.02;
 
 export function VoiceFoodLog({ onTranscript }: { onTranscript: (text: string) => void }) {
-  const recognition = useRef<Recognition | null>(null);
   const transcriptRef = useRef('');
   const keepListening = useRef(false);
-  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const graceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSpeechTime = useRef(0);
-  const startedAt = useRef(0);
+  const mediaRecorder = useRef<MediaRecorder | null>(null);
+  const recordedChunks = useRef<Blob[]>([]);
+  const audioStream = useRef<MediaStream | null>(null);
+  const audioContext = useRef<AudioContext | null>(null);
+  const analyserTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const localSpeechStarted = useRef(false);
+
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [message, setMessage] = useState('Tap the microphone and describe what you ate.');
@@ -27,22 +30,88 @@ export function VoiceFoodLog({ onTranscript }: { onTranscript: (text: string) =>
   const [speechDetected, setSpeechDetected] = useState(false);
   const [graceActive, setGraceActive] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [transcribing, setTranscribing] = useState(false);
 
   const clearTimers = () => {
-    if (retryTimer.current) clearTimeout(retryTimer.current);
     if (graceTimer.current) clearTimeout(graceTimer.current);
     if (maxTimer.current) clearTimeout(maxTimer.current);
     if (countdownInterval.current) clearInterval(countdownInterval.current);
-    retryTimer.current = null;
     graceTimer.current = null;
     maxTimer.current = null;
     countdownInterval.current = null;
   };
 
-  useEffect(() => () => {
-    keepListening.current = false;
-    clearTimers();
-    try { recognition.current?.stop(); } catch { /* noop */ }
+  // Releases every local-capture resource. Audio lives only in memory.
+  function teardownLocalAudio() {
+    if (analyserTimer.current) { clearInterval(analyserTimer.current); analyserTimer.current = null; }
+    const stream = audioStream.current;
+    audioStream.current = null;
+    if (stream) stream.getTracks().forEach((track) => track.stop());
+    const context = audioContext.current;
+    audioContext.current = null;
+    if (context) { try { void context.close(); } catch { /* noop */ } }
+    mediaRecorder.current = null;
+    recordedChunks.current = [];
+  }
+
+  function stopRecorderAndGetBlob(): Promise<Blob | null> {
+    const recorder = mediaRecorder.current;
+    if (!recorder || recorder.state === 'inactive') return Promise.resolve(null);
+    return new Promise((resolve) => {
+      recorder.addEventListener('stop', () => {
+        const chunks = recordedChunks.current;
+        resolve(chunks.length ? new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }) : null);
+      }, { once: true });
+      try { recorder.stop(); } catch { resolve(null); }
+    });
+  }
+
+  async function finishLocal(reason: 'grace' | 'max' | 'manual') {
+    if (analyserTimer.current) { clearInterval(analyserTimer.current); analyserTimer.current = null; }
+    const blob = await stopRecorderAndGetBlob();
+    teardownLocalAudio();
+    if (!blob || blob.size === 0) {
+      setMessage('No speech was captured. Tap Start to try again.');
+      return;
+    }
+    setTranscribing(true);
+    setMessage('Transcribing on-device…');
+    try {
+      const text = (await transcribeBlob(blob, (info: WhisperProgress) => {
+        if (info.status === 'progress' && typeof info.progress === 'number') {
+          setMessage(`Preparing on-device speech model… ${Math.round(info.progress * 100)}%`);
+        } else if (info.status === 'initiate' || info.status === 'download') {
+          setMessage('Preparing on-device speech model…');
+        }
+      })).trim();
+      if (text) {
+        transcriptRef.current = text;
+        setTranscript(text);
+        setMessage(reason === 'max'
+          ? 'Maximum listening time reached — parsing meal...'
+          : reason === 'grace'
+            ? 'Listening complete — parsing meal...'
+            : 'Recording stopped — parsing meal...');
+        onTranscript(text);
+      } else {
+        setMessage('No speech was captured. Tap Start to try again.');
+      }
+    } catch (cause) {
+      console.error('[VOICE] on-device transcription failed', cause);
+      setMessage('On-device transcription failed. Please retry.');
+    } finally {
+      setTranscribing(false);
+    }
+  }
+
+  useEffect(() => {
+    console.info('[VOICE] mounted');
+    return () => {
+      console.info('[VOICE] unmounting — keepListening=false, stopping capture');
+      keepListening.current = false;
+      clearTimers();
+      teardownLocalAudio();
+    };
   }, []);
 
   // Single exit path. Idempotent — only the first caller wins.
@@ -53,18 +122,7 @@ export function VoiceFoodLog({ onTranscript }: { onTranscript: (text: string) =>
     setListening(false);
     setGraceActive(false);
     setCountdown(null);
-    try { recognition.current?.stop(); } catch { /* noop */ }
-    const text = transcriptRef.current.trim();
-    if (text) {
-      setMessage(reason === 'max'
-        ? 'Maximum listening time reached — parsing meal...'
-        : reason === 'grace'
-          ? 'Listening complete — parsing meal...'
-          : 'Recording stopped — parsing meal...');
-      onTranscript(text);
-    } else {
-      setMessage('No speech was captured. Tap Start to try again.');
-    }
+    void finishLocal(reason);
   }
 
   // Restart the 5s silence window from the latest speech. If it fires, finish.
@@ -81,83 +139,81 @@ export function VoiceFoodLog({ onTranscript }: { onTranscript: (text: string) =>
     }, 500);
   };
 
-  const makeRecognition = () => {
-    const Constructor = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Constructor) return null;
-    const speech = new Constructor();
-    recognition.current = speech;
-    speech.continuous = true; speech.interimResults = true; speech.lang = 'en-IN';
-    speech.onstart = () => { if (keepListening.current) { setListening(true); setMessage('Listening...'); } };
-    speech.onspeechstart = () => { setSpeechDetected(true); setMessage('Speech detected — converting to text...'); resetGrace(); };
-    speech.onresult = (event) => {
-      let value = '';
-      for (let i = 0; i < event.results.length; i += 1) value += event.results[i][0].transcript;
-      const text = value.trim();
-      transcriptRef.current = text;
-      setTranscript(text);
-      if (text) {
-        setSpeechDetected(true);
-        setMessage('Speech detected — text receiving...');
-        resetGrace();
-      }
-    };
-    speech.onerror = (event) => {
-      const fatal = ['not-allowed', 'service-not-allowed', 'network', 'audio-capture'].includes(event.error);
-      if (fatal) {
-        keepListening.current = false;
-        clearTimers();
-        setListening(false);
-        setGraceActive(false);
-        setCountdown(null);
-      }
-      const errors: Record<string, string> = { 'not-allowed': 'Speech recognition permission was denied. Allow Microphone access and retry.', 'no-speech': 'No speech detected yet — still listening...', network: 'Browser speech recognition is unavailable. Check your internet connection or try Chrome.', 'audio-capture': 'The browser could not capture audio. Check that another app is not using the microphone.' };
-      setMessage(errors[event.error] || `Speech recognition paused (${event.error}).`);
-    };
-    speech.onnomatch = () => setMessage('Speech was heard but not understood. Keep listening or try a quieter place.');
-    speech.onend = () => {
-      if (!keepListening.current) { setListening(false); return; }
-      // A browser ending a session is NOT the user finishing. Only finish when
-      // our own grace/max timers say so; otherwise recreate and keep listening.
-      if (Date.now() - startedAt.current >= MAX_LISTENING_MS) { finish('max'); return; }
-      setMessage('Waiting for speech...');
-      retryTimer.current = setTimeout(() => { if (keepListening.current) { const next = makeRecognition(); try { next?.start(); } catch { /* next end will retry */ } } }, 250);
-    };
-    return speech;
-  };
-
   const start = async () => {
-    if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) { setMessage('Speech recognition is not supported here. Try the latest Chrome or use text log.'); return; }
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) throw new Error('unsupported');
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach((track) => track.stop());
-      setMicrophoneChecked(true);
-    } catch (cause) {
-      setMicrophoneChecked(false);
-      setMessage(cause instanceof DOMException && cause.name === 'NotAllowedError' ? 'Microphone permission was denied. Allow Microphone access in your browser site settings, then retry.' : 'The microphone could not be opened. Check your microphone, permission, and that you are using HTTPS or localhost.');
-      return;
-    }
+    if (transcribing) return;
     clearTimers();
+    teardownLocalAudio();
     transcriptRef.current = '';
     setTranscript('');
     setSpeechDetected(false);
     setGraceActive(false);
     setCountdown(null);
+    localSpeechStarted.current = false;
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (cause) {
+      setMicrophoneChecked(false);
+      setListening(false);
+      setMessage(cause instanceof DOMException && cause.name === 'NotAllowedError'
+        ? 'Microphone permission was denied. Allow Microphone access in your browser site settings, then retry.'
+        : 'The microphone could not be opened for on-device transcription.');
+      return;
+    }
+    audioStream.current = stream;
+    const tracks = stream.getAudioTracks();
+    console.info('[VOICE] local mic track:', tracks.length
+      ? tracks.map((track) => `"${track.label}" (enabled=${track.enabled}, state=${track.readyState})`).join(', ')
+      : '(none)');
+    setMicrophoneChecked(true);
+
+    const chunks: Blob[] = [];
+    recordedChunks.current = chunks;
+    const recorder = new MediaRecorder(stream);
+    recorder.ondataavailable = (event) => { if (event.data && event.data.size > 0) chunks.push(event.data); };
+    recorder.start();
+    mediaRecorder.current = recorder;
+
+    const Ctor = window.AudioContext
+      ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (Ctor) {
+      try {
+        const context = new Ctor();
+        audioContext.current = context;
+        const source = context.createMediaStreamSource(stream);
+        const analyser = context.createAnalyser();
+        analyser.fftSize = 2048;
+        source.connect(analyser);
+        const data = new Uint8Array(analyser.fftSize);
+        analyserTimer.current = setInterval(() => {
+          analyser.getByteTimeDomainData(data);
+          let sum = 0;
+          for (let i = 0; i < data.length; i += 1) { const v = (data[i] - 128) / 128; sum += v * v; }
+          const rms = Math.sqrt(sum / data.length);
+          if (rms > LOCAL_SPEECH_RMS) {
+            if (!localSpeechStarted.current) { localSpeechStarted.current = true; setSpeechDetected(true); }
+            resetGrace();
+          }
+        }, 100);
+      } catch (cause) {
+        console.warn('[VOICE] analyser unavailable; using max-time capture only', cause);
+      }
+    }
+
     keepListening.current = true;
     setListening(true);
-    startedAt.current = Date.now();
     maxTimer.current = setTimeout(() => finish('max'), MAX_LISTENING_MS);
-    setMessage('Listening...');
-    try { makeRecognition()?.start(); } catch { setMessage('Could not start speech recognition. Please retry.'); keepListening.current = false; setListening(false); }
+    setMessage('Listening with on-device Whisper...');
   };
 
   const reset = () => {
     keepListening.current = false;
     clearTimers();
+    teardownLocalAudio();
     setListening(false);
     setGraceActive(false);
     setCountdown(null);
-    try { recognition.current?.stop(); } catch { /* noop */ }
+    setTranscribing(false);
     transcriptRef.current = '';
     setTranscript('');
     setSpeechDetected(false);
@@ -189,13 +245,14 @@ export function VoiceFoodLog({ onTranscript }: { onTranscript: (text: string) =>
         <span className={chip(microphoneChecked)}>Mic access: {microphoneChecked ? 'confirmed' : 'not checked'}</span>
         <span className={chip(speechDetected)}>Speech: {speechDetected ? 'detected' : 'waiting'}</span>
         <span className={chip(!!transcript)}>Text: {transcript ? 'received' : 'waiting'}</span>
+        <span className="rounded-full px-2 py-1 bg-emerald-100 text-emerald-700">Engine: on-device Whisper</span>
       </div>
       <div className="flex gap-2">
         {listening
           ? <Button type="button" onClick={() => finish('manual')} className="flex-1 bg-red-500 hover:bg-red-600"><Square className="mr-2 h-4 w-4" />Stop</Button>
-          : <Button type="button" onClick={start} className="flex-1 bg-emerald-600 hover:bg-emerald-700"><Mic className="mr-2 h-4 w-4" />Start listening</Button>}
-        <Button type="button" variant="outline" onClick={reset} aria-label="Retry voice log"><RotateCcw className="h-4 w-4" /></Button>
-        <Button type="button" disabled={!transcript.trim() || listening} onClick={() => onTranscript(transcript.trim())}>Done</Button>
+          : <Button type="button" disabled={transcribing} onClick={start} className="flex-1 bg-emerald-600 hover:bg-emerald-700"><Mic className="mr-2 h-4 w-4" />{transcribing ? 'Transcribing…' : 'Start listening'}</Button>}
+        <Button type="button" variant="outline" disabled={transcribing} onClick={reset} aria-label="Retry voice log"><RotateCcw className="h-4 w-4" /></Button>
+        <Button type="button" disabled={!transcript.trim() || listening || transcribing} onClick={() => onTranscript(transcript.trim())}>Done</Button>
       </div>
     </div>
   );

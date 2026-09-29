@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "NutriAI API - SwappFit Integration Service",
-    "description": "Production-ready OpenAPI 3.0 REST API specification for NutriAI microservice backend integrated with SwappFit.",
+    "description": "Production-ready OpenAPI 3.0 REST API specification for NutriAI microservice backend integrated with SwappFit.\n\n## Rate limits and AI protection\n\nNutriAI fronts its AI provider with two shared controls that are already enforced: a per-user rate limiter and a single global concurrency and queue controller. This section documents the behaviour a client can actually observe.\n\n### Rate limits\n\nEach limit is a sliding 60-second window keyed on the authenticated user id. The window is held in process memory, so it applies per running instance and resets when the service restarts.\n\n| Endpoint | Limit per 60 s | Behaviour when the limit is reached |\n| --- | --- | --- |\n| POST /api/food-recognize | 10 | `429` with code `RATE_LIMIT_EXCEEDED` |\n| POST /api/voice-log/parse | 15 | `429` with code `RATE_LIMIT_EXCEEDED` |\n| POST /api/chat | 25 | `200` with a generic holding reply. No error is returned |\n| GET /api/recommendations | 20 | `200` computed by deterministic scoring instead of the AI. No error is returned |\n\nLimits are counted per user session, not per IP address. No `X-RateLimit-*` or `Retry-After` headers are sent, so a throttled client must detect the condition from the status code or the response body.\n\n### Concurrency and queueing\n\nEvery AI request passes through one global controller, so a slow request on any AI route holds a slot against all other AI routes.\n\n| Setting | Default | Environment variable |\n| --- | --- | --- |\n| Concurrent AI requests | 2 | `AI_MAX_CONCURRENCY` |\n| Queued AI requests | 10 | `AI_MAX_QUEUE_SIZE` |\n\nOnce the queue is full, further AI work is rejected with the internal code `AI_BUSY`. Clients observe this as `503` on POST /api/food-recognize and as `504` with code `AI_TIMEOUT` on the meal-plan generation endpoints. A provider timeout and a full queue raise the same code, so a `504` does not distinguish between them. Live telemetry for this controller is available from GET /api/v1/internal/ai-health.\n\n### Timeouts\n\nAI requests are aborted after a fixed timeout: 15 seconds for food recognition and 10 seconds for recommendations. There is no automatic retry, no backoff, and no circuit breaker, so a timeout is reported to the caller rather than retried.\n\n### Automatic fallbacks\n\nSome routes degrade to a non-AI result and still return `200`, so a caller cannot tell a fallback from a live AI result except where noted.\n\n| Endpoint | Fallback |\n| --- | --- |\n| POST /api/voice-log/parse | Offline text parser. The response shape is unchanged and `data.parser` is `fallback` instead of `ai` |\n| GET /api/recommendations | Deterministic scoring against the meal database |\n| GET /api/nutrition/hydration-analysis | Rule-based hydration message |\n| POST /api/chat | Static holding reply |",
     "version": "1.0.0",
     "contact": {
       "name": "NutriAI Engineering",
@@ -20,6 +20,7 @@
     { "name": "Nutrition", "description": "User profile, onboarding, physical metrics, fitness goals, and daily calorie/macronutrient budgets" },
     { "name": "Meals", "description": "AI meal recommendations, dynamic meal plan generation, ingredient & dish master database search" },
     { "name": "Food Recognition", "description": "AI photo food recognition, vision detection, portion estimation, and custom food submission" },
+    { "name": "Voice", "description": "Text-based meal logging. Converts a spoken meal description (text transcript) into structured food candidates. Speech-to-text runs on-device in the client; audio is never uploaded." },
     { "name": "Chat", "description": "NutriAI conversational assistant & contextual meal suggestions" },
     { "name": "Food Log", "description": "Daily food logging, history retrieval, quick macro logging, and item deletion" },
     { "name": "Hydration", "description": "Water logging and daily hydration tracking" },
@@ -460,6 +461,14 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "The AI provider timed out, or the shared AI queue was already full. No plan was generated; retry after a short delay.",
+            "content": {
+              "application/json": {
+                "example": { "success": false, "error": "AI provider failed to generate full day plan in time.", "code": "AI_TIMEOUT" }
+              }
+            }
           }
         }
       }
@@ -502,7 +511,7 @@
       "post": {
         "tags": ["Food Recognition"],
         "summary": "Recognize food from uploaded photo",
-        "description": "Performs strict food presence pre-validation and runs Gemma Vision AI model + 3-tier ingredient/meal DB matching.",
+        "description": "Performs strict food presence pre-validation and runs Gemma Vision AI model + 3-tier ingredient/meal DB matching. In-flight requests are deduplicated per user using SHA-256 payload hashing (idempotency key: food-recognize:<userId>:<hash>).",
         "requestBody": {
           "required": true,
           "content": {
@@ -546,7 +555,23 @@
               }
             }
           },
-          "422": { "description": "No valid food item detected in image" }
+          "422": { "description": "No valid food item detected in image" },
+          "429": {
+            "description": "Rate limit exceeded: 10 requests per 60 seconds per user. The limit is evaluated before the upload is read, so a throttled request also consumes quota.",
+            "content": {
+              "application/json": {
+                "example": { "success": false, "error": "Too many food recognition requests. Please wait a minute before trying again.", "code": "RATE_LIMIT_EXCEEDED" }
+              }
+            }
+          },
+          "503": {
+            "description": "The shared AI queue was already full, so recognition could not start (AI_BUSY). Nothing was recognised and nothing was logged; retry after a short delay.",
+            "content": {
+              "application/json": {
+                "example": { "success": false, "error": "Food recognition is temporarily unavailable as the AI server is at capacity. Please try again in a few moments.", "code": "AI_BUSY" }
+              }
+            }
+          }
         }
       }
     },
@@ -554,11 +579,24 @@
       "post": {
         "tags": ["Food Recognition"],
         "summary": "Confirm recognized portion & log to slot",
+        "description": "Resolves confirmed food portion into scaled nutrition. If food is in master DB, scales DB values; if custom/unknown, composes nutrition from ingredients. Returns mealId and final nutrition for POST /api/food-logs.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "example": { "mealId": "meal_789", "servingGms": 250, "mealSlot": "lunch" }
+              "schema": { "$ref": "#/components/schemas/FoodConfirmRequest" },
+              "example": {
+                "name": "Puttu kadala",
+                "portionType": "portion",
+                "portionValue": 300,
+                "unit": "g",
+                "totalGrams": 300,
+                "ingredients": [
+                  { "name": "Rice flour", "grams": 120 },
+                  { "name": "Black gram", "grams": 60 },
+                  { "name": "Chickpeas", "grams": 90 }
+                ]
+              }
             }
           }
         },
@@ -611,6 +649,71 @@
         "tags": ["Food Recognition"],
         "summary": "Fetch pending unknown food submissions",
         "responses": { "200": { "description": "Pending unknown food items" } }
+      }
+    },
+    "/api/voice-log/parse": {
+      "post": {
+        "tags": ["Voice"],
+        "summary": "Parse a voice meal transcript into food candidates",
+        "description": "Accepts a text transcript from a voice meal input and converts it into structured meal/food candidates.\n\n### Text, not audio\n\n**POST /api/voice-log/parse accepts text, not audio.** The request body is JSON with a single `text` field. There is no audio upload, no `multipart/form-data`, and no transcription field. Speech-to-text is entirely the caller's responsibility. Local Whisper (Transformers.js) is a client-side implementation choice inside the SwappFit app, not a NutriAI API, and is not part of this specification.\n\nThe endpoint uses the same food-resolution and nutrition system as photo-based food recognition. It returns candidates only — nothing is logged until you call POST /api/food-recognize/confirm followed by POST /api/food-logs.\n\nText is interpreted as spoken language and is expected to tolerate ASR errors (e.g. \"italy and amber for breakfast\" is resolved to idli + sambar). Foods are never invented: only foods present in the text are returned. Max 8 items per request.\n\nAuthentication uses the same user session as the rest of the API (bearer session token or `session` cookie), not a service token.\n\n### Limits and protections\n\n| Protection | Limit |\n| --- | --- |\n| Rate limit | 15 requests / 60 s per user |\n| Transcript length | 1,000 characters |\n| Items per request | 8 |\n| Food matching | Exact name or alias match only — the engine never substitutes a different database dish for the food you stated |\n\nChecks run in this order, so a rate-limited caller receives `429` even when the body is also invalid: `401` session, then `429` rate limit, then `400` body.\n\n### SwappFit Voice Meal Integration\n\nVoice logging is split between two parties: SwappFit owns the audio, NutriAI owns food understanding.\n\n| Step | Owner | Detail |\n| --- | --- | --- |\n| Microphone capture | SwappFit | Audio never reaches NutriAI and is never stored |\n| Speech-to-text | SwappFit | Any STT provider; NutriAI does not verify the origin of the text |\n| Transcript delivery | SwappFit to NutriAI | POST /api/voice-log/parse with a JSON `text` field |\n| Food understanding and ASR-error correction | NutriAI | Gemma 3 4B recovers the food the user intended |\n| Food resolution and DB nutrition match | NutriAI | Nutrition DB match, then stored custom food, then ingredient composition, then AI recipe-ingredient fallback |\n| Portion confirmation | User, in the SwappFit UI | Candidates are returned; nothing is logged yet |\n| Logging | SwappFit to NutriAI | POST /api/food-recognize/confirm, then POST /api/food-logs |\n\nNutriAI does not let AI generate nutrition numbers. When a food is not in the database, the AI extracts the recipe ingredients, then NutriAI composes the nutrition values from its own Ingredient table.\n\n#### Flow: request, response, confirmation, logging\n\n| Step | Call | Purpose |\n| --- | --- | --- |\n| 1 | POST /api/voice-log/parse | Send the transcript, receive food candidates |\n| 2 | none | The user confirms the food and the portion |\n| 3 | POST /api/food-recognize/confirm | Resolve the portion and compute final nutrition |\n| 4 | POST /api/food-logs | Log the item to the meal slot |\n\n#### Worked example\n\nTranscript: `I ate puttu kadala for breakfast`.\n\n**1. Request**\n\n```json\n{ \"text\": \"I ate puttu kadala for breakfast\" }\n```\n\n**2. Response (abbreviated)**\n\n`data.draft` reports `mealType: \"breakfast\"`, the hint for which meal slot to pre-select. One food candidate is returned with `portionType: \"portion\"`, `portionOptions` of Small 150 g, Medium 225 g, Full 300 g (default) and More, `nutritionSource: \"extracted\"`, `estimatedNutrition` populated, and `matched: false` with `mealId: null` because the dish is not in the database. Nothing has been logged yet.\n\n**3. Confirmation (the user picked Full Plate)**\n\n```json\nPOST /api/food-recognize/confirm\n{ \"name\": \"Puttu kadala\", \"portionType\": \"portion\", \"totalGrams\": 300, \"portionValue\": 300, \"unit\": \"g\", \"ingredients\": [{ \"name\": \"Rice flour\", \"grams\": 120 }, { \"name\": \"Black gram\", \"grams\": 60 }, { \"name\": \"Chickpeas\", \"grams\": 90 }] }\n```\n\nThe response contains `grams: 300`, the final `nutrition` block, and a `mealId`. A meal row is created so the same dish is recognised next time.\n\n**4. Logging**\n\n```json\nPOST /api/food-logs\n{ \"mealId\": \"meal_abc123\", \"servingGms\": 300, \"mealSlot\": \"breakfast\", \"source\": \"voice\" }\n```\n\n#### Two logging branches\n\nPOST /api/food-logs takes a different body depending on what the confirmation returned.\n\nWhen the confirm response contains a `mealId` (a Nutrition DB meal, or a meal created during confirmation), NutriAI scales the stored nutrition for you:\n\n```json\n{ \"mealId\": \"meal_abc123\", \"servingGms\": 300, \"mealSlot\": \"breakfast\", \"source\": \"voice\" }\n```\n\nWhen the confirm response has `mealId: null` (nutrition was reused from a stored unknown-food submission), you must send the nutrition values inline:\n\n```json\n{ \"name\": \"Puttu kadala\", \"servingGms\": 300, \"calories\": 320, \"proteinG\": 9.4, \"carbsG\": 48.2, \"fatG\": 8.1, \"fiberG\": 6.5, \"sugarG\": 1.2, \"sodiumMg\": 520, \"mealSlot\": \"breakfast\", \"source\": \"voice\" }\n```\n\n### Shared resolution\n\nPhoto and voice call the same food-resolution engine: Nutrition DB match, stored custom-food reuse, ingredient composition, AI recipe-ingredient fallback, followed by portion options and scaled nutrition. Confirmation (POST /api/food-recognize/confirm) and logging (POST /api/food-logs with `source: \"voice\"`) are also shared with photo. Only the input stage differs.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/VoiceParseRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transcript parsed into structured food candidates (nothing is logged)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VoiceParseResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Transcript missing, blank, or longer than 1,000 characters",
+            "content": {
+              "application/json": {
+                "example": { "success": false, "error": "Please provide a meal description under 1,000 characters." }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid user session (missing or invalid bearer token, or missing session cookie)",
+            "content": {
+              "application/json": {
+                "example": { "success": false, "error": "Not authenticated", "code": "AUTH_010" }
+              }
+            }
+          },
+          "422": {
+            "description": "No foods were found in the description",
+            "content": {
+              "application/json": {
+                "example": { "success": false, "error": "No foods were found in that description." }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (15 requests per 60 seconds per user)",
+            "content": {
+              "application/json": {
+                "example": { "success": false, "error": "Too many voice requests. Please try again shortly.", "code": "RATE_LIMIT_EXCEEDED" }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error",
+            "content": {
+              "application/json": {
+                "example": { "success": false, "error": "Unable to process your meal description. Please try again.", "code": "SYS_001" }
+              }
+            }
+          }
+        }
       }
     },
     "/api/chat": {
@@ -1170,7 +1273,79 @@
             }
           },
           "400": { "$ref": "#/components/responses/BadRequest" },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "504": {
+            "description": "The AI provider timed out, or the shared AI queue was already full. No plan days were committed; retry after a short delay.",
+            "content": {
+              "application/json": {
+                "example": { "success": false, "error": "AI provider failed to generate multi-day plan in time.", "code": "AI_TIMEOUT" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/internal/ai-health": {
+      "get": {
+        "tags": ["Internal"],
+        "summary": "AI concurrency telemetry, recent AI call metrics, and manual cleanup",
+        "description": "Returns live telemetry for the global AI concurrency and queue controller, plus aggregate metrics from the AI call log. Two optional query parameters mutate server state: `setConcurrency` changes the process-wide concurrency ceiling and `cleanup` deletes stale temporary uploads, so this endpoint should only be called by operators.\n\nAuthentication: this endpoint uses a **user session** (bearer session token or `session` cookie), not the service token used by the other `/api/v1/internal/` routes. It inherits the API-wide security requirement.\n\nThe `status` field is a fixed literal and does not reflect live AI provider reachability; use `metrics` and `concurrency` for actual conditions.",
+        "parameters": [
+          {
+            "name": "setConcurrency",
+            "in": "query",
+            "required": false,
+            "description": "Sets the process-wide maximum number of concurrent AI requests. Values outside 1-10 are ignored and leave the current setting unchanged.",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 10, "default": 2 },
+            "example": 4
+          },
+          {
+            "name": "cleanup",
+            "in": "query",
+            "required": false,
+            "description": "When `true`, deletes stale temporary upload files and returns the outcome in `data.cleanupResult`. Otherwise this field is null.",
+            "schema": { "type": "string", "enum": ["true"] },
+            "example": "true"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Concurrency telemetry, recent AI call metrics, and optional cleanup result",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": {
+                    "status": "healthy",
+                    "timestamp": "2026-09-29T09:14:22.031Z",
+                    "concurrency": { "activeInferences": 1, "queueLength": 0, "maxConcurrency": 2, "maxQueueSize": 10 },
+                    "metrics": { "requestsLastHour": 47, "avgLatencyMs": 1834 },
+                    "cleanupResult": null,
+                    "recentLogs": [
+                      { "id": "log_9f2", "modelType": "food-recognition", "latencyMs": 2210, "createdAt": "2026-09-29T09:13:58.402Z" },
+                      { "id": "log_9f1", "modelType": "chat", "latencyMs": 980, "createdAt": "2026-09-29T09:12:40.115Z" }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid user session (missing or invalid bearer token, or missing session cookie)",
+            "content": {
+              "application/json": {
+                "example": { "success": false, "error": "Unauthorized" }
+              }
+            }
+          },
+          "500": {
+            "description": "Telemetry could not be retrieved",
+            "content": {
+              "application/json": {
+                "example": { "success": false, "error": "Failed to retrieve AI health telemetry" }
+              }
+            }
+          }
         }
       }
     },
@@ -1350,6 +1525,239 @@
           "cuisines": { "type": "string", "nullable": true },
           "avoidedFoods": { "type": "string", "nullable": true },
           "otherInfo": { "type": "string", "nullable": true }
+        }
+      },
+      "FoodConfirmRequest": {
+        "type": "object",
+        "description": "Payload to confirm a food portion and resolve scaled nutrition prior to logging.",
+        "required": ["name", "portionType", "portionValue", "unit"],
+        "properties": {
+          "name": { "type": "string", "description": "Confirmed plain food name.", "example": "Puttu kadala" },
+          "portionType": { "type": "string", "enum": ["piece", "portion", "bowl", "drink", "weight"], "description": "Portion measurement type.", "example": "portion" },
+          "portionValue": { "type": "number", "minimum": 0.1, "description": "The amount in the specified unit.", "example": 300 },
+          "unit": { "type": "string", "enum": ["g", "pc", "ml"], "description": "Unit of measurement.", "example": "g" },
+          "mealId": { "type": "string", "nullable": true, "description": "Database meal ID if matched to master DB.", "example": "meal_789" },
+          "newFoodId": { "type": "string", "nullable": true, "description": "Stored unknown food ID if reusing previous custom submission." },
+          "tempImagePath": { "type": "string", "nullable": true, "description": "Temporary upload path returned by photo recognition to persist image." },
+          "ingredients": {
+            "type": "array",
+            "description": "Recipe ingredients list used for local nutrition composition when food is not in master DB.",
+            "items": {
+              "type": "object",
+              "required": ["name", "grams"],
+              "properties": {
+                "name": { "type": "string", "example": "Rice flour" },
+                "grams": { "type": "number", "example": 120 }
+              }
+            }
+          },
+          "gramsPerPiece": { "type": "number", "nullable": true, "description": "Weight per piece in grams (required when unit is 'pc')." },
+          "totalGrams": { "type": "number", "nullable": true, "description": "Total weight in grams." },
+          "mealType": { "type": "string", "nullable": true, "description": "Optional meal slot classification hint." },
+          "cuisine": { "type": "string", "nullable": true, "description": "Optional cuisine category." },
+          "servingDescription": { "type": "string", "nullable": true, "description": "Optional original serving description." }
+        }
+      },
+      "VoiceParseRequest": {
+        "type": "object",
+        "description": "A text transcript produced by the caller's own speech-to-text step. The origin of the text is not verified: typed input, a third-party STT provider, or a transcribed webhook are all accepted equally.",
+        "required": ["text"],
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "Plain-text meal description, e.g. the output of a speech-to-text step. This endpoint accepts text only and never accepts audio.",
+            "example": "I ate puttu kadala for breakfast"
+          }
+        }
+      },
+      "VoiceParseResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": { "type": "boolean", "example": true },
+          "data": {
+            "type": "object",
+            "required": ["draft", "foods", "parser"],
+            "properties": {
+              "draft": { "$ref": "#/components/schemas/MealLogDraft" },
+              "foods": {
+                "type": "array",
+                "description": "Resolved food candidates ready for portion confirmation. Never empty: a transcript with no recognisable food returns 422 instead.",
+                "items": { "$ref": "#/components/schemas/RecognizedFood" }
+              },
+              "parser": {
+                "type": "string",
+                "enum": ["ai", "fallback"],
+                "description": "Which food-understanding step produced the draft. 'ai' = the Gemma recognition model. 'fallback' = the conservative offline text parser used when the AI server is unreachable. Both feed the identical shared food-resolution engine, so the resulting candidates are comparable."
+              }
+            }
+          }
+        }
+      },
+      "MealLogDraft": {
+        "type": "object",
+        "description": "Input-neutral handoff from the food-understanding step to the portion-confirmation step. Returned for display and slot pre-selection; the authoritative resolution is in the parallel foods array.",
+        "required": ["source", "items"],
+        "properties": {
+          "source": { "type": "string", "enum": ["photo", "voice", "text"] },
+          "mealType": {
+            "type": "string",
+            "enum": ["breakfast", "lunch", "dinner", "snack"],
+            "description": "The meal slot the user actually mentioned. Omitted when no slot was spoken; the client chooses a default."
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "required": ["foodName", "quantity", "unit", "portionSpecified"],
+              "properties": {
+                "foodName": {
+                  "type": "string",
+                  "description": "The corrected, plain food name, after ASR error correction. No adjectives, no sauces, and no embedded counts.",
+                  "example": "puttu kadala"
+                },
+                "quantity": { "type": "number", "nullable": true, "description": "The stated amount, or null when none was spoken." },
+                "unit": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "The stated unit, lowercased. Typical values: piece, bowl, glass, plate, cup, serving, grams, ml.",
+                  "example": "bowl"
+                },
+                "portionSpecified": { "type": "boolean", "description": "True only when the user actually stated an amount or portion." },
+                "confidence": { "type": "number", "minimum": 0, "maximum": 1, "description": "Confidence in the interpreted food name after ASR error correction. Higher means more certain." },
+                "portionType": {
+                  "type": "string",
+                  "nullable": true,
+                  "enum": ["piece", "glass", "plate", "bowl", "grams", "ml"],
+                  "description": "The food's natural portion unit, chosen from food knowledge independently of whether an amount was spoken. Null lets the shared classifier decide."
+                }
+              }
+            }
+          }
+        }
+      },
+      "RecognizedFood": {
+        "type": "object",
+        "description": "One resolved food candidate. Returned identically by photo recognition (POST /api/food-recognize) and voice parsing (POST /api/voice-log/parse); the two inputs differ only in the stage that produced the food.",
+        "required": ["name", "servingDescription", "portionType", "estimatedGrams", "estimatedMl", "estimatedPieces", "gramsPerPiece", "totalGrams", "confidence", "needsConfirmation", "variants", "nutritionSource", "portionOptions", "estimatedNutrition", "ingredients", "matched", "unknown_food", "meal", "mealId", "newFoodId"],
+        "properties": {
+          "name": { "type": "string", "description": "The food's plain name as understood, after ASR correction where applicable.", "example": "Puttu kadala" },
+          "servingDescription": { "type": "string", "description": "How the amount was served, e.g. '2 pc'. Empty when the user stated no amount." },
+          "portionType": { "type": "string", "enum": ["piece", "portion", "bowl", "drink", "weight"], "description": "How this food is naturally measured." },
+          "estimatedGrams": { "type": "number", "nullable": true, "description": "Estimated weight in grams. Null for drink-portion foods; see estimatedMl." },
+          "estimatedMl": { "type": "number", "nullable": true, "description": "Estimated volume in millilitres. Set only for drink-portion foods." },
+          "estimatedPieces": { "type": "number", "nullable": true, "description": "Estimated count. Set only for piece-portion foods." },
+          "gramsPerPiece": { "type": "number", "nullable": true, "description": "Weight of a single piece. Set only for piece-portion foods." },
+          "totalGrams": { "type": "number", "description": "The grams the estimates resolve to, and the basis used for scaling nutrition." },
+          "confidence": { "type": "number", "description": "0-1 confidence in the food identity." },
+          "needsConfirmation": { "type": "boolean", "description": "True when the exact dish is ambiguous or confidence is low. Voice input always requires confirmation." },
+          "variants": {
+            "type": "array",
+            "description": "Plausible specific variants, offered when needsConfirmation is true. Always empty for voice input.",
+            "items": { "$ref": "#/components/schemas/RecognizedFoodVariant" }
+          },
+          "nutritionSource": {
+            "type": "string",
+            "enum": ["meal", "ingredients", "extracted", "stored"],
+            "description": "Where the nutrition came from. 'meal' = a Nutrition DB meal row. 'ingredients' = composed from the Ingredient table. 'extracted' = the AI extracted the recipe ingredients, which were then composed locally. 'stored' = reused from a previously submitted unknown food."
+          },
+          "portionOptions": {
+            "type": "array",
+            "description": "Portion choices to present for confirmation. Voice input uses natural units (glasses, plates, fixed gram levels) and marks the option matching the spoken amount as default; photo input uses the standard option set.",
+            "items": { "$ref": "#/components/schemas/PortionOption" }
+          },
+          "estimatedNutrition": {
+            "description": "Nutrition for the estimated portion, or null when no nutrition could be composed. The user can still confirm and enter it manually.",
+            "nullable": true,
+            "allOf": [{ "$ref": "#/components/schemas/ScaledNutrition" }]
+          },
+          "ingredients": {
+            "type": "array",
+            "description": "The ingredients used to compose nutrition, with per-ingredient match status.",
+            "items": { "$ref": "#/components/schemas/RecognizedIngredient" }
+          },
+          "matched": { "type": "boolean", "description": "True when the food resolved to a Nutrition DB meal." },
+          "unknown_food": { "type": "boolean", "description": "True when the food is not in the Nutrition DB." },
+          "meal": {
+            "description": "The matched Nutrition DB meal, or null when the food is unknown.",
+            "nullable": true,
+            "allOf": [{ "$ref": "#/components/schemas/MealSummary" }]
+          },
+          "mealId": { "type": "string", "nullable": true, "description": "Pass as mealId to POST /api/food-recognize/confirm to log against the DB meal." },
+          "newFoodId": { "type": "string", "nullable": true, "description": "Set when nutrition was reused from a stored unknown-food submission. Pass as newFoodId to POST /api/food-recognize/confirm." }
+        }
+      },
+      "RecognizedFoodVariant": {
+        "type": "object",
+        "description": "A candidate specific dish offered when a food's identity is ambiguous.",
+        "required": ["name", "matched", "meal", "estimatedNutrition"],
+        "properties": {
+          "name": { "type": "string", "description": "The variant dish name.", "example": "Chicken Biryani" },
+          "matched": { "type": "boolean", "description": "True when this variant resolved to a Nutrition DB meal." },
+          "meal": {
+            "description": "The matched Nutrition DB meal for this variant, or null.",
+            "nullable": true,
+            "allOf": [{ "$ref": "#/components/schemas/MealSummary" }]
+          },
+          "estimatedNutrition": {
+            "description": "Nutrition for this variant at the resolved portion, or null.",
+            "nullable": true,
+            "allOf": [{ "$ref": "#/components/schemas/ScaledNutrition" }]
+          }
+        }
+      },
+      "RecognizedIngredient": {
+        "type": "object",
+        "description": "One ingredient considered when composing nutrition for a food.",
+        "required": ["name", "grams", "matched"],
+        "properties": {
+          "name": { "type": "string", "example": "Rice flour" },
+          "grams": { "type": "number", "description": "Weight of this ingredient in the resolved portion." },
+          "matched": { "type": "boolean", "description": "False when the ingredient was not found in the master Ingredient table. Unmatched entries do not contribute to the total." }
+        }
+      },
+      "PortionOption": {
+        "type": "object",
+        "description": "A portion choice presented for confirmation. Exactly one preset option carries default: true, and for voice input it is the option closest to the amount the user actually spoke.",
+        "required": ["label", "value", "unit", "kind"],
+        "properties": {
+          "label": { "type": "string", "description": "Display label shown to the user.", "example": "1 Glass" },
+          "value": { "type": "number", "description": "The amount in the given unit. Zero when kind is 'custom', meaning the user should enter their own amount." },
+          "unit": { "type": "string", "enum": ["g", "pc", "ml"] },
+          "kind": { "type": "string", "enum": ["preset", "custom"], "description": "'preset' = a selectable amount. 'custom' = the 'More' escape hatch where the user types an amount." },
+          "default": { "type": "boolean", "description": "The recommended option." }
+        }
+      },
+      "ScaledNutrition": {
+        "type": "object",
+        "description": "Nutrition for a resolved portion, scaled from per-100 g database values. NutriAI always computes these numbers itself; they are never generated by AI.",
+        "required": ["calories", "proteinG", "carbsG", "fatG", "fiberG", "sugarG", "sodiumMg", "calciumMg", "ironMg", "zincMg", "magnesiumMg", "cholesterolMg"],
+        "properties": {
+          "calories": { "type": "number", "example": 320 },
+          "proteinG": { "type": "number", "example": 9.4 },
+          "carbsG": { "type": "number", "example": 48.2 },
+          "fatG": { "type": "number", "example": 8.1 },
+          "fiberG": { "type": "number", "example": 6.5 },
+          "sugarG": { "type": "number", "example": 1.2 },
+          "sodiumMg": { "type": "number", "example": 520 },
+          "calciumMg": { "type": "number", "example": 65 },
+          "ironMg": { "type": "number", "example": 2.1 },
+          "zincMg": { "type": "number", "example": 1.4 },
+          "magnesiumMg": { "type": "number", "example": 48 },
+          "cholesterolMg": { "type": "number", "example": 0 }
+        }
+      },
+      "MealSummary": {
+        "type": "object",
+        "description": "The matched Nutrition DB meal. This is the full meal record and it carries additional properties; do not depend on any field beyond id and name.",
+        "additionalProperties": true,
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "type": "string", "description": "Pass as mealId to POST /api/food-recognize/confirm.", "example": "meal_abc123" },
+          "name": { "type": "string", "description": "The meal's display name.", "example": "Puttu Kadala" }
         }
       }
     },
